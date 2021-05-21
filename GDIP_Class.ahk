@@ -150,31 +150,31 @@ Class gdip
                         , "int"     , dh
                         , this.Ptr  , sDC
                         , "int"     , sx
-                        , "int"     , sy
+                        , "int"     , sy 
                         , "uint"    , Raster ? Raster : 0x00CC0020)
     }
     
     ;#####################################################################################
-    ; Method                  StretchBlt
-    ; Description            The StretchBlt function copies a bitmap from a source rectangle into a destination rectangle, 
-    ;                        stretching or compressing the bitmap to fit the dimensions of the destination rectangle, if necessary.
-    ;                        The system stretches or compresses the bitmap according to the stretching mode currently set in the destination device context.
+    ; Method            StretchBlt
+    ; Description       The StretchBlt function copies a bitmap from a source rectangle into a destination rectangle, 
+    ;                   stretching or compressing the bitmap to fit the dimensions of the destination rectangle, if necessary.
+    ;                   The system stretches or compresses the bitmap according to the stretching mode currently set in the destination device context.
     ;                                                                                                                   
-    ; ddc                    handle to destination DC
-    ; dx                    x-coord of destination upper-left corner
-    ; dy                    y-coord of destination upper-left corner
-    ; dw                    width of destination rectangle
-    ; dh                    height of destination rectangle
-    ; sdc                    handle to source DC
-    ; sx                    x-coordinate of source upper-left corner
-    ; sy                    y-coordinate of source upper-left corner
-    ; sw                    width of source rectangle
-    ; sh                    height of source rectangle
-    ; Raster                raster operation code
+    ; ddc               handle to destination DC
+    ; dx                x-coord of destination upper-left corner
+    ; dy                y-coord of destination upper-left corner
+    ; dw                width of destination rectangle
+    ; dh                height of destination rectangle
+    ; sdc               handle to source DC
+    ; sx                x-coordinate of source upper-left corner
+    ; sy                y-coordinate of source upper-left corner
+    ; sw                width of source rectangle
+    ; sh                height of source rectangle
+    ; Raster            raster operation code
     ;                                                                                                                   
-    ; Return                If the function succeeds, the Return value is nonzero
+    ; Return            If the function succeeds, the Return value is nonzero
     ;                                                                                                                   
-    ; notes                    If no raster operation is specified, then SRCCOPY is used. It uses the same raster operations as BitBlt        
+    ; notes             If no raster operation is specified, then SRCCOPY is used. It uses the same raster operations as BitBlt        
     
     StretchBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, sw, sh, Raster="")
     {
@@ -225,7 +225,8 @@ Class gdip
     SetImage(hwnd, hBitmap)
     {
         SendMessage, 0x172, 0x0, hBitmap,, ahk_id %hwnd%
-        this.DeleteObject((E := ErrorLevel))
+        E := ErrorLevel
+        , this.DeleteObject(E)
         Return E
     }
     
@@ -248,16 +249,16 @@ Class gdip
     ; COLOR_3DLIGHT                 = 22
     ; COLOR_3DSHADOW                = 16
     ; COLOR_ACTIVEBORDER            = 10
-    ; COLOR_ACTIVECAPTION           = 2
+    ; COLOR_ACTIVECAPTION           =  2
     ; COLOR_APPWORKSPACE            = 12
-    ; COLOR_BACKGROUND              = 1
+    ; COLOR_BACKGROUND              =  1
     ; COLOR_BTNFACE                 = 15
     ; COLOR_BTNHIGHLIGHT            = 20
     ; COLOR_BTNHILIGHT              = 20
     ; COLOR_BTNSHADOW               = 16
     ; COLOR_BTNTEXT                 = 18
-    ; COLOR_CAPTIONTEXT             = 9
-    ; COLOR_DESKTOP                 = 1
+    ; COLOR_CAPTIONTEXT             =  9
+    ; COLOR_DESKTOP                 =  1
     ; COLOR_GRADIENTACTIVECAPTION   = 27
     ; COLOR_GRADIENTINACTIVECAPTION = 28
     ; COLOR_GRAYTEXT                = 17
@@ -265,18 +266,18 @@ Class gdip
     ; COLOR_HIGHLIGHTTEXT           = 14
     ; COLOR_HOTLIGHT                = 26
     ; COLOR_INACTIVEBORDER          = 11
-    ; COLOR_INACTIVECAPTION         = 3
+    ; COLOR_INACTIVECAPTION         =  3
     ; COLOR_INACTIVECAPTIONTEXT     = 19
     ; COLOR_INFOBK                  = 24
     ; COLOR_INFOTEXT                = 23
-    ; COLOR_MENU                    = 4
+    ; COLOR_MENU                    =  4
     ; COLOR_MENUHILIGHT             = 29
     ; COLOR_MENUBAR                 = 30
-    ; COLOR_MENUTEXT                = 7
-    ; COLOR_SCROLLBAR               = 0
-    ; COLOR_WINDOW                  = 5
-    ; COLOR_WINDOWFRAME             = 6
-    ; COLOR_WINDOWTEXT              = 8
+    ; COLOR_MENUTEXT                =  7
+    ; COLOR_SCROLLBAR               =  0
+    ; COLOR_WINDOW                  =  5
+    ; COLOR_WINDOWFRAME             =  6
+    ; COLOR_WINDOWTEXT              =  8
     
     SetSysColorToControl(hwnd, SysColor=15)
     {
@@ -292,6 +293,7 @@ Class gdip
         , this.Gdip_DeleteGraphics(G)
         , this.Gdip_DisposeImage(pBitmap)
         , this.DeleteObject(hBitmap)
+        
         Return 0
     }
     
@@ -2003,6 +2005,7 @@ Class gdip
     {
         IWidth      := Width
         , IHeight   := Height
+        , PassBrush := 0
         
         RegExMatch(Options, "i)X([\-\d\.]+)(p*)", xpos)
         RegExMatch(Options, "i)Y([\-\d\.]+)(p*)", ypos)
