@@ -2006,16 +2006,15 @@ Class gdip
         IWidth      := Width
         , IHeight   := Height
         , PassBrush := 0
-        
-        RegExMatch(Options, "i)X([\-\d\.]+)(p*)", xpos)
-        RegExMatch(Options, "i)Y([\-\d\.]+)(p*)", ypos)
-        RegExMatch(Options, "i)W([\-\d\.]+)(p*)", Width)
-        RegExMatch(Options, "i)H([\-\d\.]+)(p*)", Height)
-        RegExMatch(Options, "i)C(?!(entre|enter))([a-f\d]+)", Colour)
-        RegExMatch(Options, "i)Top|Up|Bottom|Down|vCentre|vCenter", vPos)
-        RegExMatch(Options, "i)NoWrap", NoWrap)
-        RegExMatch(Options, "i)R(\d)", Rendering)
-        RegExMatch(Options, "i)S(\d+)(p*)", Size)
+        , RegExMatch(Options, "i)X([\-\d\.]+)(p*)", xpos)
+        , RegExMatch(Options, "i)Y([\-\d\.]+)(p*)", ypos)
+        , RegExMatch(Options, "i)W([\-\d\.]+)(p*)", Width)
+        , RegExMatch(Options, "i)H([\-\d\.]+)(p*)", Height)
+        , RegExMatch(Options, "i)C(?!(entre|enter))([a-f\d]+)", Colour)
+        , RegExMatch(Options, "i)Top|Up|Bottom|Down|vCentre|vCenter", vPos)
+        , RegExMatch(Options, "i)NoWrap", NoWrap)
+        , RegExMatch(Options, "i)R(\d)", Rendering)
+        , RegExMatch(Options, "i)S(\d+)(p*)", Size)
         
         if !this.Gdip_DeleteBrush(this.Gdip_CloneBrush(Colour2))
             PassBrush   := 1
