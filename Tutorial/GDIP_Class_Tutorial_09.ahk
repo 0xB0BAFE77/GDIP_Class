@@ -4,94 +4,80 @@
 SetBatchLines, -1
 
 #Include GDIP_Class.ahk
-Tut9()
+Tut09()
 Return
 
 *Esc::ExitApp
 
-Tut9(){
+; The purpose of this tutorial is to create a fully customized progress bar
+; Note that AHK does already provide a progress bar feature with its GUI commands
+; This progress bar is made using a rectangular picture element
+; The element is filled with a rectangle and overlayed with a slightly smaller rectangle with rounded corners
+Tut09() {
     ; Before we start there are some design elements we must consider.
     ; We can either make the script faster. Creating the bitmap 1st and just write the new progress bar onto it every time and updating it on the gui
     ; and dispose it all at the end/ This will use more RAM
     ; Or we can create the entire bitmap and write the information to it, display it and then delete it after every occurence
     ; This will be slower, but will use less RAM and will be modular (can all be put into a function)
     ; I will go with the 2nd option, but if more speed is a requirement then choose the 1st
-    hwnd := {}
-    Gui, 1: -DPIScale
     
-    ; I am first creating a slider, just as a way to change the percentage on the progress bar
-    Gui, 1: Add, Slider, x10 y10 w400 Range0-100 Tooltip gSlider HWNDsliderHwnd, 50 ;vSlider
-    MsgBox, % "sliderHwnd: " sliderHwnd 
-    ; The progress bar needs to be added as a picture, as all we are doing is creating a gdi+ bitmap and setting it to this control
-    ; Note we have set the 0xE style for it to accept an hBitmap later and also set a variable in order to reference it (could also use hwnd)
-    Gui, 1: Add, Picture, x10 y+30 w400 h50 0xE ;vProgressBar
-    
-    ; We will set the initial image on the control before showing the gui
-    ;Slider(sliderHwnd)
-    
-    Gui, 1: Show, AutoSize, Example 9 - gdi+ progress bar
+    hwnd_arr := {}                                                                      ; Create an object to store some handles in
+    Gui, T09:New, -DPIScale                                                             ; 
+    Gui, T09:Default                                                                    ; 
+    Gui, Add, Slider, x10 y10 w400 Range0-100 Tooltip Gon_slider_release HWNDhwnd, 50   ; 
+        hwnd_arr.slider := hwnd                                                         ; 
+    Gui, Add, Picture, x10 y+30 w400 h50 0xE HWNDhwnd                                   ;
+        hwnd_arr.picture := hwnd                                                        ; 
+    on_slider_release(,,,,hwnd_arr)                                                     ; Run function once to set the initial drawings before showing the GUI
+    Gui, Show, AutoSize, Example 9 - gdi+ progress bar                                  ; Show the GUI with the custom progress bar
     Return
 }
 
-; This subroutine is activated every time we move the slider as I used gSlider in the options of the slider
-Slider(CtrlHwnd, GuiEvent, EventInfo, ErrLevel:="") {
-    MsgBox, % "CtrlHwnd: " CtrlHwnd "`nGuiEvent: " GuiEvent "`nEventInfo: " EventInfo "`nErrLevel: " ErrLevel
-    Gui, 1: Default
-    Gui, 1: Submit, NoHide
-    Gdip_SetProgress(ProgressBar, Percentage, 0xff0993ea, 0xffbde5ff, Percentage "`%")
-    Return
+; This is the function that fires when the slider bar is released
+; color_bg and color_fg are the background and foreground colors of the progress bar
+; new_hwnd is used to set an array of handles to the function
+; The Text, TextOptions, and Font could be moved to the parameters of the function if you wanted but I see no reason for it here
+on_slider_release(CtrlHwnd:="", GuiEvent:="", EventInfo:="", ErrLevel:="", new_hwnd:=0) {
+    Static hwnd         := ""
+        , TextOptions   := "x0p y15p s60p Center cff000000 r4 Bold"
+        , Font          := "Arial"
+        , color_bg      := 0xFF0993EA
+        , color_fg      := 0xFFBDE5FF
+    
+    If (new_hwnd != 0)                                              ; Set the new handle array if there is one.
+        hwnd := new_hwnd
+    
+    pic_w := pic_h := 0
+    GuiControlGet, pic_, Pos, % hwnd.picture                        ; Get the WHXY for the GUI picture element
+    GuiControlGet, percent, , % hwnd.slider                         ; Get the current percent
+    
+    pBitmap         := gdip.Gdip_CreateBitmap(pic_w, pic_h)         ; Create a new bitmap that we will write to the GUI
+    , gp            := gdip.Gdip_GraphicsFromImage(pBitmap)         ; Get a pointer to the graphis of the bitmap
+    , pBrushFront   := gdip.Gdip_BrushCreateSolid(color_fg)         ; Create a brush for the foreground
+    , pBrushBack    := gdip.Gdip_BrushCreateSolid(color_bg)         ; Create a brush for the background
+    , gdip.Gdip_SetSmoothingMode(gp, 4)                             ; Setting antialiasing to 4 creates the smoothest image
+    , gdip.Gdip_FillRectangle(gp, pBrushBack, 0, 0, pic_w, pic_h)   ; Create the background of the progress bar
+    , gdip.Gdip_FillRoundedRectangle(gp, pBrushFront, 4, 4          ; Create the foreground (pointer, brush, x-coord, y-coord
+                    , (pic_w-8)*(percent/100), pic_h-8              ; rectangle width, rectangle height
+                    , (percent >= 3) ? 3 : percent)                 ; radius of rounded corners)
+    , gdip.Gdip_TextToGraphics(gp                                   ; Add the text percentage to the bar (pointer,
+                    , Round(percent) "`%"                           ; text to add, 
+                    , TextOptions, Font                             ; text options, font,
+                    , pic_w, pic_h)                                 ; pic element width, pic element height)
+    , hBitmap       := gdip.Gdip_CreateHBITMAPFromBitmap(pBitmap)   ; Get a handle the bitmap we just made
+    , gdip.SetImage(hwnd.picture, hBitmap)                          ; Use handle to assign new bitmap to GUI's picture element
+    
+    ; Cleanup/garbage collection 
+    gdip.Gdip_DeleteBrush(pBrushFront)                              ; Delete foreground brush
+    , gdip.Gdip_DeleteBrush(pBrushBack)                             ; Delete background brush
+    , gdip.Gdip_DeleteGraphics(gp)                                  ; Delete graphics
+    , gdip.Gdip_DisposeImage(pBitmap)                               ; Delete bitmap
+    , gdip.DeleteObject(hBitmap)                                    ; Delete delete bitmap object
+    
+    Return 0
 }
 
-Gdip_SetProgress(ByRef Variable, Percentage, Foreground, Background=0x00000000, Text="", TextOptions="x0p y15p s60p Center cff000000 r4 Bold", Font="Arial") {
-    ; We first want the hwnd (handle to the picture control) so that we know where to put the bitmap we create
-    ; We also want to width and height (posw and Posh)
-    GuiControlGet, Pos, Pos, Variable
-    GuiControlGet, hwnd, hwnd, Variable
-    
-    ; Create 2 brushes, one for the background and one for the foreground. Remember this is in ARGB
-    pBrushFront := gdip.Gdip_BrushCreateSolid(Foreground)
-    , pBrushBack := gdip.Gdip_BrushCreateSolid(Background)
-    
-    ; Create a gdi+ bitmap the width and height that we found the picture control to be
-    ; We will then get a reference to the graphics of this bitmap
-    ; We will also set the smoothing mode of the graphics to 4 (Antialias) to make the shapes we use smooth
-    pBitmap := gdip.Gdip_CreateBitmap(Posw, Posh)
-    , G := gdip.Gdip_GraphicsFromImage(pBitmap)
-    , gdip.Gdip_SetSmoothingMode(G, 4)
-    
-    ; We will fill the background colour with out background brush
-    ; x = 0, y = 0, w = Posw, h = Posh
-    gdip.Gdip_FillRectangle(G, pBrushBack, 0, 0, Posw, Posh)
-    
-    ; We will then fill a rounded rectangle with our other brush, starting at x = 4 and y = 4
-    ; The total width is now Posw-8 as we have slightly indented the actual progress bar
-    ; The last parameter which is the amount the corners will be rounded by in pixels has been made to be 3 pixels...
-    ; ...however I have made it so that they are smaller if the percentage is too small as it cannot be rounded by that much
-    gdip.Gdip_FillRoundedRectangle(G, pBrushFront, 4, 4, (Posw-8)*(Percentage/100), Posh-8, (Percentage >= 3) ? 3 : Percentage)
-    
-    ; As mentioned in previous examples, we will provide Gdip_TextToGraphics with the width and height of the graphics
-    ; We will then write the percentage centred onto the graphics (Look at previous examples to understand all options)
-    ; I added an optional text parameter at the top of this function, to make it so you could write an indication onto the progress bar
-    ; such as "Finished!" or whatever, otherwise it will write the percentage to it
-    gdip.Gdip_TextToGraphics(G, (Text != "") ? Text : Round(Percentage) "`%", TextOptions, Font, Posw, Posh)
-    
-    ; We then get a gdi bitmap from the gdi+ one we've been working with...
-    hBitmap := gdip.Gdip_CreateHBITMAPFromBitmap(pBitmap)
-    ; ... and set it to the hwnd we found for the picture control
-    gdip.SetImage(hwnd, hBitmap)
-    
-    ; We then must delete everything we created
-    ; So the 2 brushes must be deleted
-    ; Then we can delete the graphics, our gdi+ bitmap and the gdi bitmap
-    gdip.Gdip_DeleteBrush(pBrushFront)
-    , gdip.Gdip_DeleteBrush(pBrushBack)
-    , gdip.Gdip_DeleteGraphics(G)
-    , gdip.Gdip_DisposeImage(pBitmap)
-    , gdip.DeleteObject(hBitmap)
-    
-    Return, 0
-}
-
+; Close script when GUI is closed
 GuiClose() {
     ExitApp
 }
