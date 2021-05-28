@@ -64,6 +64,7 @@ Class tutorial10
         Return
     }
     
+    ; This method is used to get the path of an image file
     file_select() {
         FileSelectFile, path, 3, % A_ScriptDir, % "Select an image."                    ; Let user select a path to an image
             , % "image (*.bmp; *.gif; *.jpg; *.jpeg; *.png; *.tiff)"
@@ -132,29 +133,21 @@ Class tutorial10
         ; We can now shift our graphics or 'canvas' using the values found with Gdip_GetRotatedTranslation so that the image will be drawn on the canvas
         gdip.Gdip_TranslateWorldTransform(gp, x_shift, y_shift)
         
-        ; If we wish to flip the image horizontally, then we supply Gdip_ScaleWorldTransform(G, x, y) with a negative x transform
-        ; We multiply the image by the x and y transform. So multiplying a direction by -1 will flip it in that direction and 1 will do nothing
-        ; We must then shift the graphics again to ensure the image will be within the 'canvas'
-        ; You can see that if we wish to flip vertically we supply a negative y transform
-        If Horizontal
-            Gdip_ScaleWorldTransform(G, -1, 1), Gdip_TranslateWorldTransform(G, -Width, 0)
-        If Vertical
-            Gdip_ScaleWorldTransform(G, 1, -1), Gdip_TranslateWorldTransform(G, 0, -Height)
-        ; As you will already know....we must draw the image onto the graphics. We want to draw from the top left coordinates of the image (0, 0) to the top left of the graphics (0, 0)
-        ; We are drawing from the orginal image size to the new size (this may not be different if the image was not larger than half the screen)
-        Gdip_DrawImage(G, pBitmap, 0, 0, Width, Height, 0, 0, i_width, i_height)
-        
         ; Even though this is not necessary in this scenario, you should always reset the transforms set on the graphics. This will remove any of the rotations
-        Gdip_ResetWorldTransform(G)
+        gdip.Gdip_ResetWorldTransform(gp)
         
         ; We will update the hwnd  with the hdc of our gdi bitmap. We are drawing it at the new width and height and in the centre of the screen
-        UpdateLayeredWindow(hwnd2, hdc, (A_ScreenWidth-r_width)//2, (A_ScreenHeight-r_height)//2, r_width, r_height)
+        gdip.UpdateLayeredWindow(hwnd2, hdc, (A_ScreenWidth-r_width)//2, (A_ScreenHeight-r_height)//2, r_width, r_height)
         
         ; As always we will dispose of everything we created
         ; So we select the object back into the hdc, the delete the bitmap and hdc
-        SelectObject(hdc, obm), DeleteObject(hbm), DeleteDC(hdc)
+        ; Garbage cleanup
+        gdip.SelectObject(hdc, obm)
+        , gdip.DeleteObject(hbm)
+        , gdip.DeleteDC(hdc)
         ; We will then dispose of the graphics and bitmap we created
-        Gdip_DeleteGraphics(G), Gdip_DisposeImage(pBitmap)
+        , gdip.Gdip_DeleteGraphics(gp)
+        , gdip.Gdip_DisposeImage(pBitmap)
 
         
         MsgBox, % "i_width: " i_width "`ni_height: " i_height "`nRatio: " Ratio "`nr_width: " r_width "`nr_height: " r_height "`nx_shift: " x_shift "`ny_shift: " y_shift "`nangle: " angle
@@ -164,6 +157,22 @@ Class tutorial10
     
     flip_image() {
         MsgBox, % A_ThisFunc
+        
+        ; If we wish to flip the image horizontally, then we supply Gdip_ScaleWorldTransform(G, x, y) with a negative x transform
+        ; We multiply the image by the x and y transform. So multiplying a direction by -1 will flip it in that direction and 1 will do nothing
+        ; We must then shift the graphics again to ensure the image will be within the 'canvas'
+        ; You can see that if we wish to flip vertically we supply a negative y transform
+        If Horizontal
+            gdip.Gdip_ScaleWorldTransform(gp, -1, 1)
+            , gdip.Gdip_TranslateWorldTransform(gp, -Width, 0)
+        If Vertical
+            gdip.Gdip_ScaleWorldTransform(gp, 1, -1)
+            , gdip.Gdip_TranslateWorldTransform(gp, 0, -Height)
+        
+        ; As you will already know....we must draw the image onto the graphics. We want to draw from the top left coordinates of the image (0, 0) to the top left of the graphics (0, 0)
+        ; We are drawing from the orginal image size to the new size (this may not be different if the image was not larger than half the screen)
+        gdip.Gdip_DrawImage(gp, pBitmap, 0, 0, Width, Height, 0, 0, i_width, i_height)
+        
         Return
     }
     
