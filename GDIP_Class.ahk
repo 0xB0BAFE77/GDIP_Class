@@ -2504,7 +2504,7 @@ Class gdip
     ;#####################################################################################
     Gdip_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize)
     {
-        Static PixelateBitmap
+        Static PixelateBitmap := ""
         
         if (!PixelateBitmap)
         {
