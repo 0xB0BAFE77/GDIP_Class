@@ -26,14 +26,16 @@ Tut3(){
     img_name := "Tut03_background.png"
     If !FileExist(A_ScriptDir "\" img_name)
         UrlDownloadToFile, % "https://raw.githubusercontent.com/0xB0BAFE77/GDIP_Class/main/Tutorial/Images/background.png", % img_name
+    
     If !FileExist(A_ScriptDir "\" img_name)
     {
         MsgBox, Error downloading background.png.
         ExitApp
     }
     
-    ; Check to ensure we actually got a bitmap from the file, in case the file was corrupt or some other error occured
+    ; Create the bitmap
     pBitmap := gdip.Gdip_CreateBitmapFromFile(img_name)
+    ; Verify than an actual bitmap was created from the file
     If !pBitmap
     {
         MsgBox, 48, File loading error!, Could not load 'background.png'
