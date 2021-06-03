@@ -79,10 +79,10 @@ Class Tut12
             this[A_LoopField] := %A_LoopField%
         
         ; Fires on left mouse down and allows click+drag moving of image
-        bf      := ObjBindMethod(this, "WM_LBUTTONDOWN")
+        bf  := ObjBindMethod(this, "WM_LBUTTONDOWN")
         OnMessage(0x201, bf)
         
-        bf := ObjBindMethod(this, "pixelate_roate")
+        bf  := ObjBindMethod(this, "pixelate_roate")
         SetTimer, % bf, 100
         
         Return
@@ -97,11 +97,11 @@ Class Tut12
         ; Make sure our pixelation numbers stay within our bounds
         ; Also sets if v should be increased or decreased
         if (v <= 1)
-            v := 1, dir := 1
+            dir := 1
         else if (v >= this.max_pixel)
-            v := this.max_pixel, dir := 0
-        Else dir ? v++ : v--
-        
+            dir := 0
+        dir ? v++ : v--
+        tooltip, % "v: " v "`ndir: " dir "`nthis.max_pixel: " this.max_pixel "`nthis.gp: " this.gp 
         ; Call Gdip_PixelateBitmap with the bitmap we retrieved earlier and the block size of the pixels
         ; The function returns the pixelated bitmap, and doesn't dispose of the original bitmap
         gdip.Gdip_PixelateBitmap(this.pBitmap
