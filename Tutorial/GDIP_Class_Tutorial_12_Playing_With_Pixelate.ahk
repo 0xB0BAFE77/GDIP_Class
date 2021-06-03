@@ -25,8 +25,8 @@ Class Tut12
         bf := ObjBindMethod(this, "delete_img")
         OnExit(bf)
         
-        url     := "https://digitalblasphemy.com/graphics/640x480/fluorescencereddit1640.jpg"
-        f_name  := "shroom.jpg"
+        url     := "https://raw.githubusercontent.com/0xB0BAFE77/GDIP_Class/main/Tutorial/Images/MushSnoom.jpg"
+        f_name  := "MushSnoom.jpg"
         If !FileExist(f_name)                                                           ; If the image we want to work with does not exist on disk, then download it...
         {
             UrlDownloadToFile, % url, % f_name
