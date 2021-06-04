@@ -1,7 +1,4 @@
 ;#Warn
-; Delete above this
-
-; Past line 2220
 
 gdip.__New()
 Class gdip
