@@ -54,33 +54,42 @@ Tutorial_01:
     obm := gdip.SelectObject(hdc, hbm)                      ; Move the bitmap into the new DC and return a new bitmap object
     gp  := gdip.Gdip_GraphicsFromHDC(hdc)                   ; Get a pointer to the graphics portion of the DC
     
-    ; Sets antialiasing (1-7) of the image which controls the quality
-    gdip.Gdip_SetSmoothingMode(gp, 7)                       ; 7 is the mode AntiAlias8x8
+    ; Sets smoothing (1-7) of the image which controls the quality/antialiasing
+    gdip.Gdip_SetSmoothingMode(gp, 7)                       ; 7
     
-    ; Let's draw our first shape. Just like in real life, you'll need a brush or a pen to draw
-    ; When creating a drawing tool, you must supply an ARBG (Alpha, Red, Green, Blue) value
-    ; Each value of an ARBG is expressed using 2 hex numbers (00 - FF)
-    ; All 4 hex values are combined with no spaces between them to form the ARBG hex value
-    ; Alpha means transparency. 00 = 100% Transparency while FF = Solid color (0% transparency)
+    ; Let's draw our first shape
+    ; We need a tool to "draw" things with and those tools are called pens and brushes
+    ; A brush fills in whatever you're drawing while a pen creates only the outline
+    ; To make a pen or brush, you must supply an ARBG (Alpha, Red, Green, Blue) hex number
+    ; Each ARBG value must be a 2 digit hex numbers (00 - FF)
+    ; If you wanted Tomato Red (#FF6347) with half transparency, you'd use 0x80FF6347 for your ARBG
+    ; 0x80 = 50% transparency, 0xFF = 100% Red, 0x63 = 39% Green, 0x47 = 28% Blue
     pBrush := gdip.Gdip_BrushCreateSolid(0xFFFF0000)        ; For a solid red brush, we set alpha and red to max (FF)
     
     ; Using the brush we just made, we're going to draw an elipse with the Gdip_FillEllipse() method
     gdip.Gdip_FillEllipse(gp                ; Pointer to our canvas
                         , pBrush            ; The brush to use
                         , 100               ; x-coordinate marking where to start
-                        , 500               ; y-coordinate
-                        , 200               ; width of the ellipse
-                        , 300)              ; height of the ellipse
+                        , 100               ; y-coordinate
+                        , 100               ; width of the ellipse
+                        , 200)              ; height of the ellipse
     
     ; To help cleanup the memory, we'll constantly be deleting things we no longer have a need for
     gdip.Gdip_DeleteBrush(pBrush)                           ; We don't need a solid red brush anymore
     
-    ; Now we can draw another shape on our canvas. Let's make a half transparent blue square.
+    ; Next, we'll draw the outline of a rectangle.
+    ; P
+    pPen    := gdip.Gdip_CreatePen(0xFFFFFF00, 2)          ; First, we make a pen
     pBrush := gdip.Gdip_BrushCreateSolid(0x800000ff)        ; Alpha is set to half transparency (80) and blue is set to max (FF)
     
     ; Fill the graphics of the bitmap with a rectangle using the brush created
     ; Filling from coordinates (250,80) a rectangle of 300x200
-    gdip.Gdip_FillRectangle(gp, pBrush, 250, 80, 300, 200)  ; Same params as drawing an ellipse 
+    gdip.Gdip_FillRectangle(gp              ; Pointer
+                            , pBrush        ; Brush or pen
+                            , 250           ; x
+                            , 350           ; y
+                            , 200           ; width
+                            , 100)          ; height
     
     ; Cleanup
     gdip.Gdip_DeleteBrush(pBrush)
@@ -89,15 +98,10 @@ Tutorial_01:
     pPen    := gdip.Gdip_CreatePen(0xFFFFFF00, 2)          ; First, we make a pen
     ; When drawing a polygon, you have to provide an x,y coord set for each point
     ; I've modified GDIP_Class to use either a string or an array of arrays
-    ; In this case we'll use the original string version
-    points  := "400,400|350,300|300,400"
-    gdip.Gdip_DrawPolygon(gp, pPen, points)                 ; Draw polygon (triangle)
+    ; We'll use the original string version
+    points  := "500,600|600,500|700,600"                    ; This tells the program to start x500y600 and each subsequent point
+    gdip.Gdip_DrawPolygon(gp, pPen, points)                 ; Draw polygon (the 3 coords provided will make a triangle)
     gdip.Gdip_DeletePen(pPen)                               ; Delete the pen as it is no longer needed and wastes memory
-    
-    pBrush  := gdip.Gdip_BrushCreateSolid(0xFFFFFF00)
-    points  := "500,500|450,400|400,500"
-    gdip.Gdip_FillPolygon(gp, pBrush, Points, FillMode=1)
-    gdip.Gdip_DeleteBrush(pBrush)
     
     ; Now we update the gui with the newly drawn picture and can finally see our work
     gdip.UpdateLayeredWindow(guiHwnd        ; Handle to our transparent gui
