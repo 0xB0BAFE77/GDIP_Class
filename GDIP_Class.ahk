@@ -1,4 +1,4 @@
-#Warn
+;#Warn
 ; Delete above this
 
 ; Past line 2220
@@ -6,25 +6,27 @@
 gdip.__New()
 Class gdip
 {
-    ; GDI+ Windows Library Class v1.48
-    ; Class Update by 0xB0BAFE77 20210501
-    ; Converted GDIP to a single class with method calls
-    ; Updated many descriptions
-    ; Formatted code and text
+    ; GDI+ Windows Library Class Rewrite
+    ; v1.48
+    ; Update by 0xB0BAFE77 20210501
+    ; 
+    ; Converted GDIP library to a single class
+    ; Updated/corrected many descriptions
+    ; Formatted code and text to be more easily readable
     ; All tutorials have been rewritten and updated
+    ; Added Gdip_DrawPolygon
     ;                                                                                                                   
     ; Originally created by tic (Tariq Porter) 20110709
     ; Later updated by Rseding91 with fincs 64 bit compatible Gdip library 20130501
     ; Supports: Basic, _L ANSi, _L Unicode x86 and _L Unicode x64
-    ;                                                                                                                   
     ; Updated 2/20/2014 - fixed Gdip_CreateRegion() and Gdip_GetClipRegion() on AHK Unicode x86
     ; Updated 5/13/2013 - fixed Gdip_SetBitmapToClipboard() on AHK Unicode x64
     ;                                                                                                                   
-    ;#####################################################################################
-    ;#####################################################################################
+    ;##################################################################################################################
+    ;##################################################################################################################
     ; STATUS ENUMERATION
     ; Return values for functions specified to have status enumerated Return type
-    ;#####################################################################################
+    ;##################################################################################################################
     ;                                                                                                                   
     ; Ok =                      = 0
     ; GenericError              = 1
@@ -49,10 +51,10 @@ Class gdip
     ; PropertyNotSupported      = 20
     ; ProfileNotFound           = 21
     ;                                                                                                                   
-    ;#####################################################################################
-    ;#####################################################################################
+    ;##################################################################################################################
+    ;##################################################################################################################
     ; METHODS
-    ;#####################################################################################
+    ;##################################################################################################################
     ;                                                                                                                   
     ; UpdateLayeredWindow(hwnd, hdc, x="", y="", w="", h="", Alpha=255)
     ; BitBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, Raster="")
@@ -63,7 +65,7 @@ Class gdip
     ; CreateSizeF(ByRef SizeF, w, h)
     ; CreateDIBSection
     ;                                                                                                                   
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method          UpdateLayeredWindow
     ; Description     Updates a layered window with the handle to the DC of a gdi bitmap
     ;                                                                                                                   
@@ -103,7 +105,7 @@ Class gdip
                         , "uint"    , 2)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            BitBlt
     ; Description       The BitBlt function performs a bit-block transfer of the color data corresponding to a rectangle 
     ;                   of pixels from the specified source device context into a destination device context.
@@ -154,7 +156,7 @@ Class gdip
                         , "uint"    , Raster ? Raster : 0x00CC0020)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            StretchBlt
     ; Description       The StretchBlt function copies a bitmap from a source rectangle into a destination rectangle, 
     ;                   stretching or compressing the bitmap to fit the dimensions of the destination rectangle, if necessary.
@@ -192,7 +194,7 @@ Class gdip
                         , "uint"    , Raster ? Raster : 0x00CC0020)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                SetStretchBltMode
     ; Description           The SetStretchBltMode function sets the bitmap stretching mode in the specified device context
     ;                                                                                                                   
@@ -213,7 +215,7 @@ Class gdip
                         , "int"     , iStretchMode)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            SetImage
     ; Description       Associates a new image with a static control
     ;                                                                                                                   
@@ -230,7 +232,7 @@ Class gdip
         Return E
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                        SetSysColorToControl
     ; Description                   Sets a solid colour to a control
     ;                                                                                                                   
@@ -297,7 +299,7 @@ Class gdip
         Return 0
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_BitmapFromScreen
     ; Description       Gets a gdi+ bitmap from the screen
     ;                                                                                                                   
@@ -363,7 +365,7 @@ Class gdip
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_BitmapFromHWND
     ; Description            Uses PrintWindow to get a handle to the specified window and Return a bitmap from it
     ;                                                                                                                   
@@ -388,7 +390,7 @@ Class gdip
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  CreateRectF
     ; Description            Creates a RectF object, containing a the coordinates and dimensions of a rectangle
     ;                                                                                                                   
@@ -409,7 +411,7 @@ Class gdip
         , NumPut(h, RectF, 12, "float")
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  CreateRect
     ; Description            Creates a Rect object, containing a the coordinates and dimensions of a rectangle
     ;                                                                                                                   
@@ -429,7 +431,7 @@ Class gdip
         , NumPut(w, Rect, 8, "uint")
         , NumPut(h, Rect, 12, "uint")
     }
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  CreateSizeF
     ; Description            Creates a SizeF object, containing an 2 values
     ;                                                                                                                   
@@ -445,7 +447,7 @@ Class gdip
         , NumPut(w, SizeF, 0, "float")
         , NumPut(h, SizeF, 4, "float")     
     }
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            CreatePointF
     ; Description       Creates a SizeF object, containing an 2 values
     ;                                                                                                                   
@@ -461,7 +463,7 @@ Class gdip
         , NumPut(x, PointF, 0, "float")
         , NumPut(y, PointF, 4, "float")     
     }
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            CreateDIBSection
     ; Description       The CreateDIBSection function creates a DIB (Device Independent Bitmap) that applications can write to directly
     ;                                                                                                                   
@@ -498,7 +500,7 @@ Class gdip
         Return hbm
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  PrintWindow
     ; Description            The PrintWindow function copies a visual window into the specified device context (DC), typically a printer DC
     ;                                                                                                                   
@@ -515,7 +517,7 @@ Class gdip
         Return DllCall("PrintWindow", this.Ptr, hwnd, this.Ptr, hdc, "uint", Flags)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  DestroyIcon
     ; Description            Destroys an icon and frees any memory the icon occupied
     ;                                                                                                                   
@@ -528,19 +530,19 @@ Class gdip
         Return DllCall("DestroyIcon", this.Ptr, hIcon)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     PaintDesktop(hdc)
     {
         Return DllCall("PaintDesktop", this.Ptr, hdc)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     CreateCompatibleBitmap(hdc, w, h)
     {
         Return DllCall("gdi32\CreateCompatibleBitmap", this.Ptr, hdc, "int", w, "int", h)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            CreateCompatibleDC
     ; Description       This function creates a memory device context (DC) compatible with the specified device
     ;                                                                                                                   
@@ -555,7 +557,7 @@ Class gdip
         Return DllCall("CreateCompatibleDC", this.Ptr, hdc)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            SelectObject
     ; Description       The SelectObject function selects an object into the specified device context (DC). The new object replaces the previous object of the same type
     ;                                                                                                                   
@@ -582,7 +584,7 @@ Class gdip
         Return DllCall("SelectObject", this.Ptr, hdc, this.Ptr, hgdiobj)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  DeleteObject
     ; Description            This function deletes a logical pen, brush, font, bitmap, region, or palette, freeing all system resources associated with the object
     ;                        After the object is deleted, the specified handle is no longer valid
@@ -596,7 +598,7 @@ Class gdip
         Return DllCall("DeleteObject", this.Ptr, hObject)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  GetDC
     ; Description            This function retrieves a handle to a display device context (DC) for the client area of the specified window.
     ;                        The display device context can be used in subsequent graphics display interface (GDI) functions to draw in the client area of the window. 
@@ -610,7 +612,7 @@ Class gdip
         Return DllCall("GetDC", this.Ptr, hwnd)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; DCX_CACHE = 0x2
     ; DCX_CLIPCHILDREN = 0x8
     ; DCX_CLIPSIBLINGS = 0x10
@@ -630,7 +632,7 @@ Class gdip
         Return DllCall("GetDCEx", this.Ptr, hwnd, this.Ptr, hrgnClip, "int", flags)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  ReleaseDC
     ; Description            This function releases a device context (DC), freeing it for use by other applications. The effect of ReleaseDC depends on the type of device context
     ;                                                                                                                   
@@ -648,7 +650,7 @@ Class gdip
         Return DllCall("ReleaseDC", this.Ptr, hwnd, this.Ptr, hdc)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  DeleteDC
     ; Description            The DeleteDC function deletes the specified device context (DC)
     ;                                                                                                                   
@@ -662,7 +664,7 @@ Class gdip
     {
         Return DllCall("DeleteDC", this.Ptr, hdc)
     }
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_LibraryVersion
     ; Description            Get the current library version
     ;                                                                                                                   
@@ -675,7 +677,7 @@ Class gdip
         Return 1.48
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method  :                Gdip_BitmapFromBRA
     ; Description:             Gets a pointer to a gdi+ bitmap from a BRA file
     ;                                                                                                                   
@@ -737,7 +739,7 @@ Class gdip
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_DrawRectangle
     ; Description       This function uses a pen to draw the outline of a rectangle into the Graphics of a bitmap
     ;                                                                                                                   
@@ -757,7 +759,7 @@ Class gdip
         Return DllCall("gdiplus\GdipDrawRectangle", this.Ptr, pGraphics, this.Ptr, pPen, "float", x, "float", y, "float", w, "float", h)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_DrawRoundedRectangle
     ; Description            This function uses a pen to draw the outline of a rounded rectangle into the Graphics of a bitmap
     ;                                                                                                                   
@@ -792,7 +794,7 @@ Class gdip
         Return E
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_DrawEllipse
     ; Description            This function uses a pen to draw the outline of an ellipse into the Graphics of a bitmap
     ;                                                                                                                   
@@ -812,7 +814,7 @@ Class gdip
         Return DllCall("gdiplus\GdipDrawEllipse", this.Ptr, pGraphics, this.Ptr, pPen, "float", x, "float", y, "float", w, "float", h)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_DrawBezier
     ; Description            This function uses a pen to draw the outline of a bezier (a weighted curve) into the Graphics of a bitmap
     ;                                                                                                                   
@@ -846,7 +848,7 @@ Class gdip
                         , "float"   , y4)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_DrawArc
     ; Description       This function uses a pen to draw the outline of an arc into the Graphics of a bitmap
     ;                                                                                                                   
@@ -876,7 +878,7 @@ Class gdip
                         , "float"   , SweepAngle)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_DrawPie
     ; Description            This function uses a pen to draw the outline of a pie into the Graphics of a bitmap
     ;                                                                                                                   
@@ -898,7 +900,7 @@ Class gdip
         Return DllCall("gdiplus\GdipDrawPie", this.Ptr, pGraphics, this.Ptr, pPen, "float", x, "float", y, "float", w, "float", h, "float", StartAngle, "float", SweepAngle)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_DrawLine
     ; Description            This function uses a pen to draw a line into the Graphics of a bitmap
     ;                                                                                                                   
@@ -922,7 +924,7 @@ Class gdip
                         , "float"   , y2)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_DrawLines
     ; Description            This function uses a pen to draw a series of joined lines into the Graphics of a bitmap
     ;                                                                                                                   
@@ -945,7 +947,7 @@ Class gdip
         Return DllCall("gdiplus\GdipDrawLines", this.Ptr, pGraphics, this.Ptr, pPen, this.Ptr, &PointF, "int", Points0)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_FillRectangle
     ; Description            This function uses a brush to fill a rectangle in the Graphics of a bitmap
     ;                                                                                                                   
@@ -969,7 +971,7 @@ Class gdip
                         , "float"   , h)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_FillRoundedRectangle
     ; Description       This function uses a brush to fill a rounded rectangle in the Graphics of a bitmap
     ;                                                                                                                   
@@ -1004,34 +1006,73 @@ Class gdip
         Return E
     }
     
-    ;#####################################################################################
-    ; Method                  Gdip_FillPolygon
-    ; Description            This function uses a brush to fill a polygon in the Graphics of a bitmap
+    ;##################################################################################################################
+    ; Method            Gdip_FillPolygon
+    ; Description       This function uses a brush to fill a polygon in the Graphics of a bitmap
     ;                                                                                                                   
-    ; pGraphics                Pointer to the Graphics of a bitmap
-    ; pBrush                Pointer to a brush
-    ; Points                the coordinates of all the points passed as x1,y1|x2,y2|x3,y3.....
+    ; pGraphics         Pointer to the Graphics of a bitmap
+    ; pBrush            Pointer to a brush
+    ; Points            the coordinates of all the points passed as x1,y1|x2,y2|x3,y3.....
     ;                                                                                                                   
-    ; Return                status enumeration. 0 = success
+    ; Return            status enumeration. 0 = success
     ;                                                                                                                   
-    ; notes                    Alternate will fill the polygon as a whole, wheras winding will fill each new "segment"
-    ; Alternate             = 0
-    ; Winding                 = 1
+    ; notes             Alternate will fill the polygon as a whole, wheras winding will fill each new "segment"
+    ; Alternate         = 0
+    ; Winding           = 1
     
-    Gdip_FillPolygon(pGraphics, pBrush, Points, FillMode=0)
+    Gdip_FillPolygon(pGraphics, pBrush, points, FillMode=0)
     {
-        StringSplit, Points, Points, |
-        VarSetCapacity(PointF, 8*Points0)   
-        Loop, %Points0%
-        {
-            StringSplit, Coord, Points%A_Index%, `,
-            NumPut(Coord1, PointF, 8*(A_Index-1), "float")
-            , NumPut(Coord2, PointF, (8*(A_Index-1))+4, "float")
-        }   
-        Return DllCall("gdiplus\GdipFillPolygon", this.Ptr, pGraphics, this.Ptr, pBrush, this.Ptr, &PointF, "int", Points0, "int", FillMode)
+        points_arr := IsObject(points) ? points : StrSplit(points, "|")
+        VarSetCapacity(pointF, 8*points_arr.MaxIndex())
+        For index, coords in points_arr
+            IsObject(coords)
+                ? ""
+                : coords := StrSplit(coords, ",", " ")
+            , NumPut(coords[1], pointF, 8*(A_Index-1), "float")
+            , NumPut(coords[2], pointF, (8*(A_Index-1))+4, "float")
+        
+        Return DllCall("gdiplus\GdipFillPolygon"
+                        , this.Ptr  , pGraphics
+                        , this.Ptr  , pBrush
+                        , this.Ptr  , &pointF
+                        , "int"     , points_arr.MaxIndex()
+                        , "int"     , FillMode)
     }
     
-    ;#####################################################################################
+    ;###############################################################################################################################################
+    ; Method            Gdip_DrawPolygon
+    ; Description       This function uses a pen to draw a polygon in the Graphics of a bitmap
+    ;                                                                                                                   
+    ; pGraphics         Pointer to the Graphics of a bitmap
+    ; pBrush            Pointer to a brush
+    ; Points            List of coordinates can be passed by 2D array or by string
+    ;                   Coord sets must be pairs of numbers separated by commas (string spaces are omitted and can be used freely)
+    ;                   Examples of acceptable point sets:
+    ;                       array1  = [[30,53], [-30,53], [-30,0], [30,0]]
+    ;                       array2  = ["30,53", "-30,53", "-30,0", "30,0"]
+    ;                       string  = 30, 53|-30,53|   -30,   0|30 , 0
+    ;                                                                                                                   
+    ; Return            status enumeration. 0 = success
+    
+    Gdip_DrawPolygon(gp, pPen, points)
+    {
+        points_arr := IsObject(points) ? points : StrSplit(points, "|")
+        VarSetCapacity(pointF, 8*points_arr.MaxIndex())
+        For index, coords in points_arr
+            IsObject(coords)
+                ? ""
+                : coords := StrSplit(coords, ",", " ")
+            , NumPut(coords[1], pointF, 8*(A_Index-1)       , "float")
+            , NumPut(coords[2], pointF, (8*(A_Index-1))+4   , "float")
+        
+        Return DllCall("gdiplus\GdipDrawPolygon"
+                        , this.Ptr  , gp
+                        , this.Ptr  , pPen
+                        , this.Ptr  , &PointF
+                        , "int"     , points_arr.MaxIndex())
+    }
+    
+    ;##################################################################################################################
     ; Method                  Gdip_FillPie
     ; Description            This function uses a brush to fill a pie in the Graphics of a bitmap
     ;                                                                                                                   
@@ -1059,7 +1100,7 @@ Class gdip
                         , "float"   , SweepAngle)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_FillEllipse
     ; Description            This function uses a brush to fill an ellipse in the Graphics of a bitmap
     ;                                                                                                                   
@@ -1077,7 +1118,7 @@ Class gdip
         Return DllCall("gdiplus\GdipFillEllipse", this.Ptr, pGraphics, this.Ptr, pBrush, "float", x, "float", y, "float", w, "float", h)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_FillRegion
     ; Description            This function uses a brush to fill a region in the Graphics of a bitmap
     ;                                                                                                                   
@@ -1094,7 +1135,7 @@ Class gdip
         Return DllCall("gdiplus\GdipFillRegion", this.Ptr, pGraphics, this.Ptr, pBrush, this.Ptr, Region)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_FillPath
     ; Description            This function uses a brush to fill a path in the Graphics of a bitmap
     ;                                                                                                                   
@@ -1109,7 +1150,7 @@ Class gdip
         Return DllCall("gdiplus\GdipFillPath", this.Ptr, pGraphics, this.Ptr, pBrush, this.Ptr, Path)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_DrawImagePointsRect
     ; Description       This function draws a bitmap into the Graphics of another bitmap and skews it
     ;                                                                                                                   
@@ -1171,7 +1212,7 @@ Class gdip
         Return E
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_DrawImage
     ; Description       This function draws a bitmap into the Graphics of another bitmap
     ;                                                                                                                   
@@ -1251,7 +1292,7 @@ Class gdip
         Return E
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_SetImageAttributesColorMatrix
     ; Description            This function creates an image matrix ready for drawing
     ;                                                                                                                   
@@ -1283,7 +1324,7 @@ Class gdip
         Return ImageAttr
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GraphicsFromImage
     ; Description            This function gets the graphics for a bitmap used for drawing functions
     ;                                                                                                                   
@@ -1299,7 +1340,7 @@ Class gdip
         Return pGraphics
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GraphicsFromHDC
     ; Description            This function gets the graphics from the handle to a device context
     ;                                                                                                                   
@@ -1315,7 +1356,7 @@ Class gdip
         Return pGraphics
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GetDC
     ; Description            This function gets the device context of the passed Graphics
     ;                                                                                                                   
@@ -1329,7 +1370,7 @@ Class gdip
         Return hdc
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_ReleaseDC
     ; Description            This function releases a device context from use for further use
     ;                                                                                                                   
@@ -1343,7 +1384,7 @@ Class gdip
         Return DllCall("gdiplus\GdipReleaseDC", this.Ptr, pGraphics, this.Ptr, hdc)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GraphicsClear
     ; Description            Clears the graphics of a bitmap ready for further drawing
     ;                                                                                                                   
@@ -1360,7 +1401,7 @@ Class gdip
         Return DllCall("gdiplus\GdipGraphicsClear", this.Ptr, pGraphics, "int", ARGB)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_BlurBitmap
     ; Description            Gives a pointer to a blurred bitmap from a pointer to a bitmap
     ;                                                                                                                   
@@ -1396,7 +1437,7 @@ Class gdip
         Return pBitmap2
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_SaveBitmapToFile
     ; Description       Saves a bitmap to a file in any supported format onto disk
     ;                                                                                                                   
@@ -1502,7 +1543,7 @@ Class gdip
         Return E ? -5 : 0
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GetPixel
     ; Description            Gets the ARGB of a pixel in a bitmap
     ;                                                                                                                   
@@ -1518,7 +1559,7 @@ Class gdip
         Return ARGB
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_SetPixel
     ; Description            Sets the ARGB of a pixel in a bitmap
     ;                                                                                                                   
@@ -1533,7 +1574,7 @@ Class gdip
         Return DllCall("gdiplus\GdipBitmapSetPixel", this.Ptr, pBitmap, "int", x, "int", y, "int", ARGB)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GetImageWidth
     ; Description            Gives the width of a bitmap
     ;                                                                                                                   
@@ -1547,7 +1588,7 @@ Class gdip
         Return Width
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                  Gdip_GetImageHeight
     ; Description            Gives the height of a bitmap
     ;                                                                                                                   
@@ -1561,7 +1602,7 @@ Class gdip
         Return Height
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method                Gdip_GetDimensions
     ; Description            Gives the width and height of a bitmap
     ;                                                                                                                   
@@ -1578,20 +1619,20 @@ Class gdip
         ,DllCall("gdiplus\GdipGetImageHeight", this.Ptr, pBitmap, "uint*", Height)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GetDimensions(pBitmap, ByRef Width, ByRef Height)
     {
         this.Gdip_GetImageDimensions(pBitmap, Width, Height)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GetImagePixelFormat(pBitmap)
     {
         DllCall("gdiplus\GdipGetImagePixelFormat", this.Ptr, pBitmap, this.PtrA, (Format:=""))
         Return Format
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Method            Gdip_GetDpiX
     ; Description       Gives the horizontal dots per inch of the graphics of a bitmap
     ;                                                                                                                   
@@ -1608,34 +1649,34 @@ Class gdip
         Return Round(dpix)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GetDpiY(pGraphics)
     {
         DllCall("gdiplus\GdipGetDpiY", this.Ptr, pGraphics, "float*", (dpiy:=""))
         Return Round(dpiy)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GetImageHorizontalResolution(pBitmap)
     {
         DllCall("gdiplus\GdipGetImageHorizontalResolution", this.Ptr, pBitmap, "float*", (dpix:=""))
         Return Round(dpix)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GetImageVerticalResolution(pBitmap)
     {
         DllCall("gdiplus\GdipGetImageVerticalResolution", this.Ptr, pBitmap, "float*", (dpiy:=""))
         Return Round(dpiy)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_BitmapSetResolution(pBitmap, dpix, dpiy)
     {
         Return DllCall("gdiplus\GdipBitmapSetResolution", this.Ptr, pBitmap, "float", dpix, "float", dpiy)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; sFile IconNumber IconSize pBitmap
     
     Gdip_CreateBitmapFromFile(sFile, IconNumber=1, IconSize="")
@@ -1720,42 +1761,42 @@ Class gdip
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateBitmapFromHBITMAP(hBitmap, Palette=0)
     {
         DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", this.Ptr, hBitmap, this.Ptr, Palette, this.PtrA, (pBitmap:=""))
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateHBITMAPFromBitmap(pBitmap, Background=0xffffffff)
     {
         DllCall("gdiplus\GdipCreateHBITMAPFromBitmap", this.Ptr, pBitmap, this.PtrA, (hbm:=""), "int", Background)
         Return hbm
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateBitmapFromHICON(hIcon)
     {
         DllCall("gdiplus\GdipCreateBitmapFromHICON", this.Ptr, hIcon, this.PtrA, (pBitmap:=""))
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateHICONFromBitmap(pBitmap)
     {
         DllCall("gdiplus\GdipCreateHICONFromBitmap", this.Ptr, pBitmap, this.PtrA, (hIcon:=""))
         Return hIcon
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateBitmap(Width, Height, Format=0x26200A)
     {
         DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", Width, "int", Height, "int", 0, "int", Format, this.Ptr, 0, this.PtrA, (pBitmap:=""))
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateBitmapFromClipboard()
     {
 
@@ -1774,7 +1815,7 @@ Class gdip
         Return pBitmap
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_SetBitmapToClipboard(pBitmap)
     {
         off1        := A_PtrSize = 8 ? 52 : 44
@@ -1793,7 +1834,7 @@ Class gdip
         , DllCall("CloseClipboard")
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CloneBitmapArea(pBitmap, x, y, w, h, Format=0x26200A)
     {
         DllCall("gdiplus\GdipCloneBitmapArea"
@@ -1807,30 +1848,30 @@ Class gdip
         Return pBitmapDest
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Create resources
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreatePen(ARGB, w)
     {
         DllCall("gdiplus\GdipCreatePen1", "UInt", ARGB, "float", w, "int", 2, this.PtrA, (pPen:=""))
         Return pPen
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreatePenFromBrush(pBrush, w)
     {
         DllCall("gdiplus\GdipCreatePen2", this.Ptr, pBrush, "float", w, "int", 2, this.PtrA, (pPen:=""))
         Return pPen
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_BrushCreateSolid(ARGB=0xff000000)
     {
         DllCall("gdiplus\GdipCreateSolidFill", "UInt", ARGB, this.PtrA, (pBrush:=""))
         Return pBrush
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; HatchStyleHorizontal              = 0
     ; HatchStyleVertical                = 1
     ; HatchStyleForwardDiagonal         = 2
@@ -1897,7 +1938,7 @@ Class gdip
         Return pBrush
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateTextureBrush(pBitmap, WrapMode=1, x=0, y=0, w="", h="")
     {
         pBrush := ""
@@ -1907,7 +1948,7 @@ Class gdip
         Return pBrush
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; WrapModeTile = 0
     ; WrapModeTileFlipX = 1
     ; WrapModeTileFlipY = 2
@@ -1923,7 +1964,7 @@ Class gdip
         Return LGpBrush
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; LinearGradientModeHorizontal = 0
     ; LinearGradientModeVertical = 1
     ; LinearGradientModeForwardDiagonal = 2
@@ -1935,72 +1976,72 @@ Class gdip
         Return LGpBrush
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CloneBrush(pBrush)
     {
         DllCall("gdiplus\GdipCloneBrush", this.Ptr, pBrush, this.PtrA, (pBrushClone:=""))
         Return pBrushClone
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Delete resources
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeletePen(pPen)
     {
         Return DllCall("gdiplus\GdipDeletePen", this.Ptr, pPen)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeleteBrush(pBrush)
     {
         Return DllCall("gdiplus\GdipDeleteBrush", this.Ptr, pBrush)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DisposeImage(pBitmap)
     {
         Return DllCall("gdiplus\GdipDisposeImage", this.Ptr, pBitmap)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeleteGraphics(pGraphics)
     {
         Return DllCall("gdiplus\GdipDeleteGraphics", this.Ptr, pGraphics)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DisposeImageAttributes(ImageAttr)
     {
         Return DllCall("gdiplus\GdipDisposeImageAttributes", this.Ptr, ImageAttr)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeleteFont(hFont)
     {
         Return DllCall("gdiplus\GdipDeleteFont", this.Ptr, hFont)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeleteStringFormat(hFormat)
     {
         Return DllCall("gdiplus\GdipDeleteStringFormat", this.Ptr, hFormat)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeleteFontFamily(hFamily)
     {
         Return DllCall("gdiplus\GdipDeleteFontFamily", this.Ptr, hFamily)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DeleteMatrix(Matrix)
     {
         Return DllCall("gdiplus\GdipDeleteMatrix", this.Ptr, Matrix)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Text functions
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_TextToGraphics(pGraphics, Text, Options, Font="Arial", Width="", Height="", Measure=0)
     {
         IWidth      := Width
@@ -2110,7 +2151,7 @@ Class gdip
         Return E ? E : ReturnRC
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_DrawString(pGraphics, sString, hFont, hFormat, pBrush, ByRef RectF)
     {
         if (!A_IsUnicode)
@@ -2142,7 +2183,7 @@ Class gdip
                     , this.Ptr  , pBrush)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_MeasureString(pGraphics, sString, hFont, hFormat, ByRef RectF)
     {
         VarSetCapacity((RC:=""), 16)
@@ -2219,9 +2260,9 @@ Class gdip
         Return hFamily
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Matrix functions
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_CreateAffineMatrix(m11, m12, m21, m22, x, y)
     {
         DllCall("gdiplus\GdipCreateMatrix2", "float", m11, "float", m12, "float", m21, "float", m22, "float", x, "float", y, this.PtrA, (Matrix:=""))
@@ -2234,9 +2275,9 @@ Class gdip
         Return Matrix
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; GraphicsPath functions
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Alternate = 0
     ; Winding = 1
     Gdip_CreatePath(BrushMode=0)
@@ -2269,37 +2310,40 @@ Class gdip
         Return DllCall("gdiplus\GdipDeletePath", this.Ptr, Path)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Quality functions
-    ;#####################################################################################
-    ; SystemDefault = 0
-    ; SingleBitPerPixelGridFit = 1
-    ; SingleBitPerPixel = 2
-    ; AntiAliasGridFit = 3
-    ; AntiAlias = 4
+    ;##################################################################################################################
+    ; SystemDefault             = 0
+    ; SingleBitPerPixelGridFit  = 1
+    ; SingleBitPerPixel         = 2
+    ; AntiAliasGridFit          = 3
+    ; AntiAlias                 = 4
     Gdip_SetTextRenderingHint(pGraphics, RenderingHint)
     {
         Return DllCall("gdiplus\GdipSetTextRenderingHint", this.Ptr, pGraphics, "int", RenderingHint)
     }
     
-    ; Default = 0
-    ; LowQuality = 1
-    ; HighQuality = 2
-    ; Bilinear = 3
-    ; Bicubic = 4
-    ; NearestNeighbor = 5
-    ; HighQualityBilinear = 6
-    ; HighQualityBicubic = 7
+    ; Default               = 0
+    ; LowQuality            = 1
+    ; HighQuality           = 2
+    ; Bilinear              = 3
+    ; Bicubic               = 4
+    ; NearestNeighbor       = 5
+    ; HighQualityBilinear   = 6
+    ; HighQualityBicubic    = 7
     Gdip_SetInterpolationMode(pGraphics, InterpolationMode)
     {
         Return DllCall("gdiplus\GdipSetInterpolationMode", this.Ptr, pGraphics, "int", InterpolationMode)
     }
     
-    ; Default = 0
-    ; HighSpeed = 1
-    ; HighQuality = 2
-    ; None = 3
-    ; AntiAlias = 4
+    ; Invalid      = 0
+    ; Default      = 1
+    ; HighSpeed    = 2
+    ; HighQuality  = 3
+    ; None         = 4
+    ; AntiAlias    = 5
+    ; AntiAlias8x4 = 6
+    ; AntiAlias8x8 = 7
     Gdip_SetSmoothingMode(pGraphics, SmoothingMode)
     {
         Return DllCall("gdiplus\GdipSetSmoothingMode", this.Ptr, pGraphics, "int", SmoothingMode)
@@ -2312,9 +2356,9 @@ Class gdip
         Return DllCall("gdiplus\GdipSetCompositingMode", this.Ptr, pGraphics, "int", CompositingMode)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; Extra functions
-    ;#####################################################################################
+    ;##################################################################################################################
     __New()
     {
         this.Ptr    := A_PtrSize ? "UPtr"   : "UInt"
@@ -2470,9 +2514,9 @@ Class gdip
         Return DllCall("gdiplus\GdipDeleteRegion", this.Ptr, Region)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     ; BitmapLockBits
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_LockBits(pBitmap, x, y, w, h, ByRef Stride, ByRef Scan0, ByRef BitmapData, LockMode = 3, PixelFormat = 0x26200a)
     {
         this.CreateRect((Rect:=""), x, y, w, h)
@@ -2483,25 +2527,25 @@ Class gdip
         Return E
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_UnlockBits(pBitmap, ByRef BitmapData)
     {
         Return DllCall("Gdiplus\GdipBitmapUnlockBits", this.Ptr, pBitmap, this.Ptr, &BitmapData)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_SetLockBitPixel(ARGB, Scan0, x, y, Stride)
     {
         Numput(ARGB, Scan0+0, (x*4)+(y*Stride), "UInt")
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GetLockBitPixel(Scan0, x, y, Stride)
     {
         Return NumGet(Scan0+0, (x*4)+(y*Stride), "UInt")
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_PixelateBitmap(pBitmap, ByRef pBitmapOut, BlockSize)
     {
         Static PixelateBitmap := ""
@@ -2578,25 +2622,29 @@ Class gdip
         if (BlockSize > Width || BlockSize > Height)
             Return -2
         
-        E1 := this.Gdip_LockBits(pBitmap,     0, 0, Width, Height, Stride1, Scan01, BitmapData1)
-        E2 := this.Gdip_LockBits(pBitmapOut,  0, 0, Width, Height, Stride2, Scan02, BitmapData2)
-        if (E1 || E2)
+        if (this.Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1)
+            || this.Gdip_LockBits(pBitmapOut , 0, 0, Width, Height, Stride2, Scan02, BitmapData2))
             Return -3
         
-        E := DllCall(&PixelateBitmap, this.Ptr, Scan01, this.Ptr, Scan02, "int", Width, "int", Height, "int", Stride1, "int", BlockSize)
+        E := DllCall(&PixelateBitmap, this.Ptr  , Scan01
+                                    , this.Ptr  , Scan02
+                                    , "int"     , Width
+                                    , "int"     , Height
+                                    , "int"     , Stride1
+                                    , "int"     , BlockSize)
         , this.Gdip_UnlockBits(pBitmap, BitmapData1)
         , this.Gdip_UnlockBits(pBitmapOut, BitmapData2)
         
         Return 0
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_ToARGB(A, R, G, B)
     {
         Return (A << 24) | (R << 16) | (G << 8) | B
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_FromARGB(ARGB, ByRef A, ByRef R, ByRef G, ByRef B)
     {
           A := (0xff000000 & ARGB) >> 24
@@ -2605,31 +2653,31 @@ Class gdip
         , B := (0x000000ff & ARGB)
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_AFromARGB(ARGB)
     {
         Return (0xff000000 & ARGB) >> 24
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_RFromARGB(ARGB)
     {
         Return (0x00ff0000 & ARGB) >> 16
     }
     
-    ;#####################################################################################
+    ;##################################################################################################################
     Gdip_GFromARGB(ARGB)
     {
         Return (0x0000ff00 & ARGB) >> 8
     }
     
-    ;#####################################################################################    
+    ;##################################################################################################################    
     Gdip_BFromARGB(ARGB)
     {
         Return 0x000000ff & ARGB
     }
     
-    ;#####################################################################################    
+    ;##################################################################################################################    
     StrGetB(Address, Length=-1, Encoding=0)
     {
         ; Flexible parameter handling:
