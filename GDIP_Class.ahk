@@ -12,6 +12,9 @@ Class gdip
     ; Formatted code and text to be more easily readable
     ; All tutorials have been rewritten and updated
     ; Added Gdip_DrawPolygon
+    ; Added color object containing CSS3's extended color table
+    ;   Use: gdip.color.name where name is one of 140 named colors
+    ; Added alpha() method for passing in 
     ;                                                                                                                   
     ; Originally created by tic (Tariq Porter) 20110709
     ; Later updated by Rseding91 with fincs 64 bit compatible Gdip library 20130501
@@ -2358,12 +2361,12 @@ Class gdip
     ;##################################################################################################################
     __New()
     {
-        this.Ptr    := A_PtrSize ? "UPtr"   : "UInt"
+        this.Ptr    := A_PtrSize ? "UPtr"   : "UInt"    ; Set pointer types
         this.PtrA   := A_PtrSize ? "UPtr*"  : "UInt*"
+        this.pToken := this.Startup()                   ; Start up GDIP
+        this.generate_colors()                          ; Generate color object
+        OnExit(this.run_method("__Delete"))             ; Set cleanup method to run at script exit
         
-        this.pToken := this.Startup()
-        OnExit(this.run_method("__Delete"))
-        ;MsgBox, % "GDIP Started up successfully.`n`nthis.Ptr: " this.Ptr "`nthis.PtrA: " this.PtrA "`nthis.pToken: " this.pToken 
         Return 0
     }
     
@@ -2719,6 +2722,183 @@ Class gdip
         
         Return String
     }
+    
+    ; ########## Colors and Alpha ##########
+    ; This needs to be updated so things like grey/gray are addressed.
+    ; These slight variations should be accounted for
+    generate_colors() {
+        this.color := {}
+        
+        ; Pink
+        this.color.MediumVioletRed      := 0xC71585
+        this.color.DeepPink             := 0xFF1493
+        this.color.PaleVioletRed        := 0xDB7093
+        this.color.HotPink              := 0xFF69B4
+        this.color.LightPink            := 0xFFB6C1
+        this.color.Pink                 := 0xFFC0CB
+        
+        ; Red
+        this.color.DarkRed              := 0x8B0000
+        this.color.Red                  := 0xFF0000
+        this.color.Firebrick            := 0xB22222
+        this.color.Crimson              := 0xDC143C
+        this.color.IndianRed            := 0xCD5C5C
+        this.color.LightCoral           := 0xF08080
+        this.color.Salmon               := 0xFA8072
+        this.color.DarkSalmon           := 0xE9967A
+        this.color.LightSalmon          := 0xFFA07A
+        
+        ; Orange
+        this.color.OrangeRed            := 0xFF4500
+        this.color.Tomato               := 0xFF6347
+        this.color.DarkOrange           := 0xFF8C00
+        this.color.Coral                := 0xFF7F50
+        this.color.Orange               := 0xFFA500
+        
+        ; Yellow
+        this.color.DarkKhaki            := 0xBDB76B
+        this.color.Gold                 := 0xFFD700
+        this.color.Khaki                := 0xF0E68C
+        this.color.PeachPuff            := 0xFFDAB9
+        this.color.Yellow               := 0xFFFF00
+        this.color.PaleGoldenrod        := 0xEEE8AA
+        this.color.Moccasin             := 0xFFE4B5
+        this.color.PapayaWhip           := 0xFFEFD5
+        this.color.LightGoldenrodYellow := 0xFAFAD2
+        this.color.LemonChiffon         := 0xFFFACD
+        this.color.LightYellow          := 0xFFFFE0
+        
+        ; Brown
+        this.color.Maroon               := 0x800000
+        this.color.Brown                := 0xA52A2A
+        this.color.SaddleBrown          := 0x8B4513
+        this.color.Sienna               := 0xA0522D
+        this.color.Chocolate            := 0xD2691E
+        this.color.DarkGoldenrod        := 0xB8860B
+        this.color.Peru                 := 0xCD853F
+        this.color.RosyBrown            := 0xBC8F8F
+        this.color.Goldenrod            := 0xDAA520
+        this.color.SandyBrown           := 0xF4A460
+        this.color.Tan                  := 0xD2B48C
+        this.color.Burlywood            := 0xDEB887
+        this.color.Wheat                := 0xF5DEB3
+        this.color.NavajoWhite          := 0xFFDEAD
+        this.color.Bisque               := 0xFFE4C4
+        this.color.BlanchedAlmond       := 0xFFEBCD
+        this.color.Cornsilk             := 0xFFF8DC
+        
+        ; Green
+        this.color.DarkGreen            := 0x006400
+        this.color.Green                := 0x008000
+        this.color.DarkOliveGreen       := 0x556B2F
+        this.color.ForestGreen          := 0x228B22
+        this.color.SeaGreen             := 0x2E8B57
+        this.color.Olive                := 0x808000
+        this.color.OliveDrab            := 0x6B8E23
+        this.color.MediumSeaGreen       := 0x3CB371
+        this.color.LimeGreen            := 0x32CD32
+        this.color.Lime                 := 0x00FF00
+        this.color.SpringGreen          := 0x00FF7F
+        this.color.MediumSpringGreen    := 0x00FA9A
+        this.color.DarkSeaGreen         := 0x8FBC8F
+        this.color.MediumAquamarine     := 0x66CDAA
+        this.color.YellowGreen          := 0x9ACD32
+        this.color.LawnGreen            := 0x7CFC00
+        this.color.Chartreuse           := 0x7FFF00
+        this.color.LightGreen           := 0x90EE90
+        this.color.GreenYellow          := 0xADFF2F
+        this.color.PaleGreen            := 0x98FB98
+        
+        ; Cyan
+        this.color.Teal                 := 0x008080
+        this.color.DarkCyan             := 0x008B8B
+        this.color.LightSeaGreen        := 0x20B2AA
+        this.color.CadetBlue            := 0x5F9EA0
+        this.color.DarkTurquoise        := 0x00CED1
+        this.color.MediumTurquoise      := 0x48D1CC
+        this.color.Turquoise            := 0x40E0D0
+        this.color.Aqua                 := 0x00FFFF
+        this.color.Cyan                 := 0x00FFFF
+        this.color.Aquamarine           := 0x7FFFD4
+        this.color.PaleTurquoise        := 0xAFEEEE
+        this.color.LightCyan            := 0xE0FFFF
+        
+        ; Blue
+        this.color.Navy                 := 0x000080
+        this.color.DarkBlue             := 0x00008B
+        this.color.MediumBlue           := 0x0000CD
+        this.color.Blue                 := 0x0000FF
+        this.color.MidnightBlue         := 0x191970
+        this.color.RoyalBlue            := 0x4169E1
+        this.color.SteelBlue            := 0x4682B4
+        this.color.DodgerBlue           := 0x1E90FF
+        this.color.DeepSkyBlue          := 0x00BFFF
+        this.color.CornflowerBlue       := 0x6495ED
+        this.color.SkyBlue              := 0x87CEEB
+        this.color.LightSkyBlue         := 0x87CEFA
+        this.color.LightSteelBlue       := 0xB0C4DE
+        this.color.LightBlue            := 0xADD8E6
+        this.color.PowderBlue           := 0xB0E0E6
+        
+        ; Purplethis.color.violetthis.color.and magenta
+        this.color.Indigo               := 0x4B0082
+        this.color.Purple               := 0x800080
+        this.color.DarkMagenta          := 0x8B008B
+        this.color.DarkViolet           := 0x9400D3
+        this.color.DarkSlateBlue        := 0x483D8B
+        this.color.BlueViolet           := 0x8A2BE2
+        this.color.DarkOrchid           := 0x9932CC
+        this.color.Fuchsia              := 0xFF00FF
+        this.color.Magenta              := 0xFF00FF
+        this.color.SlateBlue            := 0x6A5ACD
+        this.color.MediumSlateBlue      := 0x7B68EE
+        this.color.MediumOrchid         := 0xBA55D3
+        this.color.MediumPurple         := 0x9370DB
+        this.color.Orchid               := 0xDA70D6
+        this.color.Violet               := 0xEE82EE
+        this.color.Plum                 := 0xDDA0DD
+        this.color.Thistle              := 0xD8BFD8
+        this.color.Lavender             := 0xE6E6FA
+        
+        ; White
+        this.color.MistyRose            := 0xFFE4E1
+        this.color.AntiqueWhite         := 0xFAEBD7
+        this.color.Linen                := 0xFAF0E6
+        this.color.Beige                := 0xF5F5DC
+        this.color.WhiteSmoke           := 0xF5F5F5
+        this.color.LavenderBlush        := 0xFFF0F5
+        this.color.OldLace              := 0xFDF5E6
+        this.color.AliceBlue            := 0xF0F8FF
+        this.color.Seashell             := 0xFFF5EE
+        this.color.GhostWhite           := 0xF8F8FF
+        this.color.Honeydew             := 0xF0FFF0
+        this.color.FloralWhite          := 0xFFFAF0
+        this.color.Azure                := 0xF0FFFF
+        this.color.MintCream            := 0xF5FFFA
+        this.color.Snow                 := 0xFFFAFA
+        this.color.Ivory                := 0xFFFFF0
+        this.color.White                := 0xFFFFFF
+        
+        ; Black and gray/grey
+        this.color.Black                := 0x000000
+        this.color.DarkSlateGray        := 0x2F4F4F
+        this.color.DimGray              := 0x696969
+        this.color.SlateGray            := 0x708090
+        this.color.Gray                 := 0x808080
+        this.color.LightSlateGray       := 0x778899
+        this.color.DarkGray             := 0xA9A9A9
+        this.color.Silver               := 0xC0C0C0
+        this.color.LightGray            := 0xD3D3D3
+        this.color.Gainsboro            := 0xDCDCDC
+        
+        Return
+    }
+    
+    ; Pass in 
+    alpha_perc(perc) {
+        Return Round(perc * 255 / 100) + 0x0
+    }
+
     
     ; ########## Misc Methods ##########
     run_method(method_name, params:="") {
