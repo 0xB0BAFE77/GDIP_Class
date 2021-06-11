@@ -31,46 +31,58 @@ Return
 *Esc::ExitApp
 
 Tutorial_02() {
-    ; Let's use our new function to create a new bitmap
-    ; This function will return a bmo (Bitmap Object). It's an object that contains all
-    ; the info about the new bitmap we created. BMO will be used with all of our new functions.
-    ; We must provide this function with a width and height for out bitmap
+    ; Let's use our new function to create a brand new bitmap. It requires a width and height to make the bitmap.
+    ; This function returns a bmo (Bitmap Object). This is a simple object that contains all the info about the bitmap.
+    ; Our new functions will expect a BMO to be passed to them. This is an efficient way to transmit data without using global variables.
     bmo     := bitmap_new(600, 400)
+    ; Note we're already referencing the bmo for the graphics pointer (gp)
     gdip.Gdip_SetSmoothingMode(bmo.gp, 7)
     
-    ; To make things easy, let's make an object called color
-    ; Add all the colors we're going to be using
-    color   :=  {"sky"      : gdip.color.DeepSkyBlue
-                ,"grass"    : gdip.color.Green
-                ,"house"    : gdip.color.Wheat
-                ,"door"     : gdip.color.Sienna
-                ,"window"   : gdip.color.Gold
-                ,"roof"     : gdip.color.DarkGray
-                ,"sun"      : gdip.color.Yellow
-                ,"cloud"    : gdip.color.GhostWhite
-                ,"leaves"   : gdip.color.DarkGreen
-                ,"trunk"    : gdip.color.SaddleBrown }
+    house   :=  {"house"     : 
+                ,"roof"     : 
+                ,"door"
+                ,"window1"
+                ,"window2"
+                ,""     : 
+                ,""     : 
+                ,""     : 
+                ,""     : 
+                ,""     : 
+                ,""     : 
+                ,""     : 
+                ,""     : }
     
-    ; We're going to draw a basic house with a sun in the sky.
-    ; We've made 3 new functions to draw stuff: draw_ellipse(), draw_rectangle(), draw_polygon()
-    ; Each function has usage instructions by it
-    ; To draw this image, we the furthest thing first and the closest thing last
-    ; Let's make the sky
-    draw_rectangle(bmo, 0xFF, color.sky, x, y, width, height, pen_size:=0)
-    ;draw_rectangle(bmo, arbg, x, y, width, height, pen_size:=0)
-    ;draw_polygon(bmo, arbg, points, pen_size:=0)
+    ; We're going to draw a basic house
+    ; We've made 3 new functions to draw stuff with
+    ; Each function has usage more detailed instructions by it
+    ; Here's what is expected of each function:
+    ;   draw_ellipse(bmo, alpha, color, x, y, width, height, pen_size:=0)
+    ;   draw_rectangle(bmo, alpha, color, x, y, width, height, pen_size:=0)
+    ;   draw_polygon(bmo, alpha, color, points, pen_size:=0)
+    draw_rectangle(bmo, 0xFF, color.sky     , 0, 0, bmo.width, bmo.height)                       ; The first part of the image we'll make is the sky
+    draw_rectangle(bmo, 0xFF, color.ground  , 0, bmo.height*0.7, bmo.width, bmo.height*0.3)   ; The ground
+    draw_rectangle(bmo, 0xFF, color.grass   , 0, bmo.height*0.7, bmo.width, 3)                 ; Grass
+    draw_ellipse(bmo, 0xFF, color.sun       , 0, 0, 100, 100, 0)
+    draw_rectangle(bmo, 0xFF, color.cloud   , x, y, w, h)               ; Clouds?
+    draw_rectangle(bmo, 0xFF, color.house   , 200, y, 200, h)       ; House
+    draw_rectangle(bmo, 0xFF, color.roof    , x, y, w, h)       ; Roof
+    draw_rectangle(bmo, 0xFF, color.window  , x, y, w, h)       ; Window
+    draw_rectangle(bmo, 0xFF, color.door    , x, y, w, h)       ; Door
+    draw_rectangle(bmo, 0xFF, color., x, y, w, h)               ; 
+    draw_rectangle(bmo, 0xFF, color., x, y, w, h)               ; 
+    
     
     ; Next, we'll draw the outline of a rectangle.
     ; P
-    pPen    := gdip.Gdip_CreatePen(0xFFFFFF00, 2)          ; First, we make a pen
-    pBrush  := gdip.Gdip_BrushCreateSolid(0x800000ff)        ; Alpha is set to half transparency (80) and blue is set to max (FF)
+    pPen    := gdip.Gdip_CreatePen(0xFFFFFF00, 2)               ; First, we make a pen
+    pBrush  := gdip.Gdip_BrushCreateSolid(0x800000FF)           ; Alpha is set to half transparency (80) and blue is set to max (FF)
     
     ; Cleanup
     gdip.Gdip_DeleteBrush(pBrush)
     
     ; For our thrid shape, we're going to make a solid yellow triangle outline
-    pPen    := gdip.Gdip_CreatePen(0xFFFFFF00, 2)          ; First, we make a pen
-    gdip.Gdip_DeletePen(pPen)                               ; Delete the pen as it is no longer needed and wastes memory
+    pPen    := gdip.Gdip_CreatePen(0xFFFFFF00, 2)               ; First, we make a pen
+    gdip.Gdip_DeletePen(pPen)                                   ; Delete the pen as it is no longer needed and wastes memory
     
     ; Now we update the gui with the newly drawn picture and can finally see our work
     gdip.UpdateLayeredWindow(guiHwnd        ; Handle to our transparent gui
@@ -129,23 +141,24 @@ bitmap_delete(bmo) {
 }
 
 ; Draws an ellipse
-; Requires a bmo, percent alpha, a hex color 6 digits long,
-;   x and y coord of the ellipse, and the width and height
 ; If the last parameter is 0 or is omitted, the ellipse is filled in
 ; Otherwise, that number is treated as pen thickness and an outline will be drawn instead
-draw_ellipse(bmo, alpha, color, x, y, width, height, pen_size:=0) {
-    arbg := gdip.Gdip_ToARGB(alpha
-                            ,
-                            ,
-                            ,)
-    If (pen_size= 0)
+draw_ellipse(bmo                        ; An object that has bitmap info in it. Our bitmap_new() function makes them.
+            , alpha                     ; Percent alpha from 0-100 where 0 is transparent and 100 is solid
+            , color                     ; An RGB hex value
+            , x                         ; x-coord (furthest left coordinate of ellipse)
+            , y                         ; y-coord (furthest top coordinate of ellipse)
+            , width                     ; Width of the middle of the ellipse
+            , height                    ; Height at the center of the ellipse
+            , pen_size:=0) {            ; 0 = Fill in, anything 1 and higher makes the shape an outline of pen_size thickness
+    argb := (alpha << 24) + color                                       ; Creates a valid 8 digit ARGB value for pen/brush creation
+    If (pen_size = 0)                                                   ; If no pen size, draw a filled in ellipse
     {
         brush := gdip.Gdip_BrushCreateSolid()
         gdip.Gdip_FillEllipse(bmo.gp, brush, x, y, width, height)
         Gdip_DeleteBrush(brush)
     }
-    Else
-    {
+    Else If (pen_size >= 1){                                            ; If number is 1 or greater, make an outline with that thickness
         pen := gdip.Gdip_CreatePen(arbg, pen_size)
         gdip.Gdip_DrawEllipse(bmo.gp, pen, x, y, width, height)
         gdip.Gdip_DeletePen(pen)
