@@ -5,17 +5,23 @@ Class gdip
 {
     ; GDI+ Windows Library Class Rewrite
     ; v1.48
-    ; Update by 0xB0BAFE77 20210501
+    ; Update by 0xB0BAFE77 20210609
     ; 
-    ; Converted GDIP library to a single class
-    ; Updated/corrected many descriptions
+    ; Converted GDIP library to a class
+    ; Updated many descriptions
     ; Formatted code and text to be more easily readable
-    ; All tutorials have been rewritten and updated
-    ; Added Gdip_DrawPolygon
-    ; Added color object containing CSS3's extended color table
-    ;   Use: gdip.color.name where name is one of 140 named colors
-    ; Added alpha() method for passing in 
-    ;                                                                                                                   
+    ; All tutorials have been rewritten, updated, expanded and new ones included
+    ;   Tutorials start extremely simple with the user making basic shapes in global space
+    ;   Progress is made into functions, GUIs, classes, and even into games
+    ; Added Gdip_DrawPolygon() as only the fill variant existed
+    ; Added new color object that contains all of CSS3's extended color table hex values and names
+    ;   Use: gdip.color.color_name where color_name is one of the 140 predefined colors
+    ;   Official CSS3 color module info: https://www.w3.org/TR/2018/REC-css-color-3-20180619
+    ;   
+    ; Added alpha(percent) method
+    ;   Pass a percentage from 1-100 in and it will return the 2 digit hex equivalent for alpha blending
+    ;   Example: alpha(50) = 0x80, alpha(100) = 0xFF
+    ;
     ; Originally created by tic (Tariq Porter) 20110709
     ; Later updated by Rseding91 with fincs 64 bit compatible Gdip library 20130501
     ; Supports: Basic, _L ANSi, _L Unicode x86 and _L Unicode x64
