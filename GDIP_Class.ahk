@@ -431,7 +431,7 @@ Class gdip
             , h := S4
         }
         
-        If (x = "") || (y = "") || (w = "") || (h = "") ; If any whxy value is empty, throw error -1
+        If (x = "") || (y = "") || (w = "") || (h = "")         ; If any whxy value is empty, throw error -1
             Return -1
         
         chdc    := this.CreateCompatibleDC()                    ; Create a device context
@@ -872,7 +872,7 @@ Class gdip
     ; Call          Gdip_BitmapFromBRA(ByRef BRAFromMem, File, Alternate=0)                                             |
     ; Description   Gets a pointer to a gdi+ bitmap from a BRA file                                                     |
     ;                                                                                                                   |
-    ; BRAFromMem  The variable for a BRA file read into memory                                                          |
+    ; BRAFromMem    The variable for a BRA file read into memory                                                        |
     ; Fn            File name or file number depending on the Alt parameter.                                            |
     ; Alt           Changes whether the Fn parameter is file name or number                                             |
     ;                                                                                                                   |
