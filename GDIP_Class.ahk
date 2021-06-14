@@ -114,7 +114,7 @@ Class gdip
             ? (VarSetCapacity(pt, 8), NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt") )
             : ""
         
-        if (w = "") || (h = "")
+        If (w = "") || (h = "")
             WinGetPos,,, w, h, ahk_id %hwnd%
         
         Return DllCall("UpdateLayeredWindow"
@@ -153,23 +153,24 @@ Class gdip
     ;               SRCCOPY copies the source rectangle directly to the destination.                                    |
     ;                                                                                                                   |
     ; List of raster operation codes:                                                                                   |
-    ; BLACKNESS     = 0x00000042                                                                                        |
-    ; CAPTUREBLT    = 0x40000000                                                                                        |
-    ; DSTINVERT     = 0x00550009                                                                                        |
-    ; MERGECOPY     = 0x00C000CA                                                                                        |
-    ; MERGEPAINT    = 0x00BB0226                                                                                        |
-    ; NOMIRRORBITMAP= 0x80000000                                                                                        |
-    ; NOTSRCCOPY    = 0x00330008                                                                                        |
-    ; NOTSRCERASE   = 0x001100A6                                                                                        |
-    ; PATCOPY       = 0x00F00021                                                                                        |
-    ; PATINVERT     = 0x005A0049                                                                                        |
-    ; PATPAINT      = 0x00FB0A09                                                                                        |
-    ; SRCAND        = 0x008800C6                                                                                        |
-    ; SRCCOPY       = 0x00CC0020                                                                                        |
-    ; SRCERASE      = 0x00440328                                                                                        |
-    ; SRCINVERT     = 0x00660046                                                                                        |
-    ; SRCPAINT      = 0x00EE0086                                                                                        |
-    ; WHITENESS     = 0x00FF0062                                                                                        |
+    ; By name:                                                          By Number                                       |
+    ; BLACKNESS         = 0x00000042                                    0x00000042 = BLACKNESS                          |
+    ; CAPTUREBLT        = 0x40000000                                    0x001100A6 = NOTSRCERASE                        |
+    ; DSTINVERT         = 0x00550009                                    0x00330008 = NOTSRCCOPY                         |
+    ; MERGECOPY         = 0x00C000CA                                    0x00440328 = SRCERASE                           |
+    ; MERGEPAINT        = 0x00BB0226                                    0x00550009 = DSTINVERT                          |
+    ; NOMIRRORBITMAP    = 0x80000000                                    0x005A0049 = PATINVERT                          |
+    ; NOTSRCCOPY        = 0x00330008                                    0x00660046 = SRCINVERT                          |
+    ; NOTSRCERASE       = 0x001100A6                                    0x008800C6 = SRCAND                             |
+    ; PATCOPY           = 0x00F00021                                    0x00BB0226 = MERGEPAINT                         |
+    ; PATINVERT         = 0x005A0049                                    0x00C000CA = MERGECOPY                          |
+    ; PATPAINT          = 0x00FB0A09                                    0x00CC0020 = SRCCOPY                            |
+    ; SRCAND            = 0x008800C6                                    0x00EE0086 = SRCPAINT                           |
+    ; SRCCOPY           = 0x00CC0020                                    0x00F00021 = PATCOPY                            |
+    ; SRCERASE          = 0x00440328                                    0x00FB0A09 = PATPAINT                           |
+    ; SRCINVERT         = 0x00660046                                    0x00FF0062 = WHITENESS                          |
+    ; SRCPAINT          = 0x00EE0086                                    0x40000000 = CAPTUREBLT                         |
+    ; WHITENESS         = 0x00FF0062                                    0x80000000 = NOMIRRORBITMAP                     |
     ;___________________________________________________________________________________________________________________|
     BitBlt(dDC, dx, dy, dw, dh, sDC, sx, sy, Raster="")
     {
@@ -184,56 +185,6 @@ Class gdip
                         , "int"     , sy 
                         , "uint"    , Raster ? Raster : 0x00CC0020)
     }
-    
-    ; TRYING OUT SOME "BOOK" ARTWORK HERE INSTEAD OF THE FOLDER DESIGN
-    ;  _______________________________________________________________________________________________________________
-    ; |\______________________________________________________________________________________________________________\
-    ; | \______________________________________________________________________________________________________________\
-    ; | |StretchBlt                                                                                                     |
-    ; | |                                                                                                               |
-    ; | |Call          StretchBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, sw, sh, Raster="")                                  |
-    ; | |Description   Copies a bitmap from source to destination and applies any stretching or compressing the source  |
-    ; | |              bitmap needs to fit the destination. Stretching/compressing is done using the dest stretch mode. |
-    ; | |                                                                                                               |
-    ; | |dDC           Handle to destination device context                                                             |
-    ; | |dx            x-coord of the upper-left corner of the area being copied                                        |
-    ; | |dy            y-coord of the upper-left corner of the area being copied                                        |
-    ; | |dw            Width of the area being copied                                                                   |
-    ; | |dh            Height of the area being copied                                                                  |
-    ; | |sDC           Handle to source device context                                                                  |
-    ; | |sx            x-coord of destination where the source should be copied to                                      |
-    ; | |sy            y-coord of destination where the source should be copied to                                      |
-    ; | |sw            Width of the area being copied                                                                   |
-    ; | |sh            Height of the area being copied                                                                  |
-    ; | |Raster        Raster operation code                                                                            |
-    ; | |                                                                                                               |
-    ; | |Return        If the function succeeds, the Return value is nonzero                                            |
-    ; | |                                                                                                               |
-    ; | |notes         If raster operation is not specified, SRCCOPY is used.                                           |
-    ; | |              SRCCOPY copies the source rectangle directly to the destination.                                 |
-    ; | |                                                                                                               |
-    ; | |List of raster operation codes:                                                                                |
-    ; | |BLACKNESS     = 0x00000042                                                                                     |
-    ; | |CAPTUREBLT    = 0x40000000                                                                                     |
-    ; | |DSTINVERT     = 0x00550009                                                                                     |
-    ; | |MERGECOPY     = 0x00C000CA                                                                                     |
-    ; | |MERGEPAINT    = 0x00BB0226                                                                                     |
-    ; | |NOMIRRORBITMAP= 0x80000000                                                                                     |
-    ; | |NOTSRCCOPY    = 0x00330008                                                                                     |
-    ; | |NOTSRCERASE   = 0x001100A6                                                                                     |
-    ; | |PATCOPY       = 0x00F00021                                                                                     |
-    ; | |PATINVERT     = 0x005A0049                                                                                     |
-    ; | |PATPAINT      = 0x00FB0A09                                                                                     |
-    ; | |SRCAND        = 0x008800C6                                                                                     |
-    ; | |SRCCOPY       = 0x00CC0020                                                                                     |
-    ; | |SRCERASE      = 0x00440328                                                                                     |
-    ; | |SRCINVERT     = 0x00660046                                                                                     |
-    ; | |SRCPAINT      = 0x00EE0086                                                                                     |
-    ; \ |WHITENESS     = 0x00FF0062                                                                                     |
-    ;  \|_______________________________________________________________________________________________________________|
-    ;                                                                                                                   |
-    ; I THINK I LIKE THE FOLDER DESIGN MORE...
-    
     
     ;###################################################################################################################
     ;  ______________                                                                                                   
@@ -261,23 +212,24 @@ Class gdip
     ;               SRCCOPY copies the source rectangle directly to the destination.                                    |
     ;                                                                                                                   |
     ; List of raster operation codes:                                                                                   |
-    ; BLACKNESS     = 0x00000042                                                                                        |
-    ; CAPTUREBLT    = 0x40000000                                                                                        |
-    ; DSTINVERT     = 0x00550009                                                                                        |
-    ; MERGECOPY     = 0x00C000CA                                                                                        |
-    ; MERGEPAINT    = 0x00BB0226                                                                                        |
-    ; NOMIRRORBITMAP= 0x80000000                                                                                        |
-    ; NOTSRCCOPY    = 0x00330008                                                                                        |
-    ; NOTSRCERASE   = 0x001100A6                                                                                        |
-    ; PATCOPY       = 0x00F00021                                                                                        |
-    ; PATINVERT     = 0x005A0049                                                                                        |
-    ; PATPAINT      = 0x00FB0A09                                                                                        |
-    ; SRCAND        = 0x008800C6                                                                                        |
-    ; SRCCOPY       = 0x00CC0020                                                                                        |
-    ; SRCERASE      = 0x00440328                                                                                        |
-    ; SRCINVERT     = 0x00660046                                                                                        |
-    ; SRCPAINT      = 0x00EE0086                                                                                        |
-    ; WHITENESS     = 0x00FF0062                                                                                        |
+    ; By name:                                                          By Number                                       |
+    ; BLACKNESS         = 0x00000042                                    0x00000042 = BLACKNESS                          |
+    ; CAPTUREBLT        = 0x40000000                                    0x001100A6 = NOTSRCERASE                        |
+    ; DSTINVERT         = 0x00550009                                    0x00330008 = NOTSRCCOPY                         |
+    ; MERGECOPY         = 0x00C000CA                                    0x00440328 = SRCERASE                           |
+    ; MERGEPAINT        = 0x00BB0226                                    0x00550009 = DSTINVERT                          |
+    ; NOMIRRORBITMAP    = 0x80000000                                    0x005A0049 = PATINVERT                          |
+    ; NOTSRCCOPY        = 0x00330008                                    0x00660046 = SRCINVERT                          |
+    ; NOTSRCERASE       = 0x001100A6                                    0x008800C6 = SRCAND                             |
+    ; PATCOPY           = 0x00F00021                                    0x00BB0226 = MERGEPAINT                         |
+    ; PATINVERT         = 0x005A0049                                    0x00C000CA = MERGECOPY                          |
+    ; PATPAINT          = 0x00FB0A09                                    0x00CC0020 = SRCCOPY                            |
+    ; SRCAND            = 0x008800C6                                    0x00EE0086 = SRCPAINT                           |
+    ; SRCCOPY           = 0x00CC0020                                    0x00F00021 = PATCOPY                            |
+    ; SRCERASE          = 0x00440328                                    0x00FB0A09 = PATPAINT                           |
+    ; SRCINVERT         = 0x00660046                                    0x00FF0062 = WHITENESS                          |
+    ; SRCPAINT          = 0x00EE0086                                    0x40000000 = CAPTUREBLT                         |
+    ; WHITENESS         = 0x00FF0062                                    0x80000000 = NOMIRRORBITMAP                     |
     ;___________________________________________________________________________________________________________________|
     StretchBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, sw, sh, Raster="")
     {
@@ -324,10 +276,10 @@ Class gdip
     ;                       color over the destination block of pixels approximates the color of the source pixels.     |
     ;                       After setting HALFTONE, an application must call SetBrushOrgEx() to set the brush origin.   |
     ;                       Failure will cause brush misalignment issues.                                               |
-    ; STRETCH_ANDSCANS      Same as BLACKONWHITE.                                                                       |
-    ; STRETCH_DELETESCANS   Same as COLORONCOLOR.                                                                       |
-    ; STRETCH_HALFTONE      Same as HALFTONE.                                                                           |
-    ; STRETCH_ORSCANS       Same as WHITEONBLACK.                                                                       |
+    ; STRETCH_ANDSCANS      Synonymous with BLACKONWHITE.                                                               |
+    ; STRETCH_DELETESCANS   Synonymous with COLORONCOLOR.                                                               |
+    ; STRETCH_HALFTONE      Synonymous with HALFTONE.                                                                   |
+    ; STRETCH_ORSCANS       Synonymous with WHITEONBLACK.                                                               |
     ;___________________________________________________________________________________________________________________|
     SetStretchBltMode(hdc, iStretchMode=4)
     {
@@ -371,6 +323,7 @@ Class gdip
     ; notes         A control must have the 0xE style set to it so it is recognised as a bitmap                         |
     ;               By default SysColor=15 is used which is COLOR_3DFACE. This is the standard background for a control |
     ;                                                                                                                   |
+    ; By Name:                                              By Number:                                                  |
     ; COLOR_3DDKSHADOW              = 21                    COLOR_SCROLLBAR               = 0                           |
     ; COLOR_3DFACE                  = 15                    COLOR_BACKGROUND              = 1                           |
     ; COLOR_3DHIGHLIGHT             = 20                    COLOR_DESKTOP                 = 1                           |
@@ -445,31 +398,31 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_BitmapFromScreen(Screen=0, Raster="")
     {
-        if (Screen = 0) ; If 0, get size and pos of virtual screen (the bounding rectangle of all monitors)
+        If (Screen = 0) ; If 0, get size and pos of virtual screen (the bounding rectangle of all monitors)
         {
-            Sysget, x, 76                           ; SM_XVIRTUALSCREEN
-            Sysget, y, 77                           ; SM_YVIRTUALSCREEN
-            Sysget, w, 78                           ; SM_CXVIRTUALSCREEN
-            Sysget, h, 79                           ; SM_CYVIRTUALSCREEN
+            Sysget, x, 76                                       ; SM_XVIRTUALSCREEN
+            Sysget, y, 77                                       ; SM_YVIRTUALSCREEN
+            Sysget, w, 78                                       ; SM_CXVIRTUALSCREEN
+            Sysget, h, 79                                       ; SM_CYVIRTUALSCREEN
         }
-        else if (SubStr(Screen, 1, 5) = "hwnd:")    ; Check for "hwnd:" prefix
+        Else If (SubStr(Screen, 1, 5) = "hwnd:")                ; Check for "hwnd:" prefix
         {
-            Screen := SubStr(Screen, 6)             ; Remove prefix
-            if !WinExist("ahk_id " Screen)          ; If handle not exist
-                Return -2                           ; Return error -2
-            WinGetPos,,, w, h, ahk_id %Screen%      ; Otherwise, get w/h of screen
-            x := y := 0                             ; Set x/y defaults
-            , hhdc := this.GetDCEx(Screen, 3)       ; Get a handle to that screen's device context
+            Screen := SubStr(Screen, 6)                         ; Remove prefix
+            if !WinExist("ahk_id " Screen)                      ; If handle not exist
+                Return -2                                       ; Return error -2
+            WinGetPos,,, w, h, ahk_id %Screen%                  ; Otherwise, get w/h of screen
+            x := y := 0                                         ; Set x/y defaults
+            , hhdc := this.GetDCEx(Screen, 3)                   ; Get a handle to that screen's device context
         }
-        else if (Screen&1 != "")                    ; Check if 1 (main monitor)
+        Else If (Screen&1 != "")                                ; Check if 1 (main monitor)
         {
-            Sysget, M, Monitor, %Screen%            ; Get whxy values
+            Sysget, M, Monitor, %Screen%                        ; Get whxy values
               x := MLeft
             , y := MTop
             , w := MRight-MLeft
             , h := MBottom-MTop
         }
-        else                                        ; Otherwise, get whxy values from provided monitor #
+        else                                                    ; Otherwise, get whxy values from provided monitor #
         {
             StringSplit, S, Screen, |
               x := S1
@@ -478,7 +431,7 @@ Class gdip
             , h := S4
         }
         
-        if (x = "") || (y = "") || (w = "") || (h = "") ; If any whxy value is empty, throw error -1
+        If (x = "") || (y = "") || (w = "") || (h = "") ; If any whxy value is empty, throw error -1
             Return -1
         
         chdc    := this.CreateCompatibleDC()                    ; Create a device context
@@ -854,6 +807,137 @@ Class gdip
                         , "int"     , flags)
     }
     
+    ;###################################################################################################################
+    ;  _____________                                                                                                    
+    ; / ReleaseDC() \                                                                                                   
+    ;/               \__________________________________________________________________________________________________
+    ; Call          ReleaseDC(hdc, hwnd=0)                                                                              |
+    ; Description   Releases a device context, freeing it for use. The effect depends on the type of device context.    |
+    ;                                                                                                                   |
+    ; hdc           Handle to the device context to be released                                                         |
+    ; hwnd          Handle to the window whose device context is to be released                                         |
+    ;                                                                                                                   |
+    ; Return        1 = Released                                                                                        |
+    ;               0 = Not released                                                                                    |
+    ;                                                                                                                   |
+    ; notes         ReleaseDC() must be called whenever GetWindowDC() and GetDC() have retrieved a DC.                  |
+    ;               Applications created by calling CreateDC() must instead use the DeleteDC function.                  |
+    ;___________________________________________________________________________________________________________________|
+    ReleaseDC(hdc, hwnd=0)
+    {
+        Return DllCall("ReleaseDC"
+                        , this.Ptr  , hwnd
+                        , this.Ptr  , hdc)
+    }
+    
+    ;###################################################################################################################
+    ;  ____________                                                                                                     
+    ; / DeleteDC() \                                                                                                    
+    ;/              \___________________________________________________________________________________________________
+    ; Call          DeleteDC(hdc)                                                                                       |
+    ; Description   Deletes the specified device context (DC)                                                           |
+    ;                                                                                                                   |
+    ; hdc           Handle to the device context                                                                        |
+    ;                                                                                                                   |
+    ; Return        Nonzero on success                                                                                  |
+    ;                                                                                                                   |
+    ; notes         DeleteDC() is only meant for applications created by CreateDC().                                    |
+    ;               Applications created by calling GetDC() must use ReleaseDC() to free the DC.                        |
+    ;___________________________________________________________________________________________________________________|
+    DeleteDC(hdc)
+    {
+        Return DllCall("DeleteDC", this.Ptr, hdc)
+    }
+    
+    ;###################################################################################################################
+    ;  _______________________                                                                                          
+    ; / Gdip_LibraryVersion() \                                                                                         
+    ;/                         \________________________________________________________________________________________
+    ; Call          Gdip_LibraryVersion                                                                                 |
+    ; Description   Get the current library version                                                                     |
+    ;                                                                                                                   |
+    ; Return        This library's version                                                                              |
+    ;                                                                                                                   |
+    ; notes         Useful for non compiled programs. Ensures an old version isn't ran when testing your scripts.       |
+    ;___________________________________________________________________________________________________________________|
+    Gdip_LibraryVersion()
+    {
+        Return 1.48
+    }
+    
+    ;###################################################################################################################
+    ;  ______________________                                                                                           
+    ; / Gdip_BitmapFromBRA() \                                                                                                
+    ;/                        \_________________________________________________________________________________________
+    ; Call          Gdip_BitmapFromBRA(ByRef BRAFromMem, File, Alternate=0)                                             |
+    ; Description   Gets a pointer to a gdi+ bitmap from a BRA file                                                     |
+    ;                                                                                                                   |
+    ; BRAFromMem  The variable for a BRA file read into memory                                                          |
+    ; Fn            File name or file number depending on the Alt parameter.                                            |
+    ; Alt           Changes whether the Fn parameter is file name or number                                             |
+    ;                                                                                                                   |
+    ; Return        If the function succeeds, the Return value is a pointer to a gdi+ bitmap                            |
+    ;               -1 = The BRA variable is empty                                                                      |
+    ;               -2 = The BRA has an incorrect header                                                                |
+    ;               -3 = The BRA has information missing                                                                |
+    ;               -4 = Could not find file inside the BRA                                                             |
+    ;___________________________________________________________________________________________________________________|
+    Gdip_BitmapFromBRA(ByRef BRAFromMem, Fn, Alt=0)
+    {
+        Static FName = "ObjRelease"
+        
+        if !BRAFromMem
+            Return -1
+        
+        Loop, Parse, BRAFromMem, `n
+        {
+            If (A_Index = 1)
+            {
+                StringSplit, Header, A_LoopField, |
+                If (Header0 != 4 || Header2 != "BRA!")
+                    Return -2
+            }
+            Else If (A_Index = 2)
+            {
+                StringSplit, Info, A_LoopField, |
+                If (Info0 != 3)
+                    Return -3
+            }
+            else Break
+        }
+        
+        if !Alt
+            StringReplace, Fn, Fn, \, \\, All
+        
+        RegExMatch(BRAFromMem, "mi`n)^" (Alt ? Fn "\|.+?\|(\d+)\|(\d+)" : "\d+\|" Fn "\|(\d+)\|(\d+)") "$", FileInfo)
+        if !FileInfo
+            Return -4
+        
+        pStream := pBitmap := ""
+        , hData := DllCall("GlobalAlloc"
+                            , "uint"    , 2
+                            , this.Ptr  , FileInfo2)
+        , pData := DllCall("GlobalLock", this.Ptr  , hData)
+        , DllCall("RtlMoveMemory"
+                , this.Ptr  , pData
+                , this.Ptr  , &BRAFromMem+Info2+FileInfo1
+                , this.Ptr  , FileInfo2)
+        , DllCall("GlobalUnlock", this.Ptr, hData)
+        , DllCall("ole32\CreateStreamOnHGlobal"
+                , this.Ptr  , hData
+                , "int"     , 1
+                , this.PtrA , pStream)
+        , DllCall("gdiplus\GdipCreateBitmapFromStream"
+                , this.Ptr  , pStream
+                , this.PtrA , pBitmap)
+        
+        If (A_PtrSize)
+            %FName%(pStream)
+        Else
+            DllCall(NumGet(NumGet(1*pStream)+8), "uint", pStream)
+        
+        Return pBitmap
+    }
     
     
     
@@ -889,127 +973,7 @@ Class gdip
     
     
     
-    
-    ;###################################################################################################################
-    ;  _____________                                                                                                    
-    ; / ReleaseDC() \                                                                                                
-    ;/               \__________________________________________________________________________________________________
-    ; Call          ReleaseDC(hdc, hwnd=0)
-    ; Description   This function releases a device context (DC), freeing it for use by other applications. The effect of ReleaseDC depends on the type of device context
-    ;                                                                                                                   |
-    ; hdc           Handle to the device context to be released
-    ; hwnd          Handle to the window whose device context is to be released
-    ;                                                                                                                   |
-    ; Return        1 = released
-    ;               0 = not released
-    ;                                                                                                                   |
-    ; notes         The application must call the ReleaseDC function for each call to the GetWindowDC function and for each call to the GetDC function that retrieves a common device context
-    ;               An application cannot use the ReleaseDC function to release a device context that was created by calling the CreateDC function; instead, it must use the DeleteDC function. 
-    ;___________________________________________________________________________________________________________________|
-    ReleaseDC(hdc, hwnd=0)
-    {
-        Return DllCall("ReleaseDC", this.Ptr, hwnd, this.Ptr, hdc)
-    }
-    
-    ;###################################################################################################################
-    ;  ________________                                                                                                 
-    ; / () \                                                                                                
-    ;/                  \_______________________________________________________________________________________________
-    ; Call          DeleteDC
-    ; Description   The DeleteDC function deletes the specified device context (DC)
-    ;                                                                                                                   |
-    ; hdc                    A handle to the device context
-    ;                                                                                                                   |
-    ; Return                If the function succeeds, the Return value is nonzero
-    ;                                                                                                                   |
-    ; notes                    An application must not delete a DC whose handle was obtained by calling the GetDC function. Instead, it must call the ReleaseDC function to free the DC
-    ;___________________________________________________________________________________________________________________|
-    DeleteDC(hdc)
-    {
-        Return DllCall("DeleteDC", this.Ptr, hdc)
-    }
-    
-    ;###################################################################################################################
-    ;  ________________                                                                                                 
-    ; / () \                                                                                                
-    ;/                  \_______________________________________________________________________________________________
-    ; Call          Gdip_LibraryVersion
-    ; Description   Get the current library version
-    ;                                                                                                                   |
-    ; Return                the library version
-    ;                                                                                                                   |
-    ; notes                    This is useful for non compiled programs to ensure that a person doesn't run an old version when testing your scripts
-    ;___________________________________________________________________________________________________________________|
-    Gdip_LibraryVersion()
-    {
-        Return 1.48
-    }
-    
-    ;###################################################################################################################
-    ;  ________________                                                                                                 
-    ; / () \                                                                                                
-    ;/                  \_______________________________________________________________________________________________
-    ; Call          Gdip_BitmapFromBRA
-    ; Description:             Gets a pointer to a gdi+ bitmap from a BRA file
-    ;                                                                                                                   |
-    ; BRAFromMemIn            The variable for a BRA file read to memory
-    ; File                    The name of the file, or its number that you would like (This depends on alternate parameter)
-    ; Alternate                Changes whether the File parameter is the file name or its number
-    ;                                                                                                                   |
-    ; Return                  If the function succeeds, the Return value is a pointer to a gdi+ bitmap
-    ;                        -1 = The BRA variable is empty
-    ;                        -2 = The BRA has an incorrect header
-    ;                        -3 = The BRA has information missing
-    ;                        -4 = Could not find file inside the BRA
-    ;___________________________________________________________________________________________________________________|
-    Gdip_BitmapFromBRA(ByRef BRAFromMemIn, File, Alternate=0)
-    {
-        Static FName = "ObjRelease"
-        
-        if !BRAFromMemIn
-            Return -1
-        
-        Loop, Parse, BRAFromMemIn, `n
-        {
-            if (A_Index = 1)
-            {
-                StringSplit, Header, A_LoopField, |
-                if (Header0 != 4 || Header2 != "BRA!")
-                    Return -2
-            }
-            else if (A_Index = 2)
-            {
-                StringSplit, Info, A_LoopField, |
-                if (Info0 != 3)
-                    Return -3
-            }
-            else
-                break
-        }
-        
-        if !Alternate
-            StringReplace, File, File, \, \\, All
-        
-        RegExMatch(BRAFromMemIn, "mi`n)^" (Alternate ? File "\|.+?\|(\d+)\|(\d+)" : "\d+\|" File "\|(\d+)\|(\d+)") "$", FileInfo)
-        if !FileInfo
-            Return -4
-        
-        pStream := pBitmap := ""
-        , hData := DllCall("GlobalAlloc", "uint", 2, this.Ptr, FileInfo2, this.Ptr)
-        , pData := DllCall("GlobalLock", this.Ptr, hData, this.Ptr)
-        , DllCall("RtlMoveMemory", this.Ptr, pData, this.Ptr, &BRAFromMemIn+Info2+FileInfo1, this.Ptr, FileInfo2)
-        , DllCall("GlobalUnlock", this.Ptr, hData)
-        , DllCall("ole32\CreateStreamOnHGlobal", this.Ptr, hData, "int", 1, this.PtrA, pStream)
-        , DllCall("gdiplus\GdipCreateBitmapFromStream", this.Ptr, pStream, this.PtrA, pBitmap)
-        
-        If (A_PtrSize)
-            %FName%(pStream)
-        Else
-            DllCall(NumGet(NumGet(1*pStream)+8), "uint", pStream)
-        
-        Return pBitmap
-    }
-    
+
     ;###################################################################################################################
     ;  ________________                                                                                                 
     ; / () \                                                                                                
@@ -1502,12 +1466,12 @@ Class gdip
             NumPut(Coord1, PointF, 8*(A_Index-1), "float"), NumPut(Coord2, PointF, (8*(A_Index-1))+4, "float")
         }
         
-        if (Matrix&1 = "")
+        If (Matrix&1 = "")
             ImageAttr := this.Gdip_SetImageAttributesColorMatrix(Matrix)
-        else if (Matrix != 1)
+        Else If (Matrix != 1)
             ImageAttr := this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
         
-        if (sx = "" && sy = "" && sw = "" && sh = "")
+        If (sx = "" && sy = "" && sw = "" && sh = "")
         {
             sx := 0, sy := 0
             sw := this.Gdip_GetImageWidth(pBitmap)
@@ -1579,9 +1543,9 @@ Class gdip
                 : (Matrix != 1) ? this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
                 : ""
         
-        if (sx = "" && sy = "" && sw = "" && sh = "")
+        If (sx = "" && sy = "" && sw = "" && sh = "")
         {
-            if (dx = "" && dy = "" && dw = "" && dh = "")
+            If (dx = "" && dy = "" && dw = "" && dh = "")
             {
                 sx := dx := 0, sy := dy := 0
                 sw := dw := this.Gdip_GetImageWidth(pBitmap)
@@ -1761,7 +1725,7 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_BlurBitmap(pBitmap, Blur)
     {
-        if (Blur > 100) || (Blur < 1)
+        If (Blur > 100) || (Blur < 1)
             Return -1    
         
         sWidth      := this.Gdip_GetImageWidth(pBitmap)
@@ -1850,7 +1814,7 @@ Class gdip
         if !pCodec
             Return -3
         
-        if (Quality != 75)
+        If (Quality != 75)
         {
             Quality := (Quality < 0)
                 ? 0 
@@ -1866,7 +1830,7 @@ Class gdip
                 Loop, % NumGet(EncoderParameters, "UInt")      ;%
                 {
                     elem := (24+(A_PtrSize ? A_PtrSize : 4))*(A_Index-1) + 4 + (pad := A_PtrSize = 8 ? 4 : 0)
-                    if (NumGet(EncoderParameters, elem+16, "UInt") = 1) && (NumGet(EncoderParameters, elem+20, "UInt") = 6)
+                    If (NumGet(EncoderParameters, elem+16, "UInt") = 1) && (NumGet(EncoderParameters, elem+20, "UInt") = 6)
                     {
                         p := elem+&EncoderParameters-pad-4
                         NumPut(Quality, NumGet(NumPut(4, NumPut(1, p+0)+20, "UInt")), "UInt")
@@ -1876,7 +1840,7 @@ Class gdip
             }
         }
         
-        if (!A_IsUnicode)
+        If (!A_IsUnicode)
         {
             nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, this.Ptr, &sOutput, "int", -1, this.Ptr, 0, "int", 0)
             VarSetCapacity(wOutput, nSize*2)
@@ -2178,7 +2142,7 @@ Class gdip
         }
         else
         {
-            if (!A_IsUnicode)
+            If (!A_IsUnicode)
             {
                 VarSetCapacity(wFile, 1024)
                 DllCall("kernel32\MultiByteToWideChar", "uint", 0, "uint", 0, this.Ptr, &sFile, "int", -1, this.Ptr, &wFile, "int", 512)
@@ -2797,11 +2761,11 @@ Class gdip
         {
             StringSplit, ReturnRC, ReturnRC, |
             
-            if (vPos = "vCentre") || (vPos = "vCenter")
+            If (vPos = "vCentre") || (vPos = "vCenter")
                 ypos += (Height-ReturnRC4)//2
-            else if (vPos = "Top") || (vPos = "Up")
+            Else If (vPos = "Top") || (vPos = "Up")
                 ypos := 0
-            else if (vPos = "Bottom") || (vPos = "Down")
+            Else If (vPos = "Bottom") || (vPos = "Down")
                 ypos := Height-ReturnRC4
             
             this.CreateRectF(RC, xpos, ypos, Width, ReturnRC4)
@@ -2832,7 +2796,7 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawString(pGraphics, sString, hFont, hFormat, pBrush, ByRef RectF)
     {
-        if (!A_IsUnicode)
+        If (!A_IsUnicode)
         {
             nSize := DllCall("MultiByteToWideChar"
                             , "uint"    , 0
@@ -2980,7 +2944,7 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_FontFamilyCreate(Font)
     {
-        if (!A_IsUnicode)
+        If (!A_IsUnicode)
         {
             nSize := DllCall("MultiByteToWideChar", "uint", 0, "uint", 0, this.Ptr, &Font, "int", -1, "uint", 0, "int", 0)
             , VarSetCapacity(wFont, nSize*2)
@@ -3377,16 +3341,16 @@ Class gdip
                 ? Mod(Angle, 360)
                 : 360-Mod(-Angle, -360)
         
-        if ((Bound >= 0) && (Bound <= 90))
+        If ((Bound >= 0) && (Bound <= 90))
             xTranslation    := Height*Sin(TAngle)
             , yTranslation  := 0
-        else if ((Bound > 90) && (Bound <= 180))
+        Else If ((Bound > 90) && (Bound <= 180))
             xTranslation    := (Height*Sin(TAngle))-(Width*Cos(TAngle))
             , yTranslation  := -Height*Cos(TAngle)
-        else if ((Bound > 180) && (Bound <= 270))
+        Else If ((Bound > 180) && (Bound <= 270))
             xTranslation    := -(Width*Cos(TAngle))
             , yTranslation  := -(Height*Cos(TAngle))-(Width*Sin(TAngle))
-        else if ((Bound > 270) && (Bound <= 360))
+        Else If ((Bound > 270) && (Bound <= 360))
             xTranslation    := 0
             , yTranslation  := -Width*Sin(TAngle)
     }
@@ -3653,7 +3617,7 @@ Class gdip
     {
         Static PixelateBitmap := ""
         
-        if (!PixelateBitmap)
+        If (!PixelateBitmap)
         {
             MCode_PixelateBitmap := (A_PtrSize != 8) ; x86 machine code
             ?     "558BEC83EC3C8B4514538B5D1C99F7FB56578BC88955EC894DD885C90F8E830200008B451099F7FB8365DC008365E000894D"
@@ -3720,12 +3684,12 @@ Class gdip
         
         Width := Height := stride1 := stride2 := Scan01 := Scan02 := BitmapData1 := BitmapData2 := ""
         this.Gdip_GetImageDimensions(pBitmap, Width, Height)
-        if (Width != this.Gdip_GetImageWidth(pBitmapOut) || Height != this.Gdip_GetImageHeight(pBitmapOut))
+        If (Width != this.Gdip_GetImageWidth(pBitmapOut) || Height != this.Gdip_GetImageHeight(pBitmapOut))
             Return -1
-        if (BlockSize > Width || BlockSize > Height)
+        If (BlockSize > Width || BlockSize > Height)
             Return -2
         
-        if (this.Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1)
+        If (this.Gdip_LockBits(pBitmap, 0, 0, Width, Height, Stride1, Scan01, BitmapData1)
             || this.Gdip_LockBits(pBitmapOut , 0, 0, Width, Height, Stride2, Scan02, BitmapData2))
             Return -3
         
@@ -3870,12 +3834,12 @@ Class gdip
     StrGetB(Address, Length=-1, Encoding=0)
     {
         ; Flexible parameter handling:
-        if Length is not integer
+        If Length is not integer
             Encoding := Length
             , Length := -1
         
         ; Check for obvious errors.
-        if (Address+0 < 1024)
+        If (Address+0 < 1024)
             Return
         
         ; Ensure 'Encoding' contains a numeric identifier.
@@ -4156,3 +4120,53 @@ Class gdip
     ;                                                                                                                   |
     ; Return                                                                                                            |
     ;___________________________________________________________________________________________________________________|
+
+
+    
+    ; TRYING OUT SOME "BOOK" ARTWORK HERE INSTEAD OF THE FOLDER DESIGN
+    ;  _______________________________________________________________________________________________________________
+    ; |\______________________________________________________________________________________________________________\
+    ; | \______________________________________________________________________________________________________________\
+    ; | |StretchBlt                                                                                                     |
+    ; | |                                                                                                               |
+    ; | |Call          StretchBlt(ddc, dx, dy, dw, dh, sdc, sx, sy, sw, sh, Raster="")                                  |
+    ; | |Description   Copies a bitmap from source to destination and applies any stretching or compressing the source  |
+    ; | |              bitmap needs to fit the destination. Stretching/compressing is done using the dest stretch mode. |
+    ; | |                                                                                                               |
+    ; | |dDC           Handle to destination device context                                                             |
+    ; | |dx            x-coord of the upper-left corner of the area being copied                                        |
+    ; | |dy            y-coord of the upper-left corner of the area being copied                                        |
+    ; | |dw            Width of the area being copied                                                                   |
+    ; | |dh            Height of the area being copied                                                                  |
+    ; | |sDC           Handle to source device context                                                                  |
+    ; | |sx            x-coord of destination where the source should be copied to                                      |
+    ; | |sy            y-coord of destination where the source should be copied to                                      |
+    ; | |sw            Width of the area being copied                                                                   |
+    ; | |sh            Height of the area being copied                                                                  |
+    ; | |Raster        Raster operation code                                                                            |
+    ; | |                                                                                                               |
+    ; | |Return        If the function succeeds, the Return value is nonzero                                            |
+    ; | |                                                                                                               |
+    ; | |notes         If raster operation is not specified, SRCCOPY is used.                                           |
+    ; | |              SRCCOPY copies the source rectangle directly to the destination.                                 |
+    ; | |                                                                                                               |
+    ; | |List of raster operation codes:                                                                                |
+    ; | |BLACKNESS     = 0x00000042                                                                                     |
+    ; | |CAPTUREBLT    = 0x40000000                                                                                     |
+    ; | |DSTINVERT     = 0x00550009                                                                                     |
+    ; | |MERGECOPY     = 0x00C000CA                                                                                     |
+    ; | |MERGEPAINT    = 0x00BB0226                                                                                     |
+    ; | |NOMIRRORBITMAP= 0x80000000                                                                                     |
+    ; | |NOTSRCCOPY    = 0x00330008                                                                                     |
+    ; | |NOTSRCERASE   = 0x001100A6                                                                                     |
+    ; | |PATCOPY       = 0x00F00021                                                                                     |
+    ; | |PATINVERT     = 0x005A0049                                                                                     |
+    ; | |PATPAINT      = 0x00FB0A09                                                                                     |
+    ; | |SRCAND        = 0x008800C6                                                                                     |
+    ; | |SRCCOPY       = 0x00CC0020                                                                                     |
+    ; | |SRCERASE      = 0x00440328                                                                                     |
+    ; | |SRCINVERT     = 0x00660046                                                                                     |
+    ; | |SRCPAINT      = 0x00EE0086                                                                                     |
+    ; \ |WHITENESS     = 0x00FF0062                                                                                     |
+    ;  \|_______________________________________________________________________________________________________________|
+    ; I THINK I LIKE THE FOLDER DESIGN MORE...
