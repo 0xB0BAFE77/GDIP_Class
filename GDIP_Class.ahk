@@ -6,7 +6,7 @@ Class gdip
     ; GDI+ Class library for AHK
     ; Version:  v1.48
     ; Started:  20210501
-    ; Updated:  20210613
+    ; Updated:  20210617
     ; 
     ; This is a rewrite of tic's original GDIP library. It has been updated to be a class with methods.
     ; All of the GDIP original tutorials have been rewritten to support the new class structure.
@@ -43,6 +43,7 @@ Class gdip
     ; 20210616:
     ;   Still rewriting/updating/creating comments, param defintiions, return values, etc.
     ;   Status Enumeration has been updated to include enum number, value, and descriptions.
+    ;   Added a status object that allows you to check things/report errors. gdip.status[code] -> error
     ;
     ; History:
     ; Originally created by tic (Tariq Porter) 20110709
@@ -52,7 +53,8 @@ Class gdip
     ;   Updated 5/13/2013 - fixed Gdip_SetBitmapToClipboard() on AHK Unicode x64
     ;
     
-    ; Want to add:
+    ;===================================================================================================================
+    ; Want to add/ideas:
     ;   Wanting to add a handful of new methods to make using this easier.
     ;       Methods include:
     ;           NewBitmap() - Creates a new bitmap. Returns a BMO
@@ -4124,6 +4126,34 @@ Class gdip
     rand(min, max) {
         Random, result, % min, % max
         Return result
+    }
+    
+    ; Status object creator
+    make_status() {
+        this.status := {}
+        this.status.0  := "Ok"
+        this.status.1  := "GenericError"
+        this.status.2  := "InvalidParameter"
+        this.status.3  := "OutOfMemory"
+        this.status.4  := "ObjectBusy"
+        this.status.5  := "InsufficientBuffer"
+        this.status.6  := "NotImplemented"
+        this.status.7  := "Win32Error"
+        this.status.8  := "WrongState"
+        this.status.9  := "Aborted"
+        this.status.10 := "FileNotFound"
+        this.status.11 := "ValueOverflow"
+        this.status.12 := "AccessDenied"
+        this.status.13 := "UnknownImageFormat"
+        this.status.14 := "FontFamilyNotFound"
+        this.status.15 := "FontStyleNotFound"
+        this.status.16 := "NotTrueTypeFont"
+        this.status.17 := "UnsupportedGdiplusVersion"
+        this.status.18 := "GdiplusNotInitialized"
+        this.status.19 := "PropertyNotFound"
+        this.status.20 := "PropertyNotSupported"
+        this.status.21 := "ProfileNotFound"
+        Return
     }
 }
 
