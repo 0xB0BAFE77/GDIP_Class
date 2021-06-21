@@ -1489,38 +1489,20 @@ Class gdip
                         , "float"   , sh                            ; height of the portion of source image to be drawn
                         , "int"     , 2                             ; Unit of measure (2=pixel). See Unit enumeration.
                         , this.Ptr  , ImageAttr                     ; Pointer to image attribute
-                        , this.Ptr  , 0                             ; Callback method to cancel drawing (not used)
-                        , this.Ptr  , 0)                            ; Pointer to data used by callback method (not used)
+                        , this.Ptr  , 0                             ; Callback method to cancel drawing
+                        , this.Ptr  , 0)                            ; Pointer to data used by callback method
         , (ImageAttr)                                               ; If ImageAttr exists, delete it
             ? this.Gdip_DisposeImageAttributes(ImageAttr) : ""
         
         Return E
     }
     
-    
-    
-    
-    
-    
-    
-    
-    ;;;;;;;;;;;;;;;;;;;;; right here, right now, right here, right now... ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
     ; / Gdip_DrawImage() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
     ; Call          Gdip_DrawImage(gp, pBitmap, dx="", dy="", dw="", dh="", sx="", sy="", sw="", sh="", Matrix=1)
-    ; Description   This function draws a bitmap into the Graphics of another bitmap
+    ; Description   This function draws a bitmap into the graphics of another bitmap
     ;                                                                                                                   |
     ; gp            Pointer to the graphics of a bitmap
     ; pBitmap       Pointer to a bitmap to be drawn
@@ -1534,12 +1516,14 @@ Class gdip
     ; sh            height of source image
     ; Matrix        a matrix used to alter image attributes when drawing
     ;                                                                                                                   |
-    ; Return        status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; Notes         if sx,sy,sw,sh are missed then the entire source bitmap will be used
-    ;               Gdip_DrawImage performs faster
+    ; Notes         If sx or sy are missing, 0 will be used
+    ;               If sw or sh are missing, source bitmap width or height will be used respectively
+    ;               Image is automatically scaled to fit
     ;               Matrix can be omitted to just draw with no alteration to ARGB
-    ;               Matrix may be passed as a digit from 0 - 1 to change just transparency
+    ;               Matrix can be a 0 1 to change just transparency
     ;               Matrix can be passed as a matrix with any delimiter. For example:
     ;               MatrixBright=
     ;               (
@@ -1561,44 +1545,36 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawImage(gp, pBitmap, dx="", dy="", dw="", dh="", sx="", sy="", sw="", sh="", Matrix=1)
     {
-        ImageAttr := (Matrix&1 = "") ? this.Gdip_SetImageAttributesColorMatrix(Matrix)
-                : (Matrix != 1)      ? this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
+        ImageAttr := (Matrix&1 = "")
+                ? this.Gdip_SetImageAttributesColorMatrix(Matrix)
+                : (Matrix != 1)
+                ? this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
                 : ""
-        
-        If (sx = "" && sy = "" && sw = "" && sh = "")
-        {
-            If (dx = "" && dy = "" && dw = "" && dh = "")
-            {
-                sx := dx := 0, sy := dy := 0
-                sw := dw := this.Gdip_GetImageWidth(pBitmap)
-                sh := dh := this.Gdip_GetImageHeight(pBitmap)
-            }
-            else
-            {
-                sx := sy := 0
-                sw := this.Gdip_GetImageWidth(pBitmap)
-                sh := this.Gdip_GetImageHeight(pBitmap)
-            }
-        }
-        
-        E := DllCall("gdiplus\GdipDrawImageRectRect"
-                    , this.Ptr  , gp
-                    , this.Ptr  , pBitmap
-                    , "float"   , dx
-                    , "float"   , dy
-                    , "float"   , dw
-                    , "float"   , dh
-                    , "float"   , sx
-                    , "float"   , sy
-                    , "float"   , sw
-                    , "float"   , sh
-                    , "int"     , 2
-                    , this.Ptr  , ImageAttr
-                    , this.Ptr  , 0
-                    , this.Ptr  , 0)
-        
-        if ImageAttr
-            this.Gdip_DisposeImageAttributes(ImageAttr)
+        , (sx = "") ? sx := 0 : ""
+        , (sy = "") ? sy := 0 : "" 
+        , (sw = "") ? sw := this.Gdip_GetImageWidth(pBitmap) : ""
+        , (sh = "") ? sh := this.Gdip_GetImageHeight(pBitmap) : ""
+        , (dx = "") ? dx := sx : ""
+        , (dy = "") ? dy := sy : ""
+        , (dw = "") ? dw := sw : ""
+        , (dh = "") ? dh := sh : ""
+        , status := DllCall("gdiplus\GdipDrawImageRectRect"
+                            , this.Ptr  , gp
+                            , this.Ptr  , pBitmap
+                            , "float"   , dx
+                            , "float"   , dy
+                            , "float"   , dw
+                            , "float"   , dh
+                            , "float"   , sx
+                            , "float"   , sy
+                            , "float"   , sw
+                            , "float"   , sh
+                            , "int"     , 2
+                            , this.Ptr  , ImageAttr
+                            , this.Ptr  , 0
+                            , this.Ptr  , 0)
+        , (ImageAttr)
+            ? this.Gdip_DisposeImageAttributes(ImageAttr) : ""
         
         Return E
     }
@@ -1607,60 +1583,29 @@ Class gdip
     ;/\______________\                                                                                                  |
     ; / Gdip_SetImageAttributesColorMatrix() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_SetImageAttributesColorMatrix(Matrix)                                                          |
+    ; Call          Gdip_SetImageAttributesColorMatrix(mtx)                                                             |
     ; Description   This function creates an image matrix ready for drawing                                             |
     ;                                                                                                                   |
-    ; Matrix        a matrix used to alter image attributes when drawing                                                |
+    ; mtx           A 5x5 matrix used to alter image attributes when drawing                                            |
     ;               passed with any delimeter                                                                           |
     ;                                                                                                                   |
     ; Return        Returns an image matrix on sucess or 0 if it fails                                                  |
     ;                                                                                                                   |
     ; Note          colorMatrix is a 2D array (5x5 grid)                                                                |
-    ;                _MatrixBright__________    _MatrixNegative__    _MatrixGreyScale_______                            |
-    ;               |1.5  |0    |0    |0 |0 |  |-1 |0  |0  |0 |0 |  |0.299|0.299|0.299|0 |0 |                           |
-    ;               |0    |1.5  |0    |0 |0 |  |0  |-1 |0  |0 |0 |  |0.587|0.587|0.587|0 |0 |                           |
-    ;               |0    |0    |1.5  |0 |0 |  |0  |0  |-1 |0 |0 |  |0.114|0.114|0.114|0 |0 |                           |
-    ;               |0    |0    |0    |1 |0 |  |0  |0  |0  |1 |0 |  |0    |0    |0    |1 |0 |                           |
-    ;               |0.05 |0.05 |0.05 |0 |1 |  |0  |0  |0  |0 |1 |  |0    |0    |0    |0 |1 |                           |
-    ;                ------------------------  -------------------  -------------------------                           |
     ;___________________________________________________________________________________________________________________|
-    Gdip_SetImageAttributesColorMatrix(Matrix)
-    {
-        VarSetCapacity(colorMatrix, 100, 0)
-        , ImageAttr := ""
-        , Matrix    := RegExReplace(Matrix, "^[^\d-\.]+([\d\.])", "$1", "", 1)
-        , Matrix    := RegExReplace(Matrix, "[^\d-\.]+", "|")
-        , data      := StrSplit(matrix, "|")
-        
-        For index, value in data
-            (value = "") ? value := (Mod(A_Index-1, 6) ? 0 : 1) : ""
-            , NumPut(value, colorMatrix, (A_Index-1)*4, "float")
-        
-        DllCall("gdiplus\GdipCreateImageAttributes", this.PtrA, ImageAttr)
-        , DllCall("gdiplus\GdipSetImageAttributesColorMatrix"
-                , this.Ptr  , ImageAttr                                     ; pointer to image attribute struct
-                , "int"     , 1                                             ; Color adjust type 0-4
-                , "int"     , 1                                             ; Enable
-                , this.Ptr  , &colorMatrix                                  ; Color matrix
-                , this.Ptr  , 0                                             ; Grayscale matrix
-                , "int"     , 0)                                            ; Flags 0-3
-        
-        Return ImageAttr
-    }
-    
-    Gdip_SetImageAttributesColorMatrix(Matrix)
+    Gdip_SetImageAttributesColorMatrix(mtx)
     {
         VarSetCapacity(colorMatrix, 100, 0)
         ImageAttr   := ""
-        Matrix      := RegExReplace(Matrix, "^[^\d-\.]+([\d\.])", "$1", "", 1)
-        Matrix      := RegExReplace(Matrix, "[^\d-\.]+", "|")
-        StringSplit, Matrix, Matrix, |
+        mtx         := RegExReplace(mtx, "^[^\d-\.]+([\d\.])", "$1", "", 1)
+        mtx         := RegExReplace(mtx, "[^\d-\.]+", "|")
+        data        := StrSplit(mtx, "|")
         Loop, 25
         {
-            Matrix := (Matrix%A_Index% != "")
-                ? Matrix%A_Index%
-                : Mod(A_Index-1, 6) ? 0 : 1
-            , NumPut(Matrix, colorMatrix, (A_Index-1)*4, "float")
+            (data[A_Index] = "")
+                ? data[A_Index] := (Mod(A_Index-1, 6) ? 0 : 1)
+                : ""
+            , NumPut(data[A_Index], colorMatrix, (A_Index-1)*4, "float")
         }
         
         DllCall("gdiplus\GdipCreateImageAttributes", this.PtrA, ImageAttr)
@@ -3054,6 +2999,30 @@ Class gdip
         Return Matrix
     }
     
+    ;####################################################################################################################
+    ;/\______________\                                                                                                  |
+    ; / generate_matrix_types() \________________________________________________________________________________________________ |
+    ;/                 \_______________________________________________________________________________________________\|
+    ; Call          generate_matrix_types()                                                                             |
+    ; Description   Generate and store the various matrices used with GDI+ functions requiring a color matrix.          |
+    ;                                                                                                                   |
+    ;                _MatrixBright__________    _MatrixNegative__    _MatrixGreyScale__________                         |
+    ;               |1.5  |0    |0    |0 |0 |  |-1 |0  |0  |0 |0 |  |0.299 |0.299 |0.299 |0 |0 |                        |
+    ;               |0    |1.5  |0    |0 |0 |  |0  |-1 |0  |0 |0 |  |0.587 |0.587 |0.587 |0 |0 |                        |
+    ;               |0    |0    |1.5  |0 |0 |  |0  |0  |-1 |0 |0 |  |0.114 |0.114 |0.114 |0 |0 |                        |
+    ;               |0    |0    |0    |1 |0 |  |0  |0  |0  |1 |0 |  |0     |0     |0     |1 |0 |                        |
+    ;               |0.05 |0.05 |0.05 |0 |1 |  |0  |0  |0  |0 |1 |  |0     |0     |0     |0 |1 |                        |
+    ;               |-----------------------|  |-----------------|  |--------------------------|                        |
+    ;___________________________________________________________________________________________________________________|
+    generate_matrix_types()
+    {
+        this.MatrixGrayScale   := "0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1"
+        , this.MatrixGreyScale := this.MatrixGrayScale
+        , this.MatrixBright    := "1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1"
+        , this.MatrixNegative  := "-1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|0|0|0|0|1"
+        Return
+    }
+
     ;###################################################################################################################
     ; GraphicsPath functions
     ;###################################################################################################################
@@ -3090,7 +3059,12 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_AddPathEllipse(Path, x, y, w, h)
     {
-        Return DllCall("gdiplus\GdipAddPathEllipse", this.Ptr, Path, "float", x, "float", y, "float", w, "float", h)
+        Return DllCall("gdiplus\GdipAddPathEllipse"
+                        , this.Ptr  , Path
+                        , "float"   , x
+                        , "float"   , y
+                        , "float"   , w
+                        , "float"   , h)
     }
     
     ;####################################################################################################################
@@ -3243,6 +3217,7 @@ Class gdip
         this.PtrA   := A_PtrSize ? "UPtr*"  : "UInt*"
         this.pToken := this.Startup()                   ; Start up GDIP
         this.generate_colors()                          ; Generate color object
+        this.generate_matrix_types()
         OnExit(this.run_method("__Delete"))             ; Set cleanup method to run at script exit
         
         Return 0
