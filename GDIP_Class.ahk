@@ -46,9 +46,9 @@ Class gdip
     ;   Added a status object that allows you to check things/report errors. gdip.status[code] -> error
     ;
     ; 20210619:
-    ;   Added get_points(str) function. Converts a string of "x,y|x,y|x,y ... " into a 2D array
-    ;       This: "10,20 | -10, 4 | -19999, -15 | 1, -1"
-    ;       Becomes: [[10,20], [-10,4], [-19999,-15], [1,-1]]
+    ;   Added get_points_from_var(ByRef var, points) function. Gets x/y coords from points and puts them in a var
+    ;       This function works with both strings and objects
+    ;
     ; History:
     ; Originally created by tic (Tariq Porter) 20110709
     ; Later updated by Rseding91 with fincs 64 bit compatible Gdip library 20130501
@@ -63,7 +63,7 @@ Class gdip
     ;       Methods include:
     ;           bmo := NewBitmap() - Creates a new bitmap. Returns a BMO
     ;           DeleteBitmap(bmo) - Bitmap deconstructor
-    ;           hob := CreateLayeredWindow() - Create full-sized layered window for drawing to. Return object(?)
+    ;           gob := CreateLayeredWindow() - Create layered window to draw to. Return gob? (Gui OBject?)
     ;           
     ;       The new methods would create/work with BMOs. Objects for storing all bitmap required info.
     ;           BMOs = BitmapObjects and store all info on a current bitmap
@@ -173,11 +173,11 @@ Class gdip
     ;                                                                                                                   |
     ; Return        If the function succeeds, the Return value is nonzero                                               |
     ;                                                                                                                   |
-    ; notes         If raster operation is not specified, SRCCOPY is used.                                              |
+    ; Notes         If raster operation is not specified, SRCCOPY is used.                                              |
     ;               SRCCOPY copies the source rectangle directly to the destination.                                    |
     ;                                                                                                                   |
     ; List of raster operation codes:                                                                                   |
-    ; By name:                                                          By Number                                       |
+    ; Name sorted:                                                      Number Sorted                                   |
     ; BLACKNESS         = 0x00000042                                    0x00000042 = BLACKNESS                          |
     ; CAPTUREBLT        = 0x40000000                                    0x001100A6 = NOTSRCERASE                        |
     ; DSTINVERT         = 0x00550009                                    0x00330008 = NOTSRCCOPY                         |
@@ -232,11 +232,11 @@ Class gdip
     ;                                                                                                                   |
     ; Return        If the function succeeds, the Return value is nonzero                                               |
     ;                                                                                                                   |
-    ; notes         If raster operation is not specified, SRCCOPY is used.                                              |
+    ; Notes         If raster operation is not specified, SRCCOPY is used.                                              |
     ;               SRCCOPY copies the source rectangle directly to the destination.                                    |
     ;                                                                                                                   |
     ; List of raster operation codes:                                                                                   |
-    ; By name:                                                          By Number                                       |
+    ; Name sorted:                                                      Number Sorted                                   |
     ; BLACKNESS         = 0x00000042                                    0x00000042 = BLACKNESS                          |
     ; CAPTUREBLT        = 0x40000000                                    0x001100A6 = NOTSRCERASE                        |
     ; DSTINVERT         = 0x00550009                                    0x00330008 = NOTSRCCOPY                         |
@@ -344,7 +344,7 @@ Class gdip
     ;                                                                                                                   |
     ; Return        If the function succeeds, the Return value is zero                                                  |
     ;                                                                                                                   |
-    ; notes         A control must have the 0xE style set to it so it is recognised as a bitmap                         |
+    ; Notes         A control must have the 0xE style set to it so it is recognised as a bitmap                         |
     ;               By default SysColor=15 is used which is COLOR_3DFACE. This is the standard background for a control |
     ;                                                                                                                   |
     ; By Name:                                              By Number:                                                  |
@@ -418,7 +418,7 @@ Class gdip
     ; Return        If the function succeeds, the Return value is a pointer to a gdi+ bitmap                            |
     ;               -1: One or more of x,y,w,h not passed properly                                                      |
     ;                                                                                                                   |
-    ; notes         If no raster operation is specified, then SRCCOPY is used to the Returned bitmap                    |
+    ; Notes         If no raster operation is specified, then SRCCOPY is used to the Returned bitmap                    |
     ;___________________________________________________________________________________________________________________|
     Gdip_BitmapFromScreen(Screen=0, Raster="")
     {
@@ -484,7 +484,7 @@ Class gdip
     ;                                                                                                                   |
     ; Return        If the function succeeds, the Return value is a pointer to a gdi+ bitmap                            |
     ;                                                                                                                   |
-    ; notes         Window must not be not minimised in order to get a handle to it's client area                       |
+    ; Notes         Window must not be not minimised in order to get a handle to it's client area                       |
     ;___________________________________________________________________________________________________________________|
     Gdip_BitmapFromHWND(hwnd)
     {
@@ -509,8 +509,8 @@ Class gdip
     ; Description   Create a 16 byte rect struct containing x y w h values                                              |
     ;                                                                                                                   |
     ; Rect          Variable name                                                                                       |
-    ; x             x-coordinate of rectangle's upper left corner                                                       |
-    ; y             y-coordinate of rectangle's upper left corner                                                       |
+    ; x             x-coordinate of rectangle's upper-left corner                                                       |
+    ; y             y-coordinate of rectangle's upper-left corner                                                       |
     ; w             Width of the rectangle                                                                              |
     ; h             Height of the rectangle                                                                             |
     ; float         1 = params are float                                                                                |
@@ -557,8 +557,8 @@ Class gdip
     ; Description   Create an 8 byte struct containing x/y coords                                                       |
     ;                                                                                                                   |
     ; Point         Variable name                                                                                       |
-    ; x             x-coordinate of rectangle's upper left corner                                                       |
-    ; y             y-coordinate of rectangle's upper left corner                                                       |
+    ; x             x-coordinate of rectangle's upper-left corner                                                       |
+    ; y             y-coordinate of rectangle's upper-left corner                                                       |
     ; float         1 = params are float                                                                                |
     ;               0 = params are int                                                                                  |
     ;                                                                                                                   |
@@ -586,7 +586,7 @@ Class gdip
     ;                                                                                                                   |
     ; Return        Returns a handle to the new DIB                                                                     |
     ;                                                                                                                   |
-    ; notes         ppvBits will receive the location of the pixels in the DIB                                          |
+    ; Notes         ppvBits will receive the location of the pixels in the DIB                                          |
     ;___________________________________________________________________________________________________________________|
     CreateDIBSection(w, h, hdc="", bpp=32, ByRef ppvBits=0)
     {
@@ -714,23 +714,28 @@ Class gdip
     ;                                                                                                                   |
     ; hdc           Handle to an existing device context.                                                               |
     ; hGdiObj       Handle to the object to be selected. Object must have been created using one of the following:      |
-    ;               Bitmap - CreateBitmap(), CreateBitmapIndirect(), CreateCompatibleBitmap(), CreateDIBitmap(),        |
-    ;                   CreateDIBSection(). (A single bitmap cannot be selected into more than one DC at the same time) |
-    ;               Brush - CreateBrushIndirect(), CreateDIBPatternBrush(), CreateDIBPatternBrushPt(),                  |
-    ;                   CreateHatchBrush(), CreatePatternBrush(), CreateSolidBrush()                                    |
-    ;               Font - CreateFont(), CreateFontIndirect()                                                           |
-    ;               Pen - CreatePen(), CreatePenIndirect()                                                              |
-    ;               Region - CombineRgn(), CreateEllipticRgn(), CreateEllipticRgnIndirect(), CreatePolygonRgn(),        |
-    ;                   CreateRectRgn(), CreateRectRgnIndirect()                                                        |
+    ;               Brush  - CreateSolidBrush()     CreateBrushIndirect()       CreateDIBPatternBrush()                 |
+    ;                        CreateHatchBrush()     CreatePatternBrush()        CreateDIBPatternBrushPt()               |
+    ;               Region - CombineRgn()           CreateEllipticRgn()         CreateEllipticRgnIndirect()             |
+    ;                        CreateRectRgn()        CreatePolygonRgn()          CreateRectRgnIndirect()                 |
+    ;               Bitmap - CreateBitmap()         CreateBitmapIndirect()      CreateCompatibleBitmap()                |
+    ;                        CreateDIBitmap()       CreateDIBSection()                                                  |
+    ;               Font   - CreateFont()           CreateFontIndirect()                                                |
+    ;               Pen    - CreatePen()            CreatePenIndirect()                                                 |
     ;                                                                                                                   |
-    ; Return        If selected object is not a region:                                                                 |
+    ; Note          A single bitmap cannot be selected into more than one DC at the same time.                          |
+    ;                                                                                                                   |
+    ; Return        If selected object is a region:                                                                     |
+    ;                   Success:                                                                                        |
+    ;                       NULLREGION    = 1 Region is empty                                                           |
+    ;                       SIMPLEREGION  = 2 Region consists of a single rectangle                                     |
+    ;                       COMPLEXREGION = 3 Region consists of more than one rectangle                                |
+    ;                   Failure:                                                                                        |
+    ;                       HGDI_ERROR                                                                                  |
+    ;               If selected object is not a region:                                                                 |
+    ;                   Success: Handle to object                                                                       |
+    ;                   Failure: Null                                                                                   |
     ;                   On success, value is a handle. On failure it's NULL.                                            |
-    ;               If selected object is a region:                                                                     |
-    ;                   On success, value is SIMPLEREGION, COMLEXREGION, or NULLREGION. On failure, it's "HGDI_ERROR"   |
-    ;                                                                                                                   |
-    ; SIMPLEREGION  = 2 Region consists of a single rectangle                                                           |
-    ; COMPLEXREGION = 3 Region consists of more than one rectangle                                                      |
-    ; NULLREGION    = 1 Region is empty                                                                                 |
     ;___________________________________________________________________________________________________________________|
     SelectObject(hdc, hGdiObj)
     {
@@ -824,7 +829,7 @@ Class gdip
     ; Return        1 = Released                                                                                        |
     ;               0 = Not released                                                                                    |
     ;                                                                                                                   |
-    ; notes         ReleaseDC() must be called whenever GetWindowDC() and GetDC() have retrieved a DC.                  |
+    ; Notes         ReleaseDC() must be called whenever GetWindowDC() and GetDC() have retrieved a DC.                  |
     ;               Applications created by calling CreateDC() must instead use the DeleteDC function.                  |
     ;___________________________________________________________________________________________________________________|
     ReleaseDC(hdc, hwnd=0)
@@ -845,7 +850,7 @@ Class gdip
     ;                                                                                                                   |
     ; Return        Nonzero on success                                                                                  |
     ;                                                                                                                   |
-    ; notes         DeleteDC() is only meant for applications created by CreateDC().                                    |
+    ; Notes         DeleteDC() is only meant for applications created by CreateDC().                                    |
     ;               Applications created by calling GetDC() must use ReleaseDC() to free the DC.                        |
     ;___________________________________________________________________________________________________________________|
     DeleteDC(hdc)
@@ -862,7 +867,7 @@ Class gdip
     ;                                                                                                                   |
     ; Return        This library's version                                                                              |
     ;                                                                                                                   |
-    ; notes         Useful for non compiled programs. Ensures an old version isn't ran when testing your scripts.       |
+    ; Notes         Useful for non compiled programs. Ensures an old version isn't ran when testing your scripts.       |
     ;___________________________________________________________________________________________________________________|
     Gdip_LibraryVersion()
     {
@@ -955,15 +960,15 @@ Class gdip
     ;                                                                                                                   |
     ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to pen                                                                                      |
-    ; x             x-coordinate of rectangle's upper left corner                                                       |
-    ; y             y-coordinate of rectangle's upper left corner                                                       |
+    ; x             x-coordinate of rectangle's upper-left corner                                                       |
+    ; y             y-coordinate of rectangle's upper-left corner                                                       |
     ; w             Width of the rectangle                                                                              |
     ; h             Height of the rectangle                                                                             |
     ;                                                                                                                   |
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes         Remember to include pen thickness in your height/width values.                                      |
+    ; Notes         Remember to include pen thickness in your height/width values.                                      |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawRectangle(gp, pPen, x, y, w, h)
     {
@@ -983,10 +988,10 @@ Class gdip
     ; Call          Gdip_DrawRoundedRectangle(gp, pPen, x, y, w, h, r)                                                  |
     ; Description   Use a pen to draw a rounded rectangle outline into the graphics of a bitmap                         |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap                                                                 |
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to a pen                                                                                    |
-    ; x             x-coordinate of rectangle's upper left corner                                                       |
-    ; y             y-coordinate of rectangle's upper left corner                                                       |
+    ; x             x-coordinate of rectangle's upper-left corner                                                       |
+    ; y             y-coordinate of rectangle's upper-left corner                                                       |
     ; w             Width of the rectangle                                                                              |
     ; h             Height of the rectangle                                                                             |
     ; r             Radius to use when rounding the corners                                                             |
@@ -994,7 +999,7 @@ Class gdip
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes         Remember to include pen thickness in your height/width values.                                      |
+    ; Notes         Remember to include pen thickness in your height/width values.                                      |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawRoundedRectangle(gp, pPen, x, y, w, h, r)
     {
@@ -1022,10 +1027,10 @@ Class gdip
     ; Call          Gdip_DrawEllipse(gp, pPen, x, y, w, h)                                                              |
     ; Description   Use a pen to draw an ellipse outline into the graphics of a bitmap                                  |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap                                                                 |
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to a pen                                                                                    |
-    ; x             x-coordinate of ellipse's upper left corner                                                         |
-    ; y             y-coordinate of ellipse's upper left corner                                                         |
+    ; x             x-coordinate of ellipse's upper-left corner                                                         |
+    ; y             y-coordinate of ellipse's upper-left corner                                                         |
     ; w             width of the ellipse                                                                                |
     ; h             height of the ellipse                                                                               |
     ; r             Radius to use when rounding the corners                                                             |
@@ -1033,7 +1038,7 @@ Class gdip
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes         Remember to include pen thickness in your height/width values.                                      |
+    ; Notes         Remember to include pen thickness in your height/width values.                                      |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawEllipse(gp, pPen, x, y, w, h)
     {
@@ -1048,12 +1053,12 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_DrawBezier() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
     ; Call          Gdip_DrawBezier(gp, pPen, x1, y1, x2, y2, x3, y3, x4, y4)                                           |
     ; Description   Use a pen to draw a bezier (weighted curve) outline into the graphics of a bitmap                   |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap                                                                 |
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to a pen                                                                                    |
     ; x1            x-coordinate bezier start                                                                           |
     ; y1            y-coordinate bezier start                                                                           |
@@ -1067,7 +1072,7 @@ Class gdip
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes         Remember to include pen thickness in your height/width values.                                      |
+    ; Notes         Remember to include pen thickness in your height/width values.                                      |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawBezier(gp, pPen, x1, y1, x2, y2, x3, y3, x4, y4)
     {
@@ -1086,12 +1091,12 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_DrawArc() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
     ; Call          Gdip_DrawArc(gp, pPen, x, y, w, h, StartAngle, SweepAngle)                                          |
-    ; Description   Use a pen to draw an arc (portion of an ellipse) outline into the graphics of a bitmap              |
+    ; Description   Use a pen to draw an arc (curved portion of an ellipse) outline into the graphics of a bitmap       |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap                                                                 |
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to a pen                                                                                    |
     ; x             x-coordinate of upper-left corner of bounding rectangle for the ellipse that contains the arc       |
     ; y             y-coordinate of upper-left corner of bounding rectangle for the ellipse that contains the arc       |
@@ -1103,7 +1108,7 @@ Class gdip
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes         Remember to include pen thickness in your height/width values.                                      |
+    ; Notes         Remember to include pen thickness in your height/width values.                                      |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawArc(gp, pPen, x, y, w, h, StartAngle, SweepAngle)
     {
@@ -1120,24 +1125,24 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_DrawPie() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
     ; Call          Gdip_DrawPie(gp, pPen, x, y, w, h, StartAngle, SweepAngle)
-    ; Description   Use a pen to draw a pie into the graphics of a bitmap.                                                                            |
+    ; Description   Use a pen to draw a pie outline into the graphics of a bitmap.                                      |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap                                                                 |
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to a pen                                                                                    |
     ; x             x-coordinate of upper-left corner of bounding rectangle for the ellipse that will make the pie      |
     ; y             y-coordinate of upper-left corner of bounding rectangle for the ellipse that will make the pie      |
     ; w             width of the ellipse that contains the pie                                                          |
     ; h             height of the ellipse that contains the pie                                                         |
-    ; StartAngle    Starting angle/degree of the arc                                                                    |
-    ; SweepAngle    Ending angle/degree of the arc                                                                      |
+    ; StartAngle    Starting angle/degree of the pie's arc                                                              |
+    ; SweepAngle    Ending angle/degree of the pie's arc                                                                |
     ;                                                                                                                   |
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes         Remember to include pen thickness in your height/width values.                                      |
+    ; Notes         Remember to include pen thickness in your height/width values.                                      |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawPie(gp, pPen, x, y, w, h, StartAngle, SweepAngle)
     {
@@ -1159,7 +1164,7 @@ Class gdip
     ; Call          Gdip_DrawLine(gp, pPen, x1, y1, x2, y2)                                                             |
     ; Description   Use pen to draw a line into the graphics of a bitmap                                                |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap                                                                 |
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
     ; pPen          Pointer to a pen                                                                                    |
     ; x1            x-coordinate of the start of the line                                                               |
     ; y1            y-coordinate of the start of the line                                                               |
@@ -1180,45 +1185,6 @@ Class gdip
                         , "float"   , y2)
     }
     
-    
-/*
-    ;####################################################################################################################
-    ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
-    ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_DrawPolygon
-    ; Description   This function uses a pen to draw a polygon in the Graphics of a bitmap
-    ;                                                                                                                   |
-    ; gp         Pointer to the Graphics of a bitmap
-    ; pBrush            Pointer to a brush
-    ; Points            List of coordinates can be passed by 2D array or by string
-    ;                   Coord sets must be pairs of numbers separated by commas (string spaces are omitted and can be used freely)
-    ;                   Examples of acceptable point sets:
-    ;                       array1  = [[30,53], [-30,53], [-30,0], [30,0]]
-    ;                       array2  = ["30,53", "-30,53", "-30,0", "30,0"]
-    ;                       string  = 30, 53|-30,53|   -30,   0|30 , 0
-    ;                                                                                                                   |
-    ; Return            status enumeration. 0 = success
-    ;___________________________________________________________________________________________________________________|
-    Gdip_DrawPolygon(gp, pPen, points)
-    {
-        points_arr := IsObject(points) ? points : StrSplit(points, "|")
-        VarSetCapacity(pointF, 8*points_arr.MaxIndex())
-        For index, coords in points_arr
-            IsObject(coords)
-                ? ""
-                : coords := StrSplit(coords, ",", " ")
-            , NumPut(coords[1], pointF, 8*(A_Index-1)       , "float")
-            , NumPut(coords[2], pointF, (8*(A_Index-1))+4   , "float")
-        
-        Return DllCall("gdiplus\GdipDrawPolygon"
-                        , this.Ptr  , gp
-                        , this.Ptr  , pPen
-                        , this.Ptr  , &PointF
-                        , "int"     , points_arr.MaxIndex())
-    }
-    
-    
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
     ; / Gdip_DrawLines() \________________________________________________________________________________________________ |
@@ -1226,88 +1192,40 @@ Class gdip
     ; Call          Gdip_DrawLines(gp, pPen, Points)                                                                    |
     ; Description   Use a pen to draw a series of joined lines into the graphics of a bitmap                            |
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap
+    ; gp            Pointer to the graphics of a bitmap
     ; pPen          Pointer to a pen
-    ; Points        List of coordinates can be passed by array or by string
-    ;               Coord sets must be pairs of numbers separated by commas (string spaces are omitted and can be used freely)
-    ;               Examples of acceptable point sets:
-    ;                   array1  = [[30,53], [-30,53], [-30,0], [30,0]]
-    ;                   array2  = ["30,53", "-30,53", "-30,0", "30,0"]
-    ;                   string  = 30, 53|-30,53|   -30,   0|30 , 0                                                      |
+    ; Points        List of x,y coords. String: "x1,y1|x2,y2|..." or object: [[x1,y1], [x2,y2], ...]                    |
+    ;               The get_points_from_var() method covers all acceptable types Points data                            |
     ;                                                                                                                   |
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawLines(gp, pPen, Points)
     {
-        points_arr := IsObject(points) ? points : StrSplit(points, "|")
-        VarSetCapacity(pointF, 8*points_arr.MaxIndex())
-        For index, coords in points_arr
-            IsObject(coords)
-                ? ""
-                : coords := StrSplit(coords, ",", " ")
-            , NumPut(coords[1], pointF, 8*(A_Index-1)       , "float")
-            , NumPut(coords[2], pointF, (8*(A_Index-1))+4   , "float")
-        
-        ; stopped here
-        Loop, %Points0%
-        {
-            StringSplit, Coord, Points%A_Index%, `,
-            NumPut(Coord1, PointF, 8*(A_Index-1), "float")
-            , NumPut(Coord2, PointF, (8*(A_Index-1))+4, "float")
-        }
-        Return DllCall("gdiplus\GdipDrawLines", this.Ptr, gp, this.Ptr, pPen, this.Ptr, &PointF, "int", Points0)
-    }
-
-    
-    
-*/
-    
-    
-    ;####################################################################################################################
-    ;/\______________\                                                                                                  |
-    ; / Gdip_DrawLines() \________________________________________________________________________________________________ |
-    ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_DrawLines(gp, pPen, Points)                                                                    |
-    ; Description   Use a pen to draw a series of joined lines into the graphics of a bitmap                            |
-    ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap
-    ; pPen          Pointer to a pen
-    ; Points        the coordinates of all the points passed as x1,y1|x2,y2|x3,y3.....
-    ;                                                                                                                   |
-    ; Return        Status enumeration value. 0 = success.                                                              |
-    ;               The Status Enumeration Table can be found at the top of this library.                               |
-    ;___________________________________________________________________________________________________________________|
-    Gdip_DrawLines(gp, pPen, Points)
-    {
-        pts_arr := this.get_points(points)
-        VarSetCapacity(PointF, 8*pts_arr.MaxIndex())   
-        For index, value in points
-            NumPut(value.1, PointF, 8*(A_Index-1), "float")
-            , NumPut(value.2, PointF, (8*(A_Index-1))+4, "float")
-        
+        this.get_points_from_var(pointF, Points)
         Return DllCall("gdiplus\GdipDrawLines"
                     , this.Ptr  , gp
                     , this.Ptr  , pPen
-                    , this.Ptr  , &PointF
-                    , "int"     , Points0)
+                    , this.Ptr  , &pointF
+                    , "int"     , VarSetCapacity(pointF)/8)
     }
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillRectangle() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillRectangle
-    ; Description   This function uses a brush to fill a rectangle in the Graphics of a bitmap
+    ; Call          Gdip_FillRectangle(gp, pBrush, x, y, w, h)
+    ; Description   Use a brush to draw a filled rectangle into the graphics of a bitmap
     ;                                                                                                                   |
-    ; gp            Pointer to the Graphics of a bitmap
+    ; gp            Pointer to the graphics of a bitmap
     ; pBrush        Pointer to a brush
-    ; x             x-coordinate of the top left of the rectangle
-    ; y             y-coordinate of the top left of the rectangle
-    ; w             width of the rectanlge
-    ; h             height of the rectangle
+    ; x             x-coordinate for the top left of rectangle
+    ; y             y-coordinate for the top left of rectangle
+    ; w             width of rectanlge
+    ; h             height of rectangle
     ;                                                                                                                   |
-    ; Return        status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_FillRectangle(gp, pBrush, x, y, w, h)
     {
@@ -1322,20 +1240,21 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillRoundedRectangle() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillRoundedRectangle
-    ; Description   This function uses a brush to fill a rounded rectangle in the Graphics of a bitmap
+    ; Call          Gdip_FillRoundedRectangle(gp, pBrush, x, y, w, h, r)
+    ; Description   Use a brush to draw a filled rounded rectangle into the graphics of a bitmap
     ;                                                                                                                   |
-    ; gp         Pointer to the Graphics of a bitmap
-    ; pBrush            Pointer to a brush
-    ; x                 x-coordinate of the top left of the rounded rectangle
-    ; y                 y-coordinate of the top left of the rounded rectangle
-    ; w                 width of the rectanlge
-    ; h                 height of the rectangle
-    ; r                 radius of the rounded corners
+    ; gp            Pointer to the graphics of a bitmap
+    ; pBrush        Pointer to a brush
+    ; x             x-coordinate for the top left of rounded rectangle
+    ; y             y-coordinate for the top left of rounded rectangle
+    ; w             width of rounded rectanlge
+    ; h             height of rounded rectangle
+    ; r             radius of rounded corners
     ;                                                                                                                   |
-    ; Return            status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_FillRoundedRectangle(gp, pBrush, x, y, w, h, r)
     {
@@ -1343,7 +1262,7 @@ Class gdip
         , this.Gdip_SetClipRect(gp, x-r, y-r, 2*r, 2*r, 4)
         , this.Gdip_SetClipRect(gp, x+w-r, y-r, 2*r, 2*r, 4)
         , this.Gdip_SetClipRect(gp, x-r, y+h-r, 2*r, 2*r, 4)
-        , this.Gdip_SetClipRect(gp, x+w-r, y+h-r, 2*r, 2*r, 4)
+        , this.Gdip_SetClipRect(gp, x+w-r, y+h-r, 2*r, 2*r, 4)\
         , E := this.Gdip_FillRectangle(gp, pBrush, x, y, w, h)
         , this.Gdip_SetClipRegion(gp, Region, 0)
         , this.Gdip_SetClipRect(gp, x-(2*r), y+r, w+(4*r), h-(2*r), 4)
@@ -1360,93 +1279,76 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillPolygon() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillPolygon
-    ; Description   This function uses a brush to fill a polygon in the Graphics of a bitmap
+    ; Call          Gdip_FillPolygon(gp, pBrush, points, FillMode=0)
+    ; Description   Use a brush to draw a filled polygon into the graphics of a bitmap
     ;                                                                                                                   |
-    ; gp         Pointer to the Graphics of a bitmap
-    ; pBrush            Pointer to a brush
-    ; Points            the coordinates of all the points passed as x1,y1|x2,y2|x3,y3.....
+    ; gp            Pointer to the graphics of a bitmap
+    ; pBrush        Pointer to a brush
+    ; Points        List of x,y coords. String: "x1,y1|x2,y2|..." or object: [[x1,y1], [x2,y2], ...]                    |
+    ;               The get_points_from_var() method covers all acceptable types Points data                            |
+    ; FillMode      Set alternate or winding for filling mode                                                           |
+    ;               0 = Alternate = fill the polygon as a whole                                                         |
+    ;               1 = Winding   = fill each new "segment"                                                             |
     ;                                                                                                                   |
-    ; Return            status enumeration. 0 = success
-    ;                                                                                                                   |
-    ; notes             Alternate will fill the polygon as a whole, wheras winding will fill each new "segment"
-    ; Alternate         = 0
-    ; Winding           = 1
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_FillPolygon(gp, pBrush, points, FillMode=0)
     {
-        points_arr := IsObject(points) ? points : StrSplit(points, "|")
-        VarSetCapacity(pointF, 8*points_arr.MaxIndex())
-        For index, coords in points_arr
-            IsObject(coords)
-                ? ""
-                : coords := StrSplit(coords, ",", " ")
-            , NumPut(coords[1], pointF, 8*(A_Index-1), "float")
-            , NumPut(coords[2], pointF, (8*(A_Index-1))+4, "float")
-        
+        this.get_points_from_var(pointF, points)
         Return DllCall("gdiplus\GdipFillPolygon"
                         , this.Ptr  , gp
                         , this.Ptr  , pBrush
                         , this.Ptr  , &pointF
-                        , "int"     , points_arr.MaxIndex()
+                        , "int"     , VarSetCapacity(pointF)/8
                         , "int"     , FillMode)
     }
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_DrawPolygon() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_DrawPolygon
-    ; Description   This function uses a pen to draw a polygon in the Graphics of a bitmap
+    ; Call          Gdip_DrawPolygon(gp, pPen, points)
+    ; Description   Use a pen to draw a polygon outline into the graphics of a bitmap
     ;                                                                                                                   |
-    ; gp         Pointer to the Graphics of a bitmap
-    ; pBrush            Pointer to a brush
-    ; Points            List of coordinates can be passed by array or by string
-    ;                   Coord sets must be pairs of numbers separated by commas (string spaces are omitted and can be used freely)
-    ;                   Examples of acceptable point sets:
-    ;                       array1  = [[30,53], [-30,53], [-30,0], [30,0]]
-    ;                       array2  = ["30,53", "-30,53", "-30,0", "30,0"]
-    ;                       string  = 30, 53|-30,53|   -30,   0|30 , 0
+    ; gp            Pointer to the graphics of a bitmap
+    ; pBrush        Pointer to a brush
+    ; Points        List of x,y coords. String: "x1,y1|x2,y2|..." or object: [[x1,y1], [x2,y2], ...]                    |
+    ;               The get_points_from_var() method covers all acceptable types Points data                            |
     ;                                                                                                                   |
-    ; Return            status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawPolygon(gp, pPen, points)
     {
-        points_arr := IsObject(points) ? points : StrSplit(points, "|")
-        VarSetCapacity(pointF, 8*points_arr.MaxIndex())
-        For index, coords in points_arr
-            IsObject(coords)
-                ? ""
-                : coords := StrSplit(coords, ",", " ")
-            , NumPut(coords[1], pointF, 8*(A_Index-1)       , "float")
-            , NumPut(coords[2], pointF, (8*(A_Index-1))+4   , "float")
-        
+        this.get_points_from_var(pointF, points)
         Return DllCall("gdiplus\GdipDrawPolygon"
                         , this.Ptr  , gp
                         , this.Ptr  , pPen
-                        , this.Ptr  , &PointF
-                        , "int"     , points_arr.MaxIndex())
+                        , this.Ptr  , &pointF
+                        , "int"     , VarSetCapacity(pointF)/8)
     }
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillPie() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillPie
-    ; Description   This function uses a brush to fill a pie in the Graphics of a bitmap
+    ; Call          Gdip_FillPie(gp, pBrush, x, y, w, h, StartAngle, SweepAngle)
+    ; Description   Use a brush to draw a filled pie into the graphics of a bitmap
     ;                                                                                                                   |
-    ; gp                Pointer to the Graphics of a bitmap
-    ; pBrush                Pointer to a brush
-    ; x                        x-coordinate of the top left of the pie
-    ; y                        y-coordinate of the top left of the pie
-    ; w                        width of the pie
-    ; h                        height of the pie
-    ; StartAngle            specifies the angle between the x-axis and the starting point of the pie
-    ; SweepAngle            specifies the angle between the starting and ending points of the pie
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
+    ; pPen          Pointer to a pen                                                                                    |
+    ; x             x-coordinate of upper-left corner of bounding rectangle for the ellipse that will make the pie      |
+    ; y             y-coordinate of upper-left corner of bounding rectangle for the ellipse that will make the pie      |
+    ; w             width of the ellipse that contains the pie                                                          |
+    ; h             height of the ellipse that contains the pie                                                         |
+    ; StartAngle    Starting angle/degree of the pie's arc                                                              |
+    ; SweepAngle    Ending angle/degree of the pie's arc                                                                |
     ;                                                                                                                   |
-    ; Return                status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_FillPie(gp, pBrush, x, y, w, h, StartAngle, SweepAngle)
     {
@@ -1463,171 +1365,204 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillEllipse() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillEllipse
-    ; Description   This function uses a brush to fill an ellipse in the Graphics of a bitmap
+    ; Call          Gdip_FillEllipse(gp, pBrush, x, y, w, h)
+    ; Description   Use a brush to draw a filled ellipse into the graphics of a bitmap
     ;                                                                                                                   |
-    ; gp                Pointer to the Graphics of a bitmap
-    ; pBrush                Pointer to a brush
-    ; x                        x-coordinate of the top left of the ellipse
-    ; y                        y-coordinate of the top left of the ellipse
-    ; w                        width of the ellipse
-    ; h                        height of the ellipse
+    ; gp            Pointer to the graphics of a bitmap
+    ; pBrush        Pointer to a brush
+    ; x             x-coordinate for the top left of ellipse
+    ; y             y-coordinate for the top left of ellipse
+    ; w             width of rounded rectanlge
+    ; h             height of ellipse
     ;                                                                                                                   |
-    ; Return                status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_FillEllipse(gp, pBrush, x, y, w, h)
     {
-        Return DllCall("gdiplus\GdipFillEllipse", this.Ptr, gp, this.Ptr, pBrush, "float", x, "float", y, "float", w, "float", h)
+        Return DllCall("gdiplus\GdipFillEllipse"
+                        , this.Ptr  , gp
+                        , this.Ptr  , pBrush
+                        , "float"   , x
+                        , "float"   , y
+                        , "float"   , w
+                        , "float"   , h)
     }
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillRegion() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillRegion
-    ; Description   This function uses a brush to fill a region in the Graphics of a bitmap
+    ; Call          Gdip_FillRegion(gp, pBrush, Region)                                                                 |
+    ; Description   Use a brush to fill a region of the graphics of a bitmap                                            |
     ;                                                                                                                   |
-    ; gp                Pointer to the Graphics of a bitmap
-    ; pBrush                Pointer to a brush
-    ; Region                Pointer to a Region
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
+    ; pBrush        Pointer to a brush                                                                                  |
+    ; region        Pointer to a region                                                                                 |
     ;                                                                                                                   |
-    ; Return                status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes                    You can create a region Gdip_CreateRegion() and then add to this
+    ; Notes         Use Gdip_CreateRegion() can create a region                                                         |
     ;___________________________________________________________________________________________________________________|
-    Gdip_FillRegion(gp, pBrush, Region)
+    Gdip_FillRegion(gp, pBrush, region)
     {
-        Return DllCall("gdiplus\GdipFillRegion", this.Ptr, gp, this.Ptr, pBrush, this.Ptr, Region)
+        Return DllCall("gdiplus\GdipFillRegion"
+                        , this.Ptr  , gp
+                        , this.Ptr  , pBrush
+                        , this.Ptr  , region)
     }
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_FillPath() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_FillPath
-    ; Description   This function uses a brush to fill a path in the Graphics of a bitmap
+    ; Call          Gdip_FillPath(gp, pBrush, Path)                                                                     |
+    ; Description   Use a brush to fill a path into the graphics of a bitmap                                            |
     ;                                                                                                                   |
-    ; gp                Pointer to the Graphics of a bitmap
-    ; pBrush                Pointer to a brush
-    ; Region                Pointer to a Path
+    ; gp            Pointer to the graphics of a bitmap                                                                 |
+    ; pBrush        Pointer to a brush                                                                                  |
+    ; region        Pointer to a graphics path                                                                          |
     ;                                                                                                                   |
-    ; Return                status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
     Gdip_FillPath(gp, pBrush, Path)
     {
-        Return DllCall("gdiplus\GdipFillPath", this.Ptr, gp, this.Ptr, pBrush, this.Ptr, Path)
+        Return DllCall("gdiplus\GdipFillPath"
+                        , this.Ptr  , gp
+                        , this.Ptr  , pBrush
+                        , this.Ptr  , Path)
     }
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_DrawImagePointsRect() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_DrawImagePointsRect
-    ; Description   This function draws a bitmap into the Graphics of another bitmap and skews it
+    ; Call          Gdip_DrawImagePointsRect(gp, pBitmap, Points, sx="", sy="", sw="", sh="", Matrix=1)
+    ; Description   Draws a bitmap into the graphics of another bitmap and skews it
     ;                                                                                                                   |
-    ; gp         Pointer to the Graphics of a bitmap
-    ; pBitmap           Pointer to a bitmap to be drawn
-    ; Points            Points passed as x1,y1|x2,y2|x3,y3 (3 points: top left, top right, bottom left) describing the drawing of the bitmap
-    ; sx                x-coordinate of source upper-left corner
-    ; sy                y-coordinate of source upper-left corner
-    ; sw                width of source rectangle
-    ; sh                height of source rectangle
-    ; Matrix            a matrix used to alter image attributes when drawing
+    ; gp            Pointer to the graphics of a bitmap
+    ; pBitmap       Pointer to a bitmap to be drawn
+    ; Points        List of x,y coords. String: "x1,y1|x2,y2|..." or object: [[x1,y1], [x2,y2], ...]                    |
+    ;               The get_points_from_var() method covers all acceptable types Points data                            |
+    ; sx            x-coordinate of source upper-left corner
+    ; sy            y-coordinate of source upper-left corner
+    ; sw            width of source rectangle
+    ; sh            height of source rectangle
+    ; Matrix        a matrix used to alter image attributes when drawing
     ;                                                                                                                   |
-    ; Return            status enumeration. 0 = success
+    ; Return        Status enumeration value. 0 = success.                                                              |
+    ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;                                                                                                                   |
-    ; notes             if sx,sy,sw,sh are missed then the entire source bitmap will be used
-    ;                   Matrix can be omitted to just draw with no alteration to ARGB
-    ;                   Matrix may be passed as a digit from 0 - 1 to change just transparency
-    ;                   Matrix can be passed as a matrix with any delimiter
+    ; Notes         if sx,sy,sw,sh are missed then the entire source bitmap will be used
+    ;               Matrix can be omitted to just draw with no alteration to ARGB
+    ;               Matrix may be passed as a digit from 0 - 1 to change just transparency
+    ;               Matrix can be passed as a matrix with any delimiter
     ;___________________________________________________________________________________________________________________|
-    Gdip_DrawImagePointsRect(gp, pBitmap, Points, sx="", sy="", sw="", sh="", Matrix=1)
+    Gdip_DrawImagePointsRect(gp, pBitmap, Points, sx="", sy="", sw="", sh="", mtx=1)
     {
-        StringSplit, Points, Points, |
-        VarSetCapacity(PointF, 8*Points0)   
-        Loop, %Points0%
-        {
-            StringSplit, Coord, Points%A_Index%, `,
-            NumPut(Coord1, PointF, 8*(A_Index-1), "float"), NumPut(Coord2, PointF, (8*(A_Index-1))+4, "float")
-        }
-        
-        If (Matrix&1 = "")
-            ImageAttr := this.Gdip_SetImageAttributesColorMatrix(Matrix)
-        Else If (Matrix != 1)
-            ImageAttr := this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
-        
-        If (sx = "" && sy = "" && sw = "" && sh = "")
-        {
-            sx := 0, sy := 0
-            sw := this.Gdip_GetImageWidth(pBitmap)
-            sh := this.Gdip_GetImageHeight(pBitmap)
-        }
-        
-        E := DllCall("gdiplus\GdipDrawImagePointsRect"
-                    , this.Ptr  , gp
-                    , this.Ptr  , pBitmap
-                    , this.Ptr  , &PointF
-                    , "int"     , Points0
-                    , "float"   , sx
-                    , "float"   , sy
-                    , "float"   , sw
-                    , "float"   , sh
-                    , "int"     , 2
-                    , this.Ptr  , ImageAttr
-                    , this.Ptr  , 0
-                    , this.Ptr  , 0)
-        
-        if ImageAttr
-            this.Gdip_DisposeImageAttributes(ImageAttr)
+        this.get_points_from_var(pointF, points)
+        , (mtx&1 = "")
+            ? ImageAttr := this.Gdip_SetImageAttributesColorMatrix(mtx)
+            : (mtx != 1)
+            ? ImageAttr := this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|"
+                                                                 . "0|1|0|0|0|"
+                                                                 . "0|0|1|0|0|"
+                                                                 . "0|0|0|" mtx "|0|"
+                                                                 . "0|0|0|0|1")
+            : ""
+        , (sx = "") ? sx := 0 : ""
+        , (sy = "") ? sy := 0 : ""
+        , (sw = "") ? sw := this.Gdip_GetImageWidth(pBitmap) : ""
+        , (sh = "") ? sh := this.Gdip_GetImageHeight(pBitmap) : ""
+        , E := DllCall("gdiplus\GdipDrawImagePointsRect"
+                        , this.Ptr  , gp                            ; pointer to graphics
+                        , this.Ptr  , pBitmap                       ; pointer to image
+                        , this.Ptr  , &pointF                       ; points struct with x,y coords
+                        , "int"     , VarSetCapacity(pointF)/8      ; Total x,y coords
+                        , "float"   , sx                            ; upper-left x-coord of where image is to be drawn
+                        , "float"   , sy                            ; upper-left y-coord of where image is to be drawn
+                        , "float"   , sw                            ; width of the portion of source image to be drawn
+                        , "float"   , sh                            ; height of the portion of source image to be drawn
+                        , "int"     , 2                             ; Unit of measure (2=pixel). See Unit enumeration.
+                        , this.Ptr  , ImageAttr                     ; Pointer to image attribute
+                        , this.Ptr  , 0                             ; Callback method to cancel drawing (not used)
+                        , this.Ptr  , 0)                            ; Pointer to data used by callback method (not used)
+        , (ImageAttr)                                               ; If ImageAttr exists, delete it
+            ? this.Gdip_DisposeImageAttributes(ImageAttr) : ""
         
         Return E
     }
     
+    
+    
+    
+    
+    
+    
+    
+    ;;;;;;;;;;;;;;;;;;;;; right here, right now, right here, right now... ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_DrawImage() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_DrawImage
+    ; Call          Gdip_DrawImage(gp, pBitmap, dx="", dy="", dw="", dh="", sx="", sy="", sw="", sh="", Matrix=1)
     ; Description   This function draws a bitmap into the Graphics of another bitmap
     ;                                                                                                                   |
-    ; gp         Pointer to the Graphics of a bitmap
-    ; pBitmap           Pointer to a bitmap to be drawn
-    ; dx                x-coord of destination upper-left corner
-    ; dy                y-coord of destination upper-left corner
-    ; dw                width of destination image
-    ; dh                height of destination image
-    ; sx                x-coordinate of source upper-left corner
-    ; sy                y-coordinate of source upper-left corner
-    ; sw                width of source image
-    ; sh                height of source image
-    ; Matrix            a matrix used to alter image attributes when drawing
+    ; gp            Pointer to the graphics of a bitmap
+    ; pBitmap       Pointer to a bitmap to be drawn
+    ; dx            x-coord of destination upper-left corner
+    ; dy            y-coord of destination upper-left corner
+    ; dw            width of destination image
+    ; dh            height of destination image
+    ; sx            x-coordinate of source upper-left corner
+    ; sy            y-coordinate of source upper-left corner
+    ; sw            width of source image
+    ; sh            height of source image
+    ; Matrix        a matrix used to alter image attributes when drawing
     ;                                                                                                                   |
-    ; Return            status enumeration. 0 = success
+    ; Return        status enumeration. 0 = success
     ;                                                                                                                   |
-    ; notes             if sx,sy,sw,sh are missed then the entire source bitmap will be used
-    ;                   Gdip_DrawImage performs faster
-    ;                   Matrix can be omitted to just draw with no alteration to ARGB
-    ;                   Matrix may be passed as a digit from 0 - 1 to change just transparency
-    ;                   Matrix can be passed as a matrix with any delimiter. For example:
-    ;                   MatrixBright=
-    ;                   (
-    ;                      1.5    |0      |0      |0      |0
-    ;                      0      |1.5    |0      |0      |0
-    ;                      0      |0      |1.5    |0      |0
-    ;                      0      |0      |0      |1      |0
-    ;                      0.05   |0.05   |0.05   |0      |1
-    ;                   )
+    ; Notes         if sx,sy,sw,sh are missed then the entire source bitmap will be used
+    ;               Gdip_DrawImage performs faster
+    ;               Matrix can be omitted to just draw with no alteration to ARGB
+    ;               Matrix may be passed as a digit from 0 - 1 to change just transparency
+    ;               Matrix can be passed as a matrix with any delimiter. For example:
+    ;               MatrixBright=
+    ;               (
+    ;                  1.5    |0      |0      |0      |0
+    ;                  0      |1.5    |0      |0      |0
+    ;                  0      |0      |1.5    |0      |0
+    ;                  0      |0      |0      |1      |0
+    ;                  0.05   |0.05   |0.05   |0      |1
+    ;               )
     ;                                                                                                                   |
-    ; notes             MatrixBright = 1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1
-    ;                   MatrixGreyScale = 0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1
-    ;                   MatrixNegative = -1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|0|0|0|0|1
+    ; Note          colorMatrix is a 2D array (5x5 grid)                                                                |
+    ;                _MatrixBright__________    _MatrixNegative__    _MatrixGreyScale_______                            |
+    ;               |1.5  |0    |0    |0 |0 |  |-1 |0  |0  |0 |0 |  |0.299|0.299|0.299|0 |0 |                           |
+    ;               |0    |1.5  |0    |0 |0 |  |0  |-1 |0  |0 |0 |  |0.587|0.587|0.587|0 |0 |                           |
+    ;               |0    |0    |1.5  |0 |0 |  |0  |0  |-1 |0 |0 |  |0.114|0.114|0.114|0 |0 |                           |
+    ;               |0    |0    |0    |1 |0 |  |0  |0  |0  |1 |0 |  |0    |0    |0    |1 |0 |                           |
+    ;               |0.05 |0.05 |0.05 |0 |1 |  |0  |0  |0  |0 |1 |  |0    |0    |0    |0 |1 |                           |
+    ;                ------------------------  -------------------  -------------------------                           |
     ;___________________________________________________________________________________________________________________|
     Gdip_DrawImage(gp, pBitmap, dx="", dy="", dw="", dh="", sx="", sy="", sw="", sh="", Matrix=1)
     {
         ImageAttr := (Matrix&1 = "") ? this.Gdip_SetImageAttributesColorMatrix(Matrix)
-                : (Matrix != 1) ? this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
+                : (Matrix != 1)      ? this.Gdip_SetImageAttributesColorMatrix("1|0|0|0|0|0|1|0|0|0|0|0|1|0|0|0|0|0|" Matrix "|0|0|0|0|0|1")
                 : ""
         
         If (sx = "" && sy = "" && sw = "" && sh = "")
@@ -1670,25 +1605,55 @@ Class gdip
     
     ;####################################################################################################################
     ;/\______________\                                                                                                  |
-    ; / () \________________________________________________________________________________________________ |
+    ; / Gdip_SetImageAttributesColorMatrix() \________________________________________________________________________________________________ |
     ;/                 \_______________________________________________________________________________________________\|
-    ; Call          Gdip_SetImageAttributesColorMatrix
-    ; Description   This function creates an image matrix ready for drawing
+    ; Call          Gdip_SetImageAttributesColorMatrix(Matrix)                                                          |
+    ; Description   This function creates an image matrix ready for drawing                                             |
     ;                                                                                                                   |
-    ; Matrix                a matrix used to alter image attributes when drawing
-    ;                        passed with any delimeter
+    ; Matrix        a matrix used to alter image attributes when drawing                                                |
+    ;               passed with any delimeter                                                                           |
     ;                                                                                                                   |
-    ; Return                Returns an image matrix on sucess or 0 if it fails
+    ; Return        Returns an image matrix on sucess or 0 if it fails                                                  |
     ;                                                                                                                   |
-    ; notes                    MatrixBright = 1.5|0|0|0|0|0|1.5|0|0|0|0|0|1.5|0|0|0|0|0|1|0|0.05|0.05|0.05|0|1
-    ;                        MatrixGreyScale = 0.299|0.299|0.299|0|0|0.587|0.587|0.587|0|0|0.114|0.114|0.114|0|0|0|0|0|1|0|0|0|0|0|1
-    ;                        MatrixNegative = -1|0|0|0|0|0|-1|0|0|0|0|0|-1|0|0|0|0|0|1|0|0|0|0|0|1
+    ; Note          colorMatrix is a 2D array (5x5 grid)                                                                |
+    ;                _MatrixBright__________    _MatrixNegative__    _MatrixGreyScale_______                            |
+    ;               |1.5  |0    |0    |0 |0 |  |-1 |0  |0  |0 |0 |  |0.299|0.299|0.299|0 |0 |                           |
+    ;               |0    |1.5  |0    |0 |0 |  |0  |-1 |0  |0 |0 |  |0.587|0.587|0.587|0 |0 |                           |
+    ;               |0    |0    |1.5  |0 |0 |  |0  |0  |-1 |0 |0 |  |0.114|0.114|0.114|0 |0 |                           |
+    ;               |0    |0    |0    |1 |0 |  |0  |0  |0  |1 |0 |  |0    |0    |0    |1 |0 |                           |
+    ;               |0.05 |0.05 |0.05 |0 |1 |  |0  |0  |0  |0 |1 |  |0    |0    |0    |0 |1 |                           |
+    ;                ------------------------  -------------------  -------------------------                           |
     ;___________________________________________________________________________________________________________________|
     Gdip_SetImageAttributesColorMatrix(Matrix)
     {
         VarSetCapacity(colorMatrix, 100, 0)
+        , ImageAttr := ""
+        , Matrix    := RegExReplace(Matrix, "^[^\d-\.]+([\d\.])", "$1", "", 1)
+        , Matrix    := RegExReplace(Matrix, "[^\d-\.]+", "|")
+        , data      := StrSplit(matrix, "|")
+        
+        For index, value in data
+            (value = "") ? value := (Mod(A_Index-1, 6) ? 0 : 1) : ""
+            , NumPut(value, colorMatrix, (A_Index-1)*4, "float")
+        
+        DllCall("gdiplus\GdipCreateImageAttributes", this.PtrA, ImageAttr)
+        , DllCall("gdiplus\GdipSetImageAttributesColorMatrix"
+                , this.Ptr  , ImageAttr                                     ; pointer to image attribute struct
+                , "int"     , 1                                             ; Color adjust type 0-4
+                , "int"     , 1                                             ; Enable
+                , this.Ptr  , &colorMatrix                                  ; Color matrix
+                , this.Ptr  , 0                                             ; Grayscale matrix
+                , "int"     , 0)                                            ; Flags 0-3
+        
+        Return ImageAttr
+    }
+    
+    Gdip_SetImageAttributesColorMatrix(Matrix)
+    {
+        VarSetCapacity(colorMatrix, 100, 0)
         ImageAttr   := ""
-        Matrix      := RegExReplace(RegExReplace(Matrix, "^[^\d-\.]+([\d\.])", "$1", "", 1), "[^\d-\.]+", "|")
+        Matrix      := RegExReplace(Matrix, "^[^\d-\.]+([\d\.])", "$1", "", 1)
+        Matrix      := RegExReplace(Matrix, "[^\d-\.]+", "|")
         StringSplit, Matrix, Matrix, |
         Loop, 25
         {
@@ -1699,7 +1664,13 @@ Class gdip
         }
         
         DllCall("gdiplus\GdipCreateImageAttributes", this.PtrA, ImageAttr)
-        , DllCall("gdiplus\GdipSetImageAttributesColorMatrix", this.Ptr, ImageAttr, "int", 1, "int", 1, this.Ptr, &colorMatrix, this.Ptr, 0, "int", 0)
+        , DllCall("gdiplus\GdipSetImageAttributesColorMatrix"
+                , this.Ptr  , ImageAttr
+                , "int"     , 1
+                , "int"     , 1
+                , this.Ptr  , &colorMatrix
+                , this.Ptr  , 0
+                , "int"     , 0)
         Return ImageAttr
     }
     
@@ -1712,9 +1683,9 @@ Class gdip
     ;                                                                                                                   |
     ; pBitmap                Pointer to a bitmap to get the pointer to its graphics
     ;                                                                                                                   |
-    ; Return                Returns a pointer to the graphics of a bitmap
+    ; Return                Returns a Pointer to the graphics of a bitmap
     ;                                                                                                                   |
-    ; notes                    a bitmap can be drawn into the graphics of another bitmap
+    ; Notes                    a bitmap can be drawn into the graphics of another bitmap
     ;___________________________________________________________________________________________________________________|
     Gdip_GraphicsFromImage(pBitmap)
     {
@@ -1731,9 +1702,9 @@ Class gdip
     ;                                                                                                                   |
     ; hdc                    This is the handle to the device context
     ;                                                                                                                   |
-    ; Return                Returns a pointer to the graphics of a bitmap
+    ; Return                Returns a Pointer to the graphics of a bitmap
     ;                                                                                                                   |
-    ; notes                    You can draw a bitmap into the graphics of another bitmap
+    ; Notes                    You can draw a bitmap into the graphics of another bitmap
     ;___________________________________________________________________________________________________________________|
     Gdip_GraphicsFromHDC(hdc)
     {
@@ -1787,7 +1758,7 @@ Class gdip
     ;                                                                                                                   |
     ; Return                status enumeration. 0 = success
     ;                                                                                                                   |
-    ; notes                    By default this will make the background invisible
+    ; Notes                    By default this will make the background invisible
     ;                        Using clipping regions you can clear a particular area on the graphics rather than clearing the entire graphics
     ;___________________________________________________________________________________________________________________|
     Gdip_GraphicsClear(gp, ARGB=0x00ffffff)
@@ -1808,7 +1779,7 @@ Class gdip
     ; Return                If the function succeeds, the Return value is a pointer to the new blurred bitmap
     ;                        -1 = The blur parameter is outside the range 1-100
     ;                                                                                                                   |
-    ; notes                    This function will not dispose of the original bitmap
+    ; Notes                    This function will not dispose of the original bitmap
     ;___________________________________________________________________________________________________________________|
     Gdip_BlurBitmap(pBitmap, Blur)
     {
@@ -1852,7 +1823,7 @@ Class gdip
     ;                   -4 = Could not get WideChar name of output file
     ;                   -5 = Could not save file to disk
     ;                                                                                                                   |
-    ; notes             This function will use the extension supplied from the sOutput parameter to determine the output format
+    ; Notes             This function will use the extension supplied from the sOutput parameter to determine the output format
     ;___________________________________________________________________________________________________________________|
     Gdip_SaveBitmapToFile(pBitmap, sOutput, Quality=75)
     {
@@ -2559,10 +2530,10 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_CreateLineBrush(x1, y1, x2, y2, ARGB1, ARGB2, WrapMode=1)
     {
-        PointF1 := PointF2 := LGpBrush := ""
-        , this.CreatePointF(PointF1, x1, y1)
-        , this.CreatePointF(PointF2, x2, y2)
-        , DllCall("gdiplus\GdipCreateLineBrush", this.Ptr, &PointF1, this.Ptr, &PointF2, "Uint", ARGB1, "Uint", ARGB2, "int", WrapMode, this.PtrA, LGpBrush)
+        pointF1 := pointF2 := LGpBrush := ""
+        , this.CreatepointF(pointF1, x1, y1)
+        , this.CreatepointF(pointF2, x2, y2)
+        , DllCall("gdiplus\GdipCreateLineBrush", this.Ptr, &pointF1, this.Ptr, &pointF2, "Uint", ARGB1, "Uint", ARGB2, "int", WrapMode, this.PtrA, LGpBrush)
         
         Return LGpBrush
     }
@@ -3133,18 +3104,13 @@ Class gdip
     ;                                                                                                                   |
     ; Return                                                                                                            |
     ;___________________________________________________________________________________________________________________|
-    Gdip_AddPathPolygon(Path, Points)
+    Gdip_AddPathPolygon(path, points)
     {
-        StringSplit, Points, Points, |
-        VarSetCapacity(PointF, 8*Points0)   
-        Loop, %Points0%
-        {
-            StringSplit, Coord, Points%A_Index%, `,
-            NumPut(Coord1, PointF, 8*(A_Index-1), "float")
-            , NumPut(Coord2, PointF, (8*(A_Index-1))+4, "float")
-        }
-        
-        Return DllCall("gdiplus\GdipAddPathPolygon", this.Ptr, Path, this.Ptr, &PointF, "int", Points0)
+        this.get_points_from_var(pointF, points)
+        Return DllCall("gdiplus\GdipAddPathPolygon"
+                        , this.Ptr  , path
+                        , this.Ptr  , &pointF
+                        , "int"     , VarSetCapacity(pointF)/8)
     }
     
     ;####################################################################################################################
@@ -3512,8 +3478,8 @@ Class gdip
     ; Description   Update the clipping region of a graphics object to a combined region of itself and a rectangle.     |
     ;                                                                                                                   |
     ; gp            Pointer to graphics                                                                                 |
-    ; x             x-coordinate of rectangle's upper left corner                                                       |
-    ; y             y-coordinate of rectangle's upper left corner                                                       |
+    ; x             x-coordinate of rectangle's upper-left corner                                                       |
+    ; y             y-coordinate of rectangle's upper-left corner                                                       |
     ; w             Width of the rectangle                                                                              |
     ; h             Height of the rectangle                                                                             |
     ; CombineMode   Replace the existing region with:                                                                   |
@@ -3550,7 +3516,10 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_SetClipPath(gp, Path, CombineMode=0)
     {
-        Return DllCall("gdiplus\GdipSetClipPath", this.Ptr, gp, this.Ptr, Path, "int", CombineMode)
+        Return DllCall("gdiplus\GdipSetClipPath"
+                        , this.Ptr  , gp
+                        , this.Ptr  , Path
+                        , "int"     , CombineMode)
     }
     
     ;####################################################################################################################
@@ -4196,35 +4165,66 @@ Class gdip
     }
     
     ; ########## Misc Methods ##########
+    ;                                                                                                                   |
     ;___________________________________________________________________________________________________________________|
     run_method(method_name, params:="") {
         bf := ObjBindMethod(this, method_name, params*)
         Return bf
     }
     
+    ;                                                                                                                   |
     ;___________________________________________________________________________________________________________________|
     rand(min, max) {
         Random, result, % min, % max
         Return result
     }
     
-    ; Method that turns a string of x,y coordinates into a 2D array
-    ; X and Y coords need to be separated by a comma
-    ; X,Y coord pairs should be separated by a pipe
-    ; Spaces and tabs are completely ignored
-    ; -3,0|-3,3|6,0
-    get_points(pts_str){
-        If IsObject(pts_str)
-            Return pts_str
+    ;####################################################################################################################
+    ; Call          get_points_from_var(ByRef pointF, pts)                                                              |
+    ; Description   Size and fill a variable with x/y coords from pts                                                   |
+    ;                                                                                                                   |
+    ; pointF        Variable to add coords to                                                                           |
+    ; pts           One or more x/y coords. Can be string or object.                                                    |
+    ;               String: Separate x/y by comma. Separate x/y pairs by pipe. Spaces/tabs are ignored.                 |
+    ;                   "1,0|-5,-3|100.1   ,   -100.0|  10  ,   20"                                                     |
+    ;               Array: Can be filled with strings using "x,y" format or with arrays with [x,y] coords               |
+    ;                   ["1,0", "-5,-3", "100.1,-100.0", "10,20"]                                                       |
+    ;                   [[1,0], [-5,-3], [100.1,-100.0], [10,20]]                                                       |
+    ;                                                                                                                   |
+    ; Return        0 = Success, 1 = Failure                                                                            |
+    ;___________________________________________________________________________________________________________________|
+    get_points_from_var(ByRef pointF, pts)
+    {
+        arr := {}                                                       ; object to store coords
+        If IsObject(pts)                                                ; If pts is an object
+            For index, coords in pts                                    ; Loop through pts
+                IsObject(coords)                                        ; Check if first value is string or object 
+                    ? arr[A_Index] := [coords.1, coords.2]              ; If already an object, save info to new array
+                    : (data := StrSplit(coords, ",", " `t")             ; If string, split data by comma and add to array
+                        , arr[A_Index] := [data.1, data.2] )
+        Else
+            Loop, Parse, % pts, % "|", % " `t"                          ; If pts is a string, parse by pipe
+                data := StrSplit(A_LoopField, ",", " `t")               ; Split by comma to spearate x and y coords
+                , arr[A_Index] := [data.1, data.2]                      ; Add coords to array
         
-        arr := []
-        Loop, Parse, % pts_str, % "|", % " \t"
-            data := StrSplit(A_LoopField, ",", " \t")
-            , arr[A_Index] := [data[1], data[2]]
-        Return arr
+        VarSetCapacity(pointF, 8*arr.MaxIndex())                        ; Set var size based on number of coord pairs
+        
+        For index, coord in arr                                         ; Loop through array
+        {
+            If (0 * coord.1 = 0) && (0 * coord.2 = 0){                  ; Verify they're numbers and
+                  NumPut(coord.1, pointF, 8*(A_Index-1)   , "float")    ; Add x coord to the point var
+                , NumPut(coord.2, pointF, 8*(A_Index-1)+4 , "float")    ; Add y coord to the point var
+                Continue
+            }
+            Else                                                        ; If coord 1 or 2 are not numbers
+                arr := 1                                                ; Set arr to false
+            Break                                                       ; Break loop on failure
+        }
+        
+        Return (arr = 1 : 1 ? 0)                                        ; Return 0 = success, 1 = failure
     }
     
-    ; Status object creator
+    ; Creates the status object for various GDI failure types
     make_status() {
         this.status := {}
         this.status.0  := "Ok"
