@@ -4259,6 +4259,8 @@ Class gdip
 ;   https://docs.microsoft.com/en-us/windows/win32/gdi/windows-gdi
 ; FunctionX GDI tutorial:
 ;   http://www.functionx.com/bcb/index.htm
+; IT Berater's GDI+ Flat API Reference
+;   http://www.jose.it-berater.org/gdiplus/iframe/index.htm
 ; Tariq Porter's original GDI tutorials:
 ;   https://github.com/tariqporter/Gdip
 ; AutoIt library docs. Includes GDI+ info
