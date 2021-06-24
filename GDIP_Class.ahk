@@ -1,7 +1,6 @@
 ;#Warn
 
 gdip.__New()
-gdip.Gdip_SaveBitmapToFile(0x1, "c:\test.bmp")
 
 Class gdip
 {
