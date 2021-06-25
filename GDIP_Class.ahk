@@ -1,7 +1,6 @@
 ;#Warn
 
 gdip.__New()
-gdip.Gdip_SaveBitmapToFile(0x1, "c:\test.bmp")
 
 Class gdip
 {
@@ -1558,22 +1557,14 @@ Class gdip
         , (dw = "") ? dw := sw : ""
         , (dh = "") ? dh := sh : ""
         , status := DllCall("gdiplus\GdipDrawImageRectRect"
-                            , this.Ptr  , gp
-                            , this.Ptr  , pBitmap
-                            , "float"   , dx
-                            , "float"   , dy
-                            , "float"   , dw
-                            , "float"   , dh
-                            , "float"   , sx
-                            , "float"   , sy
-                            , "float"   , sw
-                            , "float"   , sh
-                            , "int"     , 2
-                            , this.Ptr  , ImageAttr
-                            , this.Ptr  , 0
-                            , this.Ptr  , 0)
-        , (ImageAttr)
-            ? this.Gdip_DisposeImageAttributes(ImageAttr) : ""
+                            , this.Ptr , gp    , this.Ptr , pBitmap
+                            , "float"  , dx    , "float"  , dy
+                            , "float"  , dw    , "float"  , dh
+                            , "float"  , sx    , "float"  , sy
+                            , "float"  , sw    , "float"  , sh
+                            , "int"    , 2     , this.Ptr , ImageAttr
+                            , this.Ptr , 0     , this.Ptr , 0)
+        , (ImageAttr) ? this.Gdip_DisposeImageAttributes(ImageAttr) : ""
         
         Return status
     }
@@ -2075,7 +2066,10 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_BitmapSetResolution(pBitmap, dpix, dpiy)
     {
-        Return DllCall("gdiplus\GdipBitmapSetResolution", this.Ptr, pBitmap, "float", dpix, "float", dpiy)
+        Return DllCall("gdiplus\GdipBitmapSetResolution"
+                    , this.Ptr  , pBitmap
+                    , "float"   , dpix
+                    , "float"   , dpiy)
     }
     
     ;####################################################################################################################
@@ -2112,20 +2106,6 @@ Class gdip
             ; Check each size
             Loop, Parse, Sizes, |
             {
-                ; Extract i
-                /*
-                UINT PrivateExtractIconsA(
-                  LPCSTR szFileName,
-                  int    nIconIndex,
-                  int    cxIcon,
-                  int    cyIcon,
-                  HICON  *phicon,
-                  UINT   *piconid,
-                  UINT   nIcons,
-                  UINT   flags
-                );
-                */
-                
                 ; Attempt to get the icon from file
                 DllCall("PrivateExtractIcons"
                         , "str"     , sFile         ; File path
@@ -2172,7 +2152,7 @@ Class gdip
             if !hIcon
                 Return -1
             
-            ; Get width and height from buffer info
+            ; Get width and height from buffer
             Width := NumGet(buff, 4, "int")
             , Height := NumGet(buff, 8, "int")
             ; Make new bitmap
@@ -2196,21 +2176,19 @@ Class gdip
                 Return -2
             }
             
-            ; Create dib
-            VarSetCapacity(dib, 104)
-            ; 
+            ; Create dib.
+            dibSize := A_PtrSize = 8 ? 104 : 84
+            , VarSetCapacity(dib, dibSize)
             , DllCall("GetObject"                               ; sizeof(DIBSECTION) = 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize
                     , this.Ptr  , hbm
-                    , "int"     , A_PtrSize = 8 ? 104 : 84
+                    , "int"     , dibSize
                     , this.Ptr  , &dib)
-            , Stride := NumGet(dib, 12, "Int")                  ; 
-            , Bits := NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0)) ; padding
             , DllCall("gdiplus\GdipCreateBitmapFromScan0"
                     , "int"     , Width
                     , "int"     , Height
-                    , "int"     , Stride
+                    , "int"     , NumGet(dib, 12, "Int")
                     , "int"     , 0x26200A
-                    , this.Ptr  , Bits
+                    , this.Ptr  , NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0))
                     , this.PtrA , pBitmapOld)
             , pBitmap := this.Gdip_CreateBitmap(Width, Height)
             , gp := this.Gdip_GraphicsFromImage(pBitmap)
@@ -2220,8 +2198,7 @@ Class gdip
             , this.DeleteDC(hdc)
             , this.Gdip_DeleteGraphics(gp)
             , this.Gdip_DisposeImage(pBitmapOld)
-            
-            this.DestroyIcon(hIcon)
+            , this.DestroyIcon(hIcon)
         }
         else
         {
