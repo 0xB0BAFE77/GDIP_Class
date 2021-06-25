@@ -1,6 +1,7 @@
 ;#Warn
 
 gdip.__New()
+gdip.Gdip_SaveBitmapToFile(0x1, "c:\test.bmp")
 
 Class gdip
 {
@@ -2101,12 +2102,12 @@ Class gdip
         if ext in exe,dll
         {
             ; Create a buffer
-            BufSize := 16 + (2*(A_PtrSize ? A_PtrSize : 4))         ; bool dword*2 hbitmap*2
+            buffSize := 16 + (2*(A_PtrSize ? A_PtrSize : 4))         ; bool dword*2 hbitmap*2
             ; Assign sizes if none provided
             , Sizes := IconSize ? IconSize : "256|128|64|48|32|16"
             ; Initialize vars
             , hIcon := pBitmapOld  := ""
-            , VarSetCapacity(buf, BufSize, 0)
+            , VarSetCapacity(buff, BuffSize, 0)
             
             ; Check each size
             Loop, Parse, Sizes, |
@@ -2125,65 +2126,99 @@ Class gdip
                 );
                 */
                 
-                ; Attempt to get the icon
+                ; Attempt to get the icon from file
                 DllCall("PrivateExtractIcons"
                         , "str"     , sFile         ; File path
                         , "int"     , IconNumber-1  ; Icon index number
-                        , "int"     , A_LoopField   ; 
-                        , "int"     , A_LoopField   ; 
-                        , this.PtrA , hIcon         ; 
-                        , this.PtrA , 0             ; 
-                        , "uint"    , 1             ; 
-                        , "uint"    , 0)            ; 
+                        , "int"     , A_LoopField   ; Horizontal icon desired
+                        , "int"     , A_LoopField   ; Vertical icon desired
+                        , this.PtrA , hIcon         ; Handle to icon
+                        , this.PtrA , 0             ; Pointer to a returned resource identifier
+                        , "uint"    , 1             ; Number of icons to extract
+                        , "uint"    , 0)            ; Flags (LR_* LoadImage flag)
                 
                 ; If not successful, continue to next size
                 if !hIcon
                     continue
                 
-                if !DllCall("GetIconInfo", this.Ptr, hIcon, this.Ptr, &buf)
+                ; If no info can be gotten from the icon, try next
+                if !DllCall("GetIconInfo", this.Ptr, hIcon, this.Ptr, &buff)
                 {
                     this.DestroyIcon(hIcon)
                     continue
                 }
                 
-                ;hbmMask  := NumGet(buf, 12 + ((A_PtrSize ? A_PtrSize : 4) - 4)) ; What is this used for...? It's only referenced here.
-                hbmColor := NumGet(buf, 12 + ((A_PtrSize ? A_PtrSize : 4) - 4) + (A_PtrSize ? A_PtrSize : 4))
-                if !(hbmColor && DllCall("GetObject", this.Ptr, hbmColor, "int", BufSize, this.Ptr, &buf))
+                ; Abandoned code
+                ;hbmMask  := NumGet(buff, 12 + ((A_PtrSize ? A_PtrSize : 4) - 4)) ; What is this even used for...? It's only referenced here.
+                
+                ; Get hbm (handle to icon color bitmap)
+                ; hbmColor := NumGet(buff, 12 + ((A_PtrSize ? A_PtrSize : 4) - 4) + (A_PtrSize ? A_PtrSize : 4))
+                hbmColor := NumGet(buff, (A_PtrSize ? (A_PtrSize*2)+8 : 16))
+                ; Check if hbmColor is valid and store info about the object
+                if !(hbmColor && DllCall("GetObject"
+                                        , this.Ptr  , hbmColor
+                                        , "int"     , BuffSize
+                                        , this.Ptr  , &buff) )
                 {
+                    ; If either failed, destroy this icon and continue to next
                     this.DestroyIcon(hIcon)
                     continue
                 }
-                break
+                ; Break if everything else has worked
+                Break
             }
             
+            ; If a valid handle is never found, return error -1
             if !hIcon
                 Return -1
             
-            Width := NumGet(buf, 4, "int")
-            , Height := NumGet(buf, 8, "int")
-            
-            hbm := this.CreateDIBSection(Width, -Height)
+            ; Get width and height from buffer info
+            Width := NumGet(buff, 4, "int")
+            , Height := NumGet(buff, 8, "int")
+            ; Make new bitmap
+            , hbm := this.CreateDIBSection(Width, -Height)
             , hdc := this.CreateCompatibleDC()
             , obm := this.SelectObject(hdc, hbm)
             
-            if !DllCall("DrawIconEx", this.Ptr, hdc, "int", 0, "int", 0, this.Ptr, hIcon, "uint", Width, "uint", Height, "uint", 0, this.Ptr, 0, "uint", 3)
+            if !DllCall("DrawIconEx"            ; Draw icon or cursor into DC
+                        , this.Ptr  , hdc       ; Handle to device context
+                        , "int"     , 0         ; Logical x-coord of icon/curosr
+                        , "int"     , 0         ; Logical y-coord of icon/curosr
+                        , this.Ptr  , hIcon     ; Handle to icon to be drawn
+                        , "uint"    , Width     ; Logical width of icon/curosr
+                        , "uint"    , Height    ; Logical height of icon/curosr
+                        , "uint"    , 0         ; If animated, set frame index
+                        , this.Ptr  , 0         ; Pointer to flicker free brush
+                        , "uint"    , 3)        ; diFlags (drawing DI_* flags)
             {
+                ; If DrawIconEx fails, destroy icon and return error -2
                 this.DestroyIcon(hIcon)
                 Return -2
             }
             
+            ; Create dib
             VarSetCapacity(dib, 104)
-            , DllCall("GetObject", this.Ptr, hbm, "int", A_PtrSize = 8 ? 104 : 84, this.Ptr, &dib) ; sizeof(DIBSECTION) = 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize
-            , Stride := NumGet(dib, 12, "Int")
+            ; 
+            , DllCall("GetObject"                               ; sizeof(DIBSECTION) = 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize
+                    , this.Ptr  , hbm
+                    , "int"     , A_PtrSize = 8 ? 104 : 84
+                    , this.Ptr  , &dib)
+            , Stride := NumGet(dib, 12, "Int")                  ; 
             , Bits := NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0)) ; padding
-            , DllCall("gdiplus\GdipCreateBitmapFromScan0", "int", Width, "int", Height, "int", Stride, "int", 0x26200A, this.Ptr, Bits, this.PtrA, pBitmapOld)
+            , DllCall("gdiplus\GdipCreateBitmapFromScan0"
+                    , "int"     , Width
+                    , "int"     , Height
+                    , "int"     , Stride
+                    , "int"     , 0x26200A
+                    , this.Ptr  , Bits
+                    , this.PtrA , pBitmapOld)
             , pBitmap := this.Gdip_CreateBitmap(Width, Height)
-            , G := this.Gdip_GraphicsFromImage(pBitmap)
-            , this.Gdip_DrawImage(G, pBitmapOld, 0, 0, Width, Height, 0, 0, Width, Height)
+            , gp := this.Gdip_GraphicsFromImage(pBitmap)
+            , this.Gdip_DrawImage(gp, pBitmapOld, 0, 0, Width, Height, 0, 0, Width, Height)
             , this.SelectObject(hdc, obm)
             , this.DeleteObject(hbm)
             , this.DeleteDC(hdc)
-            , this.Gdip_DeleteGraphics(G)
+            , this.Gdip_DeleteGraphics(gp)
             , this.Gdip_DisposeImage(pBitmapOld)
             
             this.DestroyIcon(hIcon)
