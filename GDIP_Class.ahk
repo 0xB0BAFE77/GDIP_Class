@@ -7,7 +7,7 @@ Class gdip
     ; GDI+ Class library for AHK
     ; Version:  v1.48
     ; Started:  20210501
-    ; Updated:  20210617
+    ; Updated:  20210702
     ; 
     ; This is a rewrite of tic's original GDIP library. It has been updated to be a class with methods.
     ; All of the GDIP original tutorials have been rewritten to support the new class structure.
@@ -1887,12 +1887,12 @@ Class gdip
     ; Return        Status enumeration value. 0 = success.                                                              |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
-    Gdip_BitmapSetResolution(pBitmap, dpix, dpiy)
+    Gdip_BitmapSetResolution(pBitmap, dpiX, dpiY)
     {
         Return DllCall("gdiplus\GdipBitmapSetResolution"
                     , this.Ptr  , pBitmap
-                    , "float"   , dpix
-                    , "float"   , dpiy)
+                    , "float"   , dpiX
+                    , "float"   , dpiY)
     }
     
     ;####################################################################################################################
@@ -1916,7 +1916,7 @@ Class gdip
         if ext in exe,dll
         {
             ; Create a buffer
-            buffSize := 16 + (2*(A_PtrSize ? A_PtrSize : 4))         ; bool dword*2 hbitmap*2
+            buffSize := 16 + (2*(A_PtrSize ? A_PtrSize : 4))
             ; Assign sizes if none provided
             , Sizes := IconSize ? IconSize : "256|128|64|48|32|16"
             ; Initialize vars
@@ -1924,12 +1924,12 @@ Class gdip
             , VarSetCapacity(buff, BuffSize, 0)
             
             ; Check each size
-            Loop, Parse, Sizes, |
+            Loop, Parse, % Sizes, % "|"
             {
                 ; Attempt to get the icon from file
                 DllCall("PrivateExtractIcons"
                         , "str"     , sFile         ; File path
-                        , "int"     , IconNumber-1  ; Icon index number
+                        , "int"     , IconNumber-1  ; Icon index
                         , "int"     , A_LoopField   ; Horizontal icon desired
                         , "int"     , A_LoopField   ; Vertical icon desired
                         , this.PtrA , hIcon         ; Handle to icon
@@ -1941,20 +1941,17 @@ Class gdip
                 if !hIcon
                     continue
                 
-                ; If no info can be gotten from the icon, try next
+                ; If no info can be gotten from the icon, try next one
                 if !DllCall("GetIconInfo", this.Ptr, hIcon, this.Ptr, &buff)
                 {
                     this.DestroyIcon(hIcon)
                     continue
                 }
                 
-                ; Abandoned code
-                ;hbmMask  := NumGet(buff, 12 + ((A_PtrSize ? A_PtrSize : 4) - 4)) ; What is this even used for...? It's only referenced here.
-                
-                ; Get hbm (handle to icon color bitmap)
+                ; Get handle to icon's color bitmap
                 ; hbmColor := NumGet(buff, 12 + ((A_PtrSize ? A_PtrSize : 4) - 4) + (A_PtrSize ? A_PtrSize : 4))
                 hbmColor := NumGet(buff, (A_PtrSize ? (A_PtrSize*2)+8 : 16))
-                ; Check if hbmColor is valid and store info about the object
+                ; Check if hbmColor is valid and if GetObject succeeded
                 if !(hbmColor && DllCall("GetObject"
                                         , this.Ptr  , hbmColor
                                         , "int"     , BuffSize
@@ -1964,7 +1961,7 @@ Class gdip
                     this.DestroyIcon(hIcon)
                     continue
                 }
-                ; Break if everything else has worked
+                ; If the thread gets here, break because everything was successful
                 Break
             }
             
@@ -1976,7 +1973,7 @@ Class gdip
             Width := NumGet(buff, 4, "int")
             , Height := NumGet(buff, 8, "int")
             ; Make new bitmap
-            , hbm := this.CreateDIBSection(Width, -Height)
+            , hbm := this.CreateDIBSection(Width, -Height) ; <------ Why negative height? Test later.
             , hdc := this.CreateCompatibleDC()
             , obm := this.SelectObject(hdc, hbm)
             
@@ -1996,24 +1993,30 @@ Class gdip
                 Return -2
             }
             
-            ; Create dib
-            dibSize := A_PtrSize = 8 ? 104 : 84             ; sizeof(DIBSECTION) = 76+2*(A_PtrSize=8?4:0)+2*A_PtrSize
+            ; Create dib (what is 104/84? How is the size of the dib already known?)
+            dibSize := (A_PtrSize = 8 ? 104 : 84)           ; sizeof(DIBSECTION) = 76+2 * (A_PtrSize=8?4:0) + 2*A_PtrSize
             , VarSetCapacity(dib, dibSize)
             ; 
             , DllCall("GetObject"                           ; Put bitmap into new dib using handle
                     , this.Ptr  , hbm
                     , "int"     , dibSize
                     , this.Ptr  , &dib)
-            , DllCall("gdiplus\GdipCreateBitmapFromScan0"   ; WTF is a scan0?
+            , DllCall("gdiplus\GdipCreateBitmapFromScan0"   ; Scan0 is the start of the bitmap data stream?
                     , "int"     , Width
                     , "int"     , Height
                     , "int"     , NumGet(dib, 12, "Int")
                     , "int"     , 0x26200A
-                    , this.Ptr  , NumGet(dib, 20 + (A_PtrSize = 8 ? 4 : 0))
+                    , this.Ptr  , NumGet(dib, (A_PtrSize = 8 ? 24 : 20))
                     , this.PtrA , pBitmapOld)
+            
+            ; Create a new bitmap
             , pBitmap := this.Gdip_CreateBitmap(Width, Height)
+            ; Get graphics
             , gp := this.Gdip_GraphicsFromImage(pBitmap)
+            ; And write 
             , this.Gdip_DrawImage(gp, pBitmapOld, 0, 0, Width, Height, 0, 0, Width, Height)
+            
+            ; Cleanup
             , this.SelectObject(hdc, obm)
             , this.DeleteObject(hbm)
             , this.DeleteDC(hdc)
@@ -2021,18 +2024,29 @@ Class gdip
             , this.Gdip_DisposeImage(pBitmapOld)
             , this.DestroyIcon(hIcon)
         }
+        ; If not a dll or exe, run this
         else
-        {
-            If (!A_IsUnicode)
-            {
-                VarSetCapacity(wFile, 1024)
-                DllCall("kernel32\MultiByteToWideChar", "uint", 0, "uint", 0, this.Ptr, &sFile, "int", -1, this.Ptr, &wFile, "int", 512)
-                DllCall("gdiplus\GdipCreateBitmapFromFile", this.Ptr, &wFile, this.PtrA, pBitmap)
-            }
-            else
-                DllCall("gdiplus\GdipCreateBitmapFromFile", this.Ptr, &sFile, this.PtrA, pBitmap)
-        }
+            ; If unicode
+            (A_IsUnicode)
+                ; Create the bitmap normally from file
+                ? DllCall("gdiplus\GdipCreateBitmapFromFile"
+                        , this.Ptr  , &sFile
+                        , this.PtrA , pBitmap)
+            ; If not unicode, convert sFile to wide char
+            : ( VarSetCapacity(wFile, 1024)
+                , DllCall("kernel32\MultiByteToWideChar"
+                        , "uint"    , 0
+                        , "uint"    , 0
+                        , this.Ptr  , &sFile
+                        , "int"     , -1
+                        , this.Ptr  , &wFile
+                        , "int"     , 512)
+                ; Then create the bitmap with the converted file
+                , DllCall("gdiplus\GdipCreateBitmapFromFile"
+                        , this.Ptr  , &wFile
+                        , this.PtrA , pBitmap) )
         
+        ; Return pointer to bitmap
         Return pBitmap
     }
     
@@ -2044,10 +2058,10 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_CreateBitmapFromHBITMAP(hBitmap, Palette=0)
     {
-        DllCall("gdiplus\GdipCreateBitmapFromHBITMAP"
-                , this.Ptr  , hBitmap
-                , this.Ptr  , Palette
-                , this.PtrA , (pBitmap:=""))
+        pBitmap := "", DllCall("gdiplus\GdipCreateBitmapFromHBITMAP"
+                                , this.Ptr  , hBitmap
+                                , this.Ptr  , Palette
+                                , this.PtrA , pBitmap)
         Return pBitmap
     }
     
@@ -2059,9 +2073,10 @@ Class gdip
     ;___________________________________________________________________________________________________________________|
     Gdip_CreateHBITMAPFromBitmap(pBitmap, Background=0xFFFFFFFF)
     {
-        DllCall("gdiplus\GdipCreateHBITMAPFromBitmap"
+        hbm := ""
+        , DllCall("gdiplus\GdipCreateHBITMAPFromBitmap"
                 , this.Ptr  , pBitmap
-                , this.PtrA , (hbm:="")
+                , this.PtrA , hbm
                 , "int"     , Background)
         Return hbm
     }
@@ -3914,3 +3929,4 @@ Class gdip
 ; Rseding91 (AHK forums)
 ; mim (discord)
 ; SoftCore (discord)
+
