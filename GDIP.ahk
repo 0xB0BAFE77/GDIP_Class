@@ -1,13 +1,33 @@
 #Warn
 GDIP.__New()
 
-; testing
-FileSelectFile, img_path
-img_p := GDIP.image.FromFile(img_path, 1)
-
+test()
 ExitApp
 
+
+test()
+{
+    FileSelectFile, img_path
+    img_p := GDIP.image.FromFile(img_path, 1)
+    result := GDIP.image.GetType(img_p)
+    MsgBox, % "img_p: " img_p "`nresult: " result
+}
+
 *Escape::ExitApp
+
+/*
+    Log:
+    20210729
+        Startup and shutdown are working
+        Added image class
+        Image.FromFile() works
+    20210703
+        Image.GetType() works
+        IMO = Image Object
+        IMOP = IMO Pointer
+    
+*/
+
 
 Class GDIP
 {
@@ -96,7 +116,12 @@ Class GDIP
                          ,this.PtrA , token         ; Pointer to GDIP token
                          ,this.Ptr  , &gdip_si      ; Startup Input
                          ,this.Ptr  , 0)            ; Startup Output 0 = null
-        ,this.gdip_token := token
+        
+        (estat > 0)
+            ? this.error_log(A_ThisFunc, "Startup has failed.", "Enum Status: " this.enum.status[estat])
+            : ""
+        
+        this.gdip_token := token
         
         Return estat
     }
@@ -132,8 +157,9 @@ Class GDIP
         Return guiHwnd
     }
     
+    
     ;####################################################################################################################
-    ;  Class Methods                                                                                                    |
+    ;  Regular Class Methods                                                                                            |
     ;####################################################################################################################
     ; Quick boundfuncs
     _method(method_name, params := "")
@@ -142,7 +168,10 @@ Class GDIP
         Return bf
     }
     
-    log_error(call, type, value)
+    ; Error log expects the call where the error happened
+    ; The type of value or what was expected
+    ; The value or what was actually received
+    error_log(call, msg, expected, found)
     {
         this.last_err := A_Now "`n" call "`n" type "`n" value "`n`n"
         Return
@@ -152,11 +181,13 @@ Class GDIP
     data_type_size(type)
     {
         Static dt  := ""
-        If (dt = "")
+        If !IsObject(dt)
         {
-            p := A_PtrSize
-            h := (A_PtrSize = 8) ? 4 : 2
-            u := A_IsUnicode     ? 2 : 1
+            p  := A_PtrSize
+            h  := (A_PtrSize = 8) ? 4 : 2
+            u  := A_IsUnicode     ? 2 : 1
+            dt := {}
+            
             dt.__int8     := 1    ,dt.int                 := 4    ,dt["unsigned __int16"]    := 2
             dt.__int16    := 2    ,dt.long                := 4    ,dt["unsigned __int32"]    := 4
             dt.__int32    := 4    ,dt.short               := 2    ,dt["unsigned __int64"]    := 8
@@ -222,8 +253,10 @@ Class GDIP
             dt.INT8          := 1    ,dt.POINTER_UNSIGNED  := p
         }
         bytes := dt[type]
-        Return (bytes * 0 = 0) ? bytes                  ; Bytes
-             : "error"                                  ; Not found
+        If (bytes != "")
+            Return bytes
+        this.error_log(A_ThisFunc, "No valid datatype found.", type, "See 'data_type_size' function for list of data types.")
+        Return "err"
     }
     
     is_supported_file_type(type)
@@ -252,14 +285,14 @@ Class GDIP
     Class Image Extends GDIP
     {
         ; The Clone method creates a new Image object and initializes it with the contents of this Image object.
-        Clone(image_p)
+        Clone(imop)
         {
             VarSetCapacity(clone_p, A_PtrSize)
             estat := DllCall("gdip\GdipCloneImage"
-                            ,this.Ptr   , image_p
+                            ,this.Ptr   , imop
                             ,this.Ptr   , clone_p)
-            estat ? this.log_error(A_ThisFunc, "Enum Status", estat) : ""
-            MsgBox, % "image_p: " image_p "`nclone_p: " clone_p "`nestat: " estat 
+            estat ? this.error_log(A_ThisFunc, "Enum Status", estat) : ""
+            MsgBox, % "imop: " imop "`nclone_p: " clone_p "`nestat: " estat 
             Return clone_p
         }
         
@@ -284,12 +317,12 @@ Class GDIP
         ; Returns       Pointer to new Image object
         FromFile(filename, icm=0)
         {
-            VarSetCapacity(image_p, A_PtrSize)
+            VarSetCapacity(imop, A_PtrSize)
             estat := DllCall("gdiplus\GdipLoadImageFromFile" . (icm ? "ICM" : "")
                             ,this.Ptr     , &filename
-                            ,this.PtrA    , image_p)
-            estat ? this.log_error(A_ThisFunc, "Enum Status", estat) : ""
-            Return image_p
+                            ,this.PtrA    , imop)
+            estat ? this.error_log(A_ThisFunc, "Enum Status", estat) : ""
+            Return imop
         }
         
         ; The FromStream method creates a new Image object based on a stream.
@@ -460,14 +493,16 @@ Class GDIP
             ;, type , value)
         ;}
         
-        ; The GetType method gets the type (bitmap or metafile) of this Image object.
-        GetType(image_p)
+        ; Description   Gets the type (bitmap or metafile) of this Image object.
+        ; imop       Pointer to image object
+        ; 
+        GetType(imop)
         {
-            VarSetCapacity(type, this.data_size.int)
-            DllCall("gdip\GdipGetImageType"
-                   ,this.Ptr    , image_p
-                   ,"Int"       , type)
-            Return this.enum[type]
+            type  := ""
+            estat := DllCall("gdiplus\GdipGetImageType"
+                            ,this.Ptr    , imop       ; (GpImage *image, ImageType *type)
+                            ,this.PtrA   , type)
+            Return type
         }
         
         ; The GetVerticalResolution method gets the vertical resolution, in dots per inch, of this image.
@@ -2159,22 +2194,145 @@ Class GDIP
     ;####################################################################################################################
     Class enum
     {
-        Static  ImageType := {0:"ImageTypeUnknown"
-                             ,1:"ImageTypeBitmap"
-                             ,2:"ImageTypeMetafile"}
+        ; Identify's an image's main type
+        Static  ImageType   := {0   :"ImageTypeUnknown"
+                               ,1   :"ImageTypeBitmap"
+                               ,2   :"ImageTypeMetafile" }
+        
+        ; GDIP status error codes
+        Static  Status      := {0   : "Ok"                          ; Method call was successful.                                                     |
+                               ,1   : "GenericError"                ; Error on method call that is not covered by anything else in this list.         |
+                               ,2   : "InvalidParameter"            ; One of the method arguments passed was not valid.                               |
+                               ,3   : "OutOfMemory"                 ; Operating system is out of memory / could not allocate memory.                  |
+                               ,4   : "ObjectBusy"                  ; One of the arguments specified in the API call is already in use.               |
+                               ,5   : "InsufficientBuffer"          ; A buffer passed in the API call is not large enough for the data.               |
+                               ,6   : "NotImplemented"              ; Method is not implemented.                                                      |
+                               ,7   : "Win32Error"                  ; Method generated a Win32 error.                                                 |
+                               ,8   : "WrongState"                  ; An object state is invalid for the API call.                                    |
+                               ,9   : "Aborted"                     ; Method was aborted.                                                             |
+                               ,10  : "FileNotFound"                ; Specified image file or metafile cannot be found.                               |
+                               ,11  : "ValueOverflow"               ; An arithmetic operation produced a numeric overflow.                            |
+                               ,12  : "AccessDenied"                ; Writing is not allowed to the specified file.                                   |
+                               ,13  : "UnknownImageFormat"          ; Specified image file format is not known.                                       |
+                               ,14  : "FontFamilyNotFound"          ; Specified font family not found. Either not installed or spelled incorrectly.   |
+                               ,15  : "FontStyleNotFound"           ; Specified style not available for this font family.                             |
+                               ,16  : "NotTrueTypeFont"             ; Font retrieved from HDC or LOGFONT is not TrueType and cannot be used.          |
+                               ,17  : "UnsupportedGdiplusVersion"   ; Installed GDI+ version not compatible with the application's compiled version.  |
+                               ,18  : "GdiplusNotInitialized"       ; GDI+ API not initialized.                                                       |
+                               ,19  : "PropertyNotFound"            ; Specified property does not exist in the image.                                 |
+                               ,20  : "PropertyNotSupported"        ; Specified property not supported by image format and cannot be set.             |
+                               ,21  : "ProfileNotFound" }           ; Color profile required to save in CMYK image format was not found.              |
         
     }
     
+    ;####################################################################################################################
+    ;  Generators                                                                                                       |
+    ;####################################################################################################################
+    ;####################################################################################################################
+    ; Description   Generates an object containing all the named colors from CSS3/X11 and their hex codes.              |
+    ;               These colors can be accessed by calling this.ColorHex.ColorsName                                    |
+    ;___________________________________________________________________________________________________________________|
+    generate_colorName()
+    {
+        color := {}
+        
+        ; Black and gray/grey                          ; White                                             
+         color.Black                := 0x000000        ,color.MistyRose            := 0xFFE4E1         
+        ,color.DarkSlateGray        := 0x2F4F4F        ,color.AntiqueWhite         := 0xFAEBD7         
+        ,color.DarkSlateGrey        := 0x2F4F4F        ,color.Linen                := 0xFAF0E6         
+        ,color.DimGray              := 0x696969        ,color.Beige                := 0xF5F5DC         
+        ,color.DimGrey              := 0x696969        ,color.WhiteSmoke           := 0xF5F5F5         
+        ,color.SlateGray            := 0x708090        ,color.LavenderBlush        := 0xFFF0F5         
+        ,color.SlateGrey            := 0x708090        ,color.OldLace              := 0xFDF5E6         
+        ,color.Gray                 := 0x808080        ,color.AliceBlue            := 0xF0F8FF         
+        ,color.Grey                 := 0x808080        ,color.Seashell             := 0xFFF5EE         
+        ,color.LightSlateGray       := 0x778899        ,color.GhostWhite           := 0xF8F8FF         
+        ,color.LightSlateGrey       := 0x778899        ,color.Honeydew             := 0xF0FFF0         
+        ,color.DarkGray             := 0xA9A9A9        ,color.FloralWhite          := 0xFFFAF0         
+        ,color.DarkGrey             := 0xA9A9A9        ,color.Azure                := 0xF0FFFF         
+        ,color.Silver               := 0xC0C0C0        ,color.MintCream            := 0xF5FFFA         
+        ,color.LightGray            := 0xD3D3D3        ,color.Snow                 := 0xFFFAFA         
+        ,color.LightGrey            := 0xD3D3D3        ,color.Ivory                := 0xFFFFF0         
+        ,color.Gainsboro            := 0xDCDCDC        ,color.White                := 0xFFFFFF         
+                                                                                                                           
+        ; Red                                          ; Pink
+         color.DarkRed              := 0x8B0000        ,color.MediumVioletRed      := 0xC71585
+        ,color.Red                  := 0xFF0000        ,color.DeepPink             := 0xFF1493
+        ,color.Firebrick            := 0xB22222        ,color.PaleVioletRed        := 0xDB7093
+        ,color.Crimson              := 0xDC143C        ,color.HotPink              := 0xFF69B4
+        ,color.IndianRed            := 0xCD5C5C        ,color.LightPink            := 0xFFB6C1
+        ,color.LightCoral           := 0xF08080        ,color.Pink                 := 0xFFC0CB
+        ,color.Salmon               := 0xFA8072        
+        ,color.DarkSalmon           := 0xE9967A        
+        ,color.LightSalmon          := 0xFFA07A        
+                                                                                                                           
+        ; Blue                                         ; Purple, violet, and magenta                           
+         color.Navy                 := 0x000080        ,color.Indigo               := 0x4B0082             
+        ,color.DarkBlue             := 0x00008B        ,color.Purple               := 0x800080             
+        ,color.MediumBlue           := 0x0000CD        ,color.DarkMagenta          := 0x8B008B             
+        ,color.Blue                 := 0x0000FF        ,color.DarkViolet           := 0x9400D3             
+        ,color.MidnightBlue         := 0x191970        ,color.DarkSlateBlue        := 0x483D8B             
+        ,color.RoyalBlue            := 0x4169E1        ,color.BlueViolet           := 0x8A2BE2             
+        ,color.SteelBlue            := 0x4682B4        ,color.DarkOrchid           := 0x9932CC             
+        ,color.DodgerBlue           := 0x1E90FF        ,color.Fuchsia              := 0xFF00FF             
+        ,color.DeepSkyBlue          := 0x00BFFF        ,color.Magenta              := 0xFF00FF             
+        ,color.CornflowerBlue       := 0x6495ED        ,color.SlateBlue            := 0x6A5ACD             
+        ,color.SkyBlue              := 0x87CEEB        ,color.MediumSlateBlue      := 0x7B68EE             
+        ,color.LightSkyBlue         := 0x87CEFA        ,color.MediumOrchid         := 0xBA55D3             
+        ,color.LightSteelBlue       := 0xB0C4DE        ,color.MediumPurple         := 0x9370DB             
+        ,color.LightBlue            := 0xADD8E6        ,color.Orchid               := 0xDA70D6             
+        ,color.PowderBlue           := 0xB0E0E6        ,color.Violet               := 0xEE82EE             
+                                                       ,color.Plum                 := 0xDDA0DD            
+                                                       ,color.Thistle              := 0xD8BFD8            
+                                                       ,color.Lavender             := 0xE6E6FA            
+                                                                                                                           
+        ; Green                                        ; Cyan                                                       
+         color.DarkGreen            := 0x006400        ,color.Teal                 := 0x008080             
+        ,color.Green                := 0x008000        ,color.DarkCyan             := 0x008B8B             
+        ,color.DarkOliveGreen       := 0x556B2F        ,color.LightSeaGreen        := 0x20B2AA             
+        ,color.ForestGreen          := 0x228B22        ,color.CadetBlue            := 0x5F9EA0             
+        ,color.SeaGreen             := 0x2E8B57        ,color.DarkTurquoise        := 0x00CED1             
+        ,color.Olive                := 0x808000        ,color.MediumTurquoise      := 0x48D1CC             
+        ,color.OliveDrab            := 0x6B8E23        ,color.Turquoise            := 0x40E0D0             
+        ,color.MediumSeaGreen       := 0x3CB371        ,color.Aqua                 := 0x00FFFF             
+        ,color.LimeGreen            := 0x32CD32        ,color.Cyan                 := 0x00FFFF             
+        ,color.Lime                 := 0x00FF00        ,color.Aquamarine           := 0x7FFFD4             
+        ,color.SpringGreen          := 0x00FF7F        ,color.PaleTurquoise        := 0xAFEEEE             
+        ,color.MediumSpringGreen    := 0x00FA9A        ,color.LightCyan            := 0xE0FFFF             
+        ,color.DarkSeaGreen         := 0x8FBC8F                                                                     
+        ,color.MediumAquamarine     := 0x66CDAA        ; Orange                                                     
+        ,color.YellowGreen          := 0x9ACD32        ,color.OrangeRed            := 0xFF4500             
+        ,color.LawnGreen            := 0x7CFC00        ,color.Tomato               := 0xFF6347             
+        ,color.Chartreuse           := 0x7FFF00        ,color.DarkOrange           := 0xFF8C00             
+        ,color.LightGreen           := 0x90EE90        ,color.Coral                := 0xFF7F50             
+        ,color.GreenYellow          := 0xADFF2F        ,color.Orange               := 0xFFA500             
+        ,color.PaleGreen            := 0x98FB98        
+                                                                                                                           
+        ; Brown                                                 ; Yellow                                                   
+         color.Maroon               := 0x800000        ,color.DarkKhaki            := 0xBDB76B            
+        ,color.Brown                := 0xA52A2A        ,color.Gold                 := 0xFFD700            
+        ,color.SaddleBrown          := 0x8B4513        ,color.Khaki                := 0xF0E68C            
+        ,color.Sienna               := 0xA0522D        ,color.PeachPuff            := 0xFFDAB9            
+        ,color.Chocolate            := 0xD2691E        ,color.Yellow               := 0xFFFF00            
+        ,color.DarkGoldenrod        := 0xB8860B        ,color.PaleGoldenrod        := 0xEEE8AA            
+        ,color.Peru                 := 0xCD853F        ,color.Moccasin             := 0xFFE4B5            
+        ,color.RosyBrown            := 0xBC8F8F        ,color.PapayaWhip           := 0xFFEFD5            
+        ,color.Goldenrod            := 0xDAA520        ,color.LightGoldenrodYellow := 0xFAFAD2            
+        ,color.SandyBrown           := 0xF4A460        ,color.LemonChiffon         := 0xFFFACD            
+        ,color.Tan                  := 0xD2B48C        ,color.LightYellow          := 0xFFFFE0            
+        ,color.Burlywood            := 0xDEB887                                                                     
+        ,color.Wheat                := 0xF5DEB3                                                                     
+        ,color.NavajoWhite          := 0xFFDEAD                                                                     
+        ,color.Bisque               := 0xFFE4C4                                                                     
+        ,color.BlanchedAlmond       := 0xFFEBCD                                                                     
+        ,color.Cornsilk             := 0xFFF8DC                                                                     
+        
+        this.colorhex := Color
+        
+        Return
+    }
 }
 
-/*
-    Log:
-    20210729
-        Startup and shutdown are working
-        Added image class
-        Image.FromFile() working
-    
-*/
 
 
 
@@ -2211,7 +2369,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetHeight(GpAdjustableArrowCap* cap, REAL height)
-        ; Description   The AdjustableArrowCap::SetHeight method sets the height of the arrow cap. This is the distance from the base of the arrow to its vertex.
+        ; Description   The AdjustableArrowCap::SetHeight method sets the height of the arrow cap. This is the distance from the base of the arrow to its vertex.
         ;          
         ; Params        GpAdjustableArrowCap* cap, REAL height
         ;          
@@ -2225,7 +2383,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHeight(GpAdjustableArrowCap* cap, REAL* height)
-        ; Description   The AdjustableArrowCap::GetHeight method gets the height of the arrow cap. The height is the distance from the base of the arrow to its vertex.
+        ; Description   The AdjustableArrowCap::GetHeight method gets the height of the arrow cap. The height is the distance from the base of the arrow to its vertex.
         ;          
         ; Params        GpAdjustableArrowCap* cap, REAL* height
         ;          
@@ -2239,7 +2397,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetWidth(GpAdjustableArrowCap* cap, REAL width)
-        ; Description   The AdjustableArrowCap::SetWidth method sets the width of the arrow cap. The width is the distance between the endpoints of the base of the arrow.
+        ; Description   The AdjustableArrowCap::SetWidth method sets the width of the arrow cap. The width is the distance between the endpoints of the base of the arrow.
         ;          
         ; Params        GpAdjustableArrowCap* cap, REAL width
         ;          
@@ -2253,7 +2411,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetWidth(GpAdjustableArrowCap* cap, REAL* width)
-        ; Description   The AdjustableArrowCap::GetWidth method gets the width of the arrow cap. The width is the distance between the endpoints of the base of the arrow.
+        ; Description   The AdjustableArrowCap::GetWidth method gets the width of the arrow cap. The width is the distance between the endpoints of the base of the arrow.
         ;          
         ; Params        GpAdjustableArrowCap* cap, REAL* width
         ;          
@@ -2267,7 +2425,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetMiddleInset(GpAdjustableArrowCap* cap, REAL middleInset)
-        ; Description   The AdjustableArrowCap::SetMiddleInset method sets the number of units that the midpoint of the base shifts towards the vertex.
+        ; Description   The AdjustableArrowCap::SetMiddleInset method sets the number of units that the midpoint of the base shifts towards the vertex.
         ;          
         ; Params        GpAdjustableArrowCap* cap, REAL middleInset
         ;          
@@ -2281,7 +2439,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetMiddleInset(GpAdjustableArrowCap* cap, REAL* middleInset)
-        ; Description   The AdjustableArrowCap::GetMiddleInset method gets the value of the inset. The middle inset is the number of units that the midpoint of the base shifts towards the vertex.
+        ; Description   The AdjustableArrowCap::GetMiddleInset method gets the value of the inset. The middle inset is the number of units that the midpoint of the base shifts towards the vertex.
         ;          
         ; Params        GpAdjustableArrowCap* cap, REAL* middleInset
         ;          
@@ -2295,7 +2453,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetFillState(GpAdjustableArrowCap* cap, BOOL fillState)
-        ; Description   The AdjustableArrowCap::SetFillState method sets the fill state of the arrow cap. If the arrow cap is not filled, only the outline is drawn.
+        ; Description   The AdjustableArrowCap::SetFillState method sets the fill state of the arrow cap. If the arrow cap is not filled, only the outline is drawn.
         ;          
         ; Params        GpAdjustableArrowCap* cap, BOOL fillState
         ;          
@@ -2309,7 +2467,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsFilled(GpAdjustableArrowCap* cap, BOOL* fillState)
-        ; Description   The AdjustableArrowCap::IsFilled method determines whether the arrow cap is filled.
+        ; Description   The AdjustableArrowCap::IsFilled method determines whether the arrow cap is filled.
         ;          
         ; Params        GpAdjustableArrowCap* cap, BOOL* fillState
         ;          
@@ -2327,7 +2485,7 @@ Class GDIP
     {
         ;####################################
         ; Call          Bitmap(IStream* stream, GpBitmap **bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on a stream. This function does not use Image Color Management (ICM). It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to FALSE.
+        ; Description   Creates a Bitmap::Bitmap object based on a stream. This function does not use Image Color Management (ICM). It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to FALSE.
         ;          
         ; Params        IStream* stream, GpBitmap **bitmap
         ;          
@@ -2341,7 +2499,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(GDIPCONST WCHAR* filename, GpBitmap **bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on an image file. This function does not use ICM. It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to FALSE.
+        ; Description   Creates a Bitmap::Bitmap object based on an image file. This function does not use ICM. It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to FALSE.
         ;          
         ; Params        GDIPCONST WCHAR* filename, GpBitmap **bitmap
         ;          
@@ -2355,7 +2513,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(IStream* stream, GpBitmap **bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on a stream. This function uses ICM. It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to TRUE.
+        ; Description   Creates a Bitmap::Bitmap object based on a stream. This function uses ICM. It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to TRUE.
         ;          
         ; Params        IStream* stream, GpBitmap **bitmap
         ;          
@@ -2369,7 +2527,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(GDIPCONST WCHAR* filename, GpBitmap **bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on an image file. This function uses ICM. It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to TRUE.
+        ; Description   Creates a Bitmap::Bitmap object based on an image file. This function uses ICM. It is called when the useEmbeddedColorManagement parameter of the Bitmap::Bitmap constructor is set to TRUE.
         ;          
         ; Params        GDIPCONST WCHAR* filename, GpBitmap **bitmap
         ;          
@@ -2383,7 +2541,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(INT width, INT height, INT stride, PixelFormat format, BYTE* scan0, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on an array of bytes along with size and format information.
+        ; Description   Creates a Bitmap::Bitmap object based on an array of bytes along with size and format information.
         ;          
         ; Params        INT width, INT height, INT stride, PixelFormat format, BYTE* scan0, GpBitmap** bitmap
         ;          
@@ -2397,7 +2555,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(INT width, INT height, GpGraphics* target, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on a Graphics object, a width, and a height.
+        ; Description   Creates a Bitmap::Bitmap object based on a Graphics object, a width, and a height.
         ;          
         ; Params        INT width, INT height, GpGraphics* target, GpBitmap** bitmap
         ;          
@@ -2411,7 +2569,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(IDirectDrawSurface7* surface, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on a DirectDraw surface. The Bitmap::Bitmap object maintains a reference to the DirectDraw surface until the Bitmap::Bitmap object is deleted or goes out of scope.
+        ; Description   Creates a Bitmap::Bitmap object based on a DirectDraw surface. The Bitmap::Bitmap object maintains a reference to the DirectDraw surface until the Bitmap::Bitmap object is deleted or goes out of scope.
         ;          
         ; Params        IDirectDrawSurface7* surface, GpBitmap** bitmap
         ;          
@@ -2425,7 +2583,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(GDIPCONST BITMAPINFO* gdiBitmapInfo, VOID* gdiBitmapData, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on a BITMAPINFO structure and an array of pixel data.
+        ; Description   Creates a Bitmap::Bitmap object based on a BITMAPINFO structure and an array of pixel data.
         ;          
         ; Params        GDIPCONST BITMAPINFO* gdiBitmapInfo, VOID* gdiBitmapData, GpBitmap** bitmap
         ;          
@@ -2439,7 +2597,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(HBITMAP hbm, HPALETTE hpal, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on a handle to a Windows Windows Graphics Device Interface (GDI) bitmap and a handle to a GDI palette.
+        ; Description   Creates a Bitmap::Bitmap object based on a handle to a Windows Windows Graphics Device Interface (GDI) bitmap and a handle to a GDI palette.
         ;          
         ; Params        HBITMAP hbm, HPALETTE hpal, GpBitmap** bitmap
         ;          
@@ -2453,7 +2611,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHBITMAP(GpBitmap* bitmap, HBITMAP* hbmReturn, ARGB background)
-        ; Description   The Bitmap::GetHBITMAP method creates a GDI bitmap from this Bitmap object.
+        ; Description   The Bitmap::GetHBITMAP method creates a GDI bitmap from this Bitmap object.
         ;          
         ; Params        GpBitmap* bitmap, HBITMAP* hbmReturn, ARGB background
         ;          
@@ -2467,7 +2625,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(HICON hicon, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap object based on an icon.
+        ; Description   Creates a Bitmap object based on an icon.
         ;          
         ; Params        HICON hicon, GpBitmap** bitmap
         ;          
@@ -2481,7 +2639,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHICON(GpBitmap* bitmap, HICON* hbmReturn)
-        ; Description   The Bitmap::GetHICON method creates an icon from this Bitmap object.
+        ; Description   The Bitmap::GetHICON method creates an icon from this Bitmap object.
         ;          
         ; Params        GpBitmap* bitmap, HICON* hbmReturn
         ;          
@@ -2495,7 +2653,7 @@ Class GDIP
         
         ;####################################
         ; Call          Bitmap(HINSTANCE hInstance, GDIPCONST WCHAR* lpBitmapName, GpBitmap** bitmap)
-        ; Description   Creates a Bitmap::Bitmap object based on an application or DLL instance handle and the name of a bitmap resource.
+        ; Description   Creates a Bitmap::Bitmap object based on an application or DLL instance handle and the name of a bitmap resource.
         ;          
         ; Params        HINSTANCE hInstance, GDIPCONST WCHAR* lpBitmapName, GpBitmap** bitmap
         ;          
@@ -2509,7 +2667,7 @@ Class GDIP
         
         ;####################################
         ; Call          Clone(REAL x, REAL y, REAL width, REAL height, PixelFormat format, GpBitmap *srcBitmap, GpBitmap **dstBitmap)
-        ; Description   The Bitmap::Clone method creates a new Bitmap object by copying a portion of this bitmap.
+        ; Description   The Bitmap::Clone method creates a new Bitmap object by copying a portion of this bitmap.
         ;          
         ; Params        REAL x, REAL y, REAL width, REAL height, PixelFormat format, GpBitmap *srcBitmap, GpBitmap **dstBitmap
         ;          
@@ -2523,7 +2681,7 @@ Class GDIP
         
         ;####################################
         ; Call          Clone(INT x, INT y, INT width, INT height, PixelFormat format, GpBitmap *srcBitmap, GpBitmap **dstBitmap)
-        ; Description   The Bitmap::Clone method creates a new Bitmap object by copying a portion of this bitmap.
+        ; Description   The Bitmap::Clone method creates a new Bitmap object by copying a portion of this bitmap.
         ;          
         ; Params        INT x, INT y, INT width, INT height, PixelFormat format, GpBitmap *srcBitmap, GpBitmap **dstBitmap
         ;          
@@ -2537,7 +2695,7 @@ Class GDIP
         
         ;####################################
         ; Call          LockBits(GpBitmap* bitmap, GDIPCONST GpRect* rect, UINT flags, PixelFormat format, BitmapData* lockedBitmapData)
-        ; Description   The Bitmap::LockBits method locks a rectangular portion of this bitmap and provides a temporary buffer that you can use to read or write pixel data in a specified format. Any pixel data that you write to the buffer is copied to the Bitmap object when you call Bitmap::UnlockBits.
+        ; Description   The Bitmap::LockBits method locks a rectangular portion of this bitmap and provides a temporary buffer that you can use to read or write pixel data in a specified format. Any pixel data that you write to the buffer is copied to the Bitmap object when you call Bitmap::UnlockBits.
         ;          
         ; Params        GpBitmap* bitmap, GDIPCONST GpRect* rect, UINT flags, PixelFormat format, BitmapData* lockedBitmapData
         ;          
@@ -2551,7 +2709,7 @@ Class GDIP
         
         ;####################################
         ; Call          UnlockBits(GpBitmap* bitmap, BitmapData* lockedBitmapData)
-        ; Description   The Bitmap::UnlockBits method unlocks a portion of this bitmap that was previously locked by a call to Bitmap::LockBits.
+        ; Description   The Bitmap::UnlockBits method unlocks a portion of this bitmap that was previously locked by a call to Bitmap::LockBits.
         ;          
         ; Params        GpBitmap* bitmap, BitmapData* lockedBitmapData
         ;          
@@ -2565,7 +2723,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetPixel(GpBitmap* bitmap, INT x, INT y, ARGB *color)
-        ; Description   The Bitmap::GetPixel method gets the color of a specified pixel in this bitmap.
+        ; Description   The Bitmap::GetPixel method gets the color of a specified pixel in this bitmap.
         ;          
         ; Params        GpBitmap* bitmap, INT x, INT y, ARGB *color
         ;          
@@ -2579,7 +2737,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetPixel(GpBitmap* bitmap, INT x, INT y, ARGB color)
-        ; Description   The Bitmap::SetPixel method sets the color of a specified pixel in this bitmap.
+        ; Description   The Bitmap::SetPixel method sets the color of a specified pixel in this bitmap.
         ;          
         ; Params        GpBitmap* bitmap, INT x, INT y, ARGB color
         ;          
@@ -2593,7 +2751,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetResolution(GpBitmap* bitmap, REAL xdpi, REAL ydpi)
-        ; Description   The Bitmap::SetResolution method sets the resolution of this Bitmap object.
+        ; Description   The Bitmap::SetResolution method sets the resolution of this Bitmap object.
         ;          
         ; Params        GpBitmap* bitmap, REAL xdpi, REAL ydpi
         ;          
@@ -2607,7 +2765,7 @@ Class GDIP
         
         ;####################################
         ; Call          ConvertFormat(IN GpBitmap *pInputBitmap, PixelFormat format, DitherType dithertype, PaletteType palettetype, ColorPalette *palette, REAL alphaThresholdPercent)
-        ; Description   The Bitmap::ConvertFormat method converts a bitmap to a specified pixel format. The original pixel data in the bitmap is replaced by the new pixel data.
+        ; Description   The Bitmap::ConvertFormat method converts a bitmap to a specified pixel format. The original pixel data in the bitmap is replaced by the new pixel data.
         ;          
         ; Params        IN GpBitmap *pInputBitmap, PixelFormat format, DitherType dithertype, PaletteType palettetype, ColorPalette *palette, REAL alphaThresholdPercent
         ;          
@@ -2621,7 +2779,7 @@ Class GDIP
         
         ;####################################
         ; Call          InitializePalette(OUT ColorPalette *palette, PaletteType palettetype, INT optimalColors, BOOL useTransparentColor, GpBitmap *bitmap)
-        ; Description   The Bitmap::InitializePalette method initializes a standard, optimal, or custom color palette.
+        ; Description   The Bitmap::InitializePalette method initializes a standard, optimal, or custom color palette.
         ;          
         ; Params        OUT ColorPalette *palette, PaletteType palettetype, INT optimalColors, BOOL useTransparentColor, GpBitmap *bitmap
         ;          
@@ -2635,7 +2793,7 @@ Class GDIP
         
         ;####################################
         ; Call          ApplyEffect(GpBitmap* bitmap, CGpEffect *effect, RECT *roi, BOOL useAuxData, VOID **auxData, INT *auxDataSize)
-        ; Description   The Bitmap::ApplyEffect method alters this Bitmap object by applying a specified effect.
+        ; Description   The Bitmap::ApplyEffect method alters this Bitmap object by applying a specified effect.
         ;          
         ; Params        GpBitmap* bitmap, CGpEffect *effect, RECT *roi, BOOL useAuxData, VOID **auxData, INT *auxDataSize
         ;          
@@ -2649,7 +2807,7 @@ Class GDIP
         
         ;####################################
         ; Call          ApplyEffect(GpBitmap **inputBitmaps, INT numInputs, CGpEffect *effect, RECT *roi, RECT *outputRect, GpBitmap **outputBitmap, BOOL useAuxData, VOID **auxData, INT *auxDataSize)
-        ; Description   The Bitmap::ApplyEffect method creates a new Bitmap object by applying a specified effect to an existing Bitmap object.
+        ; Description   The Bitmap::ApplyEffect method creates a new Bitmap object by applying a specified effect to an existing Bitmap object.
         ;          
         ; Params        GpBitmap **inputBitmaps, INT numInputs, CGpEffect *effect, RECT *roi, RECT *outputRect, GpBitmap **outputBitmap, BOOL useAuxData, VOID **auxData, INT *auxDataSize
         ;          
@@ -2663,7 +2821,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHistogram(GpBitmap* bitmap, IN HistogramFormat format, IN UINT NumberOfEntries, OUT UINT *channel0, OUT UINT *channel1, OUT UINT *channel2, OUT UINT *channel3)
-        ; Description   The Bitmap::GetHistogram method returns one or more histograms for specified color channels of this Bitmap object.
+        ; Description   The Bitmap::GetHistogram method returns one or more histograms for specified color channels of this Bitmap object.
         ;          
         ; Params        GpBitmap* bitmap, IN HistogramFormat format, IN UINT NumberOfEntries, OUT UINT *channel0, OUT UINT *channel1, OUT UINT *channel2, OUT UINT *channel3
         ;          
@@ -2677,7 +2835,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHistogramSize(IN HistogramFormat format, OUT UINT *NumberOfEntries)
-        ; Description   The Bitmap::GetHistogramSize returns the number of elements (in an array of UINTs) that you must allocate before you call the Bitmap::GetHistogram method of a Bitmap object.
+        ; Description   The Bitmap::GetHistogramSize returns the number of elements (in an array of UINTs) that you must allocate before you call the Bitmap::GetHistogram method of a Bitmap object.
         ;          
         ; Params        IN HistogramFormat format, OUT UINT *NumberOfEntries
         ;          
@@ -2691,7 +2849,7 @@ Class GDIP
         
         ;####################################
         ; Call          Effect(const GUID guid, CGpEffect **effect)
-        ; Description   The constructors of all descendants of the Effect class call GdipCreateEffect. For example, the Blur constructor makes the following call: GdipCreateEffect(BlurEffectGuid, &nativeEffect); BlurEffectGuid is a constant defined in Gdipluseffects.h.
+        ; Description   The constructors of all descendants of the Effect class call GdipCreateEffect. For example, the Blur constructor makes the following call: GdipCreateEffect(BlurEffectGuid, &nativeEffect); BlurEffectGuid is a constant defined in Gdipluseffects.h.
         ;          
         ; Params        CGpEffect *effect, UINT *size
         ;          
@@ -2705,7 +2863,7 @@ Class GDIP
         
         ;####################################
         ; Call          ~Effect(CGpEffect *effect)
-        ; Description   Cleans up resources used by a Bitmap object.
+        ; Description   Cleans up resources used by a Bitmap object.
         ;          
         ; Params        CGpEffect *effect
         ;          
@@ -2719,7 +2877,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetParameterSize(CGpEffect *effect, UINT *size)
-        ; Description   The Effect::GetParameterSize method gets the total size, in bytes, of the parameters currently set for this Effect. The Effect::GetParameterSize method is usually called on an object that is an instance of a descendant of the Effect class.
+        ; Description   The Effect::GetParameterSize method gets the total size, in bytes, of the parameters currently set for this Effect. The Effect::GetParameterSize method is usually called on an object that is an instance of a descendant of the Effect class.
         ;          
         ; Params        CGpEffect *effect, UINT *size
         ;          
@@ -2733,7 +2891,7 @@ Class GDIP
         
         ;####################################
         ; Call          Effect(CGpEffect *effect, const VOID *params, const UINT size)
-        ; Description   Each descendant of the Effect class has a SetParameters method that calls the protected method Effect::SetParameters, which in turn calls GdipSetEffectParameters. For example, the Blur::SetParameters method makes the following call: Effect::SetParameters(parameters, size).
+        ; Description   Each descendant of the Effect class has a SetParameters method that calls the protected method Effect::SetParameters, which in turn calls GdipSetEffectParameters. For example, the Blur::SetParameters method makes the following call: Effect::SetParameters(parameters, size).
         ;          
         ; Params        CGpEffect *effect, const VOID *params, const UINT size
         ;          
@@ -2747,7 +2905,7 @@ Class GDIP
         
         ;####################################
         ; Call          Effect(CGpEffect *effect, UINT *size, VOID *params)
-        ; Description   Each descendant of the Effect class has a SetParameters method that calls the protected method Effect::SetParameters, which in turn calls GdipSetEffectParameters. For example, the Blur::SetParameters method makes the following call: Effect::SetParameters(parameters, size).
+        ; Description   Each descendant of the Effect class has a SetParameters method that calls the protected method Effect::SetParameters, which in turn calls GdipSetEffectParameters. For example, the Blur::SetParameters method makes the following call: Effect::SetParameters(parameters, size).
         ;          
         ; Params        CGpEffect *effect, UINT *size, VOID *params
         ;          
@@ -2761,7 +2919,7 @@ Class GDIP
         
         ;####################################
         ; Call          Effect(GpTestControlEnum control, void * param)
-        ; Description   Each descendant of the Effect class has a SetParameters method that calls the protected method Effect::SetParameters, which in turn calls GdipSetEffectParameters. For example, the Blur::SetParameters method makes the following call: Effect::SetParameters(parameters, size).
+        ; Description   Each descendant of the Effect class has a SetParameters method that calls the protected method Effect::SetParameters, which in turn calls GdipSetEffectParameters. For example, the Blur::SetParameters method makes the following call: Effect::SetParameters(parameters, size).
         ;          
         ; Params        GpTestControlEnum control, void * param
         ;          
@@ -2778,7 +2936,7 @@ Class GDIP
     {
         ;####################################
         ; Call          Clone(GpBrush *brush, GpBrush **cloneBrush)
-        ; Description   The Brush::Clone method creates a new Brush object based on this brush.
+        ; Description   The Brush::Clone method creates a new Brush object based on this brush.
         ;          
         ; Params        GpBrush *brush, GpBrush **cloneBrush
         ;          
@@ -2792,7 +2950,7 @@ Class GDIP
         
         ;####################################
         ; Call          ~Brush(GpBrush *brush)
-        ; Description   Cleans up resources used by a Brush object.
+        ; Description   Cleans up resources used by a Brush object.
         ;          
         ; Params        GpBrush *brush
         ;          
@@ -2806,7 +2964,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetType(GpBrush *brush, GpBrushType *type)
-        ; Description   The Brush::GetType method gets the type of this brush.
+        ; Description   The Brush::GetType method gets the type of this brush.
         ;          
         ; Params        GpBrush *brush, GpBrushType *type
         ;          
@@ -2825,7 +2983,7 @@ Class GDIP
     {
         ;####################################
         ; Call          CachedBitmap( GpBitmap *bitmap, GpGraphics *graphics, GpCachedBitmap **cachedBitmap )
-        ; Description   Creates a CachedBitmap::CachedBitmap object based on a Bitmap object and a Graphics object. The cached bitmap takes the pixel data from the Bitmap object and stores it in a format that is optimized for the display device associated with the Graphics object.
+        ; Description   Creates a CachedBitmap::CachedBitmap object based on a Bitmap object and a Graphics object. The cached bitmap takes the pixel data from the Bitmap object and stores it in a format that is optimized for the display device associated with the Graphics object.
         ;          
         ; Params         GpBitmap *bitmap, GpGraphics *graphics, GpCachedBitmap **cachedBitmap 
         ;          
@@ -2839,7 +2997,7 @@ Class GDIP
         
         ;####################################
         ; Call          ~CachedBitmap( GpCachedBitmap *cachedBitmap )
-        ; Description   Creates a CachedBitmap::CachedBitmap object based on a Bitmap object and a Graphics object. The cached bitmap takes the pixel data from the Bitmap object and stores it in a format that is optimized for the display device associated with the Graphics object.
+        ; Description   Creates a CachedBitmap::CachedBitmap object based on a Bitmap object and a Graphics object. The cached bitmap takes the pixel data from the Bitmap object and stores it in a format that is optimized for the display device associated with the Graphics object.
         ;          
         ; Params        GpCachedBitmap *cachedBitmap
         ;          
@@ -2853,7 +3011,7 @@ Class GDIP
         
         ;####################################
         ; Call          DrawCachedBitmap( GpGraphics *graphics, GpCachedBitmap *cachedBitmap, INT x, INT y )
-        ; Description   The Graphics::DrawCachedBitmap method draws the image stored in a CachedBitmap object.
+        ; Description   The Graphics::DrawCachedBitmap method draws the image stored in a CachedBitmap object.
         ;          
         ; Params         GpGraphics *graphics, GpCachedBitmap *cachedBitmap, INT x, INT y 
         ;          
@@ -2885,7 +3043,7 @@ Class GDIP
     {
         ;####################################
         ; Call          CustomLineCap(GpPath* fillPath, GpPath* strokePath, GpLineCap baseCap, REAL baseInset, GpCustomLineCap **customCap)
-        ; Description   Creates a CustomLineCap::CustomLineCap object.
+        ; Description   Creates a CustomLineCap::CustomLineCap object.
         ;          
         ; Params        GpPath* fillPath, GpPath* strokePath, GpLineCap baseCap, REAL baseInset, GpCustomLineCap **customCap
         ;          
@@ -2899,7 +3057,7 @@ Class GDIP
         
         ;####################################
         ; Call          ~CustomLineCap(GpCustomLineCap* customCap)
-        ; Description   Cleans up resources used by a CustomLineCap::CustomLineCap object.
+        ; Description   Cleans up resources used by a CustomLineCap::CustomLineCap object.
         ;          
         ; Params        GpPath* fillPath, GpPath* strokePath, GpLineCap baseCap, REAL baseInset, GpCustomLineCap **customCap
         ;          
@@ -2913,7 +3071,7 @@ Class GDIP
         
         ;####################################
         ; Call          Clone(GpCustomLineCap* customCap, GpCustomLineCap** clonedCap)
-        ; Description   The CustomLineCap::Clone method copies the contents of the existing object into a new CustomLineCap object.
+        ; Description   The CustomLineCap::Clone method copies the contents of the existing object into a new CustomLineCap object.
         ;          
         ; Params        GpCustomLineCap* customCap, GpCustomLineCap** clonedCap
         ;          
@@ -2927,7 +3085,7 @@ Class GDIP
         
         ;####################################
         ; Call          GdipGetCustomLineCapType(GpCustomLineCap* customCap, CustomLineCapType* capType)
-        ; Description   When this function is called, the capType parameter receives the type of the CustomLineCap specified by customCap.\nThe CustomLineCapType enumeration (defined in GdiplusEnums.h) has two elements: CustomLineCapTypeDefault = 0 and CustomLineCapTypeAdjustableArrow = 1.
+        ; Description   When this function is called, the capType parameter receives the type of the CustomLineCap specified by customCap.\nThe CustomLineCapType enumeration (defined in GdiplusEnums.h) has two elements: CustomLineCapTypeDefault = 0 and CustomLineCapTypeAdjustableArrow = 1.
         ;          
         ; Params        GpCustomLineCap* customCap, CustomLineCapType* capType
         ;          
@@ -2941,7 +3099,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetStrokeCap(GpCustomLineCap* customCap, GpLineCap startCap, GpLineCap endCap)
-        ; Description   The CustomLineCap::SetStrokeCap method sets the LineCap object used to start and end lines within the GraphicsPath object that defines this CustomLineCap object.
+        ; Description   The CustomLineCap::SetStrokeCap method sets the LineCap object used to start and end lines within the GraphicsPath object that defines this CustomLineCap object.
         ;          
         ; Params        GpCustomLineCap* customCap, GpLineCap startCap, GpLineCap endCap
         ;          
@@ -2955,7 +3113,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetStrokeCaps(GpCustomLineCap* customCap, GpLineCap* startCap, GpLineCap* endCap)
-        ; Description   The CustomLineCap::GetStrokeCaps method gets the end cap styles for both the start line cap and the end line cap. Line caps are LineCap objects that end the individual lines within a path.
+        ; Description   The CustomLineCap::GetStrokeCaps method gets the end cap styles for both the start line cap and the end line cap. Line caps are LineCap objects that end the individual lines within a path.
         ;          
         ; Params        GpCustomLineCap* customCap, GpLineCap* startCap, GpLineCap* endCap
         ;          
@@ -2969,7 +3127,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetStrokeJoin(GpCustomLineCap* customCap, GpLineJoin lineJoin)
-        ; Description   The CustomLineCap::SetStrokeJoin method sets the style of line join for the stroke. The line join specifies how two lines that intersect within the GraphicsPath object that makes up the custom line cap are joined.
+        ; Description   The CustomLineCap::SetStrokeJoin method sets the style of line join for the stroke. The line join specifies how two lines that intersect within the GraphicsPath object that makes up the custom line cap are joined.
         ;          
         ; Params        GpCustomLineCap* customCap, GpLineJoin lineJoin
         ;          
@@ -2983,7 +3141,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetStrokeJoin(GpCustomLineCap* customCap, GpLineJoin* lineJoin)
-        ; Description   The CustomLineCap::GetStrokeJoin method returns the style of LineJoin used to join multiple lines in the same GraphicsPath object.
+        ; Description   The CustomLineCap::GetStrokeJoin method returns the style of LineJoin used to join multiple lines in the same GraphicsPath object.
         ;          
         ; Params        GpCustomLineCap* customCap, GpLineJoin* lineJoin
         ;          
@@ -2997,7 +3155,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetBaseCap(GpCustomLineCap* customCap, GpLineCap baseCap)
-        ; Description   The CustomLineCap::SetBaseCap method sets the LineCap that appears as part of this CustomLineCap at the end of a line.
+        ; Description   The CustomLineCap::SetBaseCap method sets the LineCap that appears as part of this CustomLineCap at the end of a line.
         ;          
         ; Params        GpCustomLineCap* customCap, GpLineCap baseCap
         ;          
@@ -3011,7 +3169,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetBaseCap(GpCustomLineCap* customCap, GpLineCap* baseCap)
-        ; Description   The CustomLineCap::GetBaseCap method gets the style of the base cap. The base cap is a LineCap object used as a cap at the end of a line along with this CustomLineCap object.
+        ; Description   The CustomLineCap::GetBaseCap method gets the style of the base cap. The base cap is a LineCap object used as a cap at the end of a line along with this CustomLineCap object.
         ;          
         ; Params        GpCustomLineCap* customCap, GpLineCap* baseCap
         ;          
@@ -3025,7 +3183,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetBaseInset(GpCustomLineCap* customCap, REAL inset)
-        ; Description   The CustomLineCap::SetBaseInset method sets the base inset value of this custom line cap. This is the distance between the end of a line and the base cap.
+        ; Description   The CustomLineCap::SetBaseInset method sets the base inset value of this custom line cap. This is the distance between the end of a line and the base cap.
         ;          
         ; Params        GpCustomLineCap* customCap, REAL inset
         ;          
@@ -3039,7 +3197,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetBaseInset(GpCustomLineCap* customCap, REAL* inset)
-        ; Description   The CustomLineCap::GetBaseInset method gets the distance between the base cap to the start of the line.
+        ; Description   The CustomLineCap::GetBaseInset method gets the distance between the base cap to the start of the line.
         ;          
         ; Params        GpCustomLineCap* customCap, REAL* inset
         ;          
@@ -3053,7 +3211,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetWidthScale(GpCustomLineCap* customCap, REAL widthScale)
-        ; Description   The CustomLineCap::SetWidthScale method sets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen used to draw lines. The default value of 1.0 does not scale the line cap.
+        ; Description   The CustomLineCap::SetWidthScale method sets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen used to draw lines. The default value of 1.0 does not scale the line cap.
         ;          
         ; Params        GpCustomLineCap* customCap, REAL widthScale
         ;          
@@ -3067,7 +3225,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetWidthScale(GpCustomLineCap* customCap, REAL* widthScale)
-        ; Description   The CustomLineCap::GetWidthScale method gets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen object used to draw a line. The default value of 1.0 does not scale the line cap.
+        ; Description   The CustomLineCap::GetWidthScale method gets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen object used to draw a line. The default value of 1.0 does not scale the line cap.
         ;          
         ; Params        GpCustomLineCap* customCap, REAL* widthScale
         ;          
@@ -3086,7 +3244,7 @@ Class GDIP
     {
         ;####################################
         ; Call          Font(HDC hdc, GpFont **font)
-        ; Description   Creates a Font object based on the GDI font object that is currently selected into a specified device context. This constructor is provided for compatibility with GDI.
+        ; Description   Creates a Font object based on the GDI font object that is currently selected into a specified device context. This constructor is provided for compatibility with GDI.
         ;          
         ; Params        HDC hdc, GpFont **font 
         ;          
@@ -3100,7 +3258,7 @@ Class GDIP
         
         ;####################################
         ; Call          Font(HDC hdc, GDIPCONST LOGFONTA *logfont, GpFont **font)
-        ; Description   Creates a Font object directly from a GDI logical font. The GDI logical font is a LOGFONTA structure, which is the one-byte character version of a logical font. This constructor is provided for compatibility with GDI.
+        ; Description   Creates a Font object directly from a GDI logical font. The GDI logical font is a LOGFONTA structure, which is the one-byte character version of a logical font. This constructor is provided for compatibility with GDI.
         ;          
         ; Params        HDC hdc, GDIPCONST LOGFONTA *logfont, GpFont **font 
         ;          
@@ -3114,7 +3272,7 @@ Class GDIP
         
         ;####################################
         ; Call          Font(HDC hdc, GDIPCONST LOGFONTW *logfont, GpFont **font)
-        ; Description   Creates a Font object directly from a GDI logical font. The GDI logical font is a LOGFONTW structure, which is the one-byte character version of a logical font. This constructor is provided for compatibility with GDI.
+        ; Description   Creates a Font object directly from a GDI logical font. The GDI logical font is a LOGFONTW structure, which is the one-byte character version of a logical font. This constructor is provided for compatibility with GDI.
         ;          
         ; Params        HDC hdc, GDIPCONST LOGFONTW *logfont, GpFont **font 
         ;          
@@ -3128,7 +3286,7 @@ Class GDIP
         
         ;####################################
         ; Call          Font(GDIPCONST GpFontFamily *fontFamily, REAL emSize, INT style, Unit unit, GpFont **font)
-        ; Description   Creates a Font object based on a font family, a size, a font style, a unit of measurement, and a FontCollection object.
+        ; Description   Creates a Font object based on a font family, a size, a font style, a unit of measurement, and a FontCollection object.
         ;          
         ; Params        GDIPCONST GpFontFamily *fontFamily, REAL emSize, INT style, Unit unit, GpFont **font 
         ;          
@@ -3142,7 +3300,7 @@ Class GDIP
         
         ;####################################
         ; Call          Font* Clone(GpFont* font, GpFont** cloneFont)
-        ; Description   Creates a new Font object based on this Font object.
+        ; Description   Creates a new Font object based on this Font object.
         ;          
         ; Params        GpFont* font, GpFont** cloneFont
         ;          
@@ -3184,7 +3342,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetSize(GpFont *font, REAL *size)
-        ; Description   Returns the font size (commonly called the em size) of this Font object. The size is in the units of this Font object.
+        ; Description   Returns the font size (commonly called the em size) of this Font object. The size is in the units of this Font object.
         ;          
         ; Params        GpFont *font, REAL *size
         ;          
@@ -3198,7 +3356,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetUnit(GpFont *font, Unit *unit)
-        ; Description   Returns the unit of measure of this Font object.
+        ; Description   Returns the unit of measure of this Font object.
         ;          
         ; Params        GpFont *font, Unit *unit
         ;          
@@ -3212,7 +3370,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHeight(GDIPCONST GpFont *font, GDIPCONST GpGraphics *graphics, REAL *height)
-        ; Description   Gets the line spacing of this font in the current unit of a specified Graphics object. The line spacing is the vertical distance between the base lines of two consecutive lines of text. Thus, the line spacing includes the blank space between lines along with the height of the character itself.
+        ; Description   Gets the line spacing of this font in the current unit of a specified Graphics object. The line spacing is the vertical distance between the base lines of two consecutive lines of text. Thus, the line spacing includes the blank space between lines along with the height of the character itself.
         ;          
         ; Params        GDIPCONST GpFont *font, GDIPCONST GpGraphics *graphics, REAL *height
         ;          
@@ -3240,7 +3398,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetLogFontA(GpFont * font, GpGraphics *graphics, LOGFONTA * logfontA)
-        ; Description   Uses a LOGFONTA structure to get the attributes of this Font object.
+        ; Description   Uses a LOGFONTA structure to get the attributes of this Font object.
         ;          
         ; Params        GpFont * font, GpGraphics *graphics, LOGFONTA * logfontA
         ;          
@@ -3254,7 +3412,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetLogFontW(GpFont * font, GpGraphics *graphics, LOGFONTW * logfontW)
-        ; Description   Uses a LOGFONTW structure to get the attributes of this Font object.
+        ; Description   Uses a LOGFONTW structure to get the attributes of this Font object.
         ;          
         ; Params        GpFont * font, GpGraphics *graphics, LOGFONTW * logfontW
         ;          
@@ -3272,7 +3430,7 @@ Class GDIP
     {
         ;####################################
         ; Call          FontFamily(GDIPCONST WCHAR *name, GpFontCollection *fontCollection, GpFontFamily **FontFamily)
-        ; Description   Creates a FontFamily::FontFamily object based on a specified font family.
+        ; Description   Creates a FontFamily::FontFamily object based on a specified font family.
         ;          
         ; Params        GDIPCONST WCHAR *name, GpFontCollection *fontCollection, GpFontFamily **FontFamily
         ;          
@@ -3286,7 +3444,7 @@ Class GDIP
         
         ;####################################
         ; Call          Clone(GpFontFamily *FontFamily, GpFontFamily **clonedFontFamily)
-        ; Description   Creates a new FontFamily::FontFamily object based on this FontFamily::FontFamily object.
+        ; Description   Creates a new FontFamily::FontFamily object based on this FontFamily::FontFamily object.
         ;          
         ; Params        GpFontFamily *FontFamily, GpFontFamily **clonedFontFamily
         ;          
@@ -3300,7 +3458,7 @@ Class GDIP
         
         ;####################################
         ; Call          GenericSansSerif(GpFontFamily **nativeFamily)
-        ; Description   Gets a FontFamily::FontFamily object that specifies a generic sans serif typeface.
+        ; Description   Gets a FontFamily::FontFamily object that specifies a generic sans serif typeface.
         ;          
         ; Params        GpFontFamily **nativeFamily
         ;          
@@ -3314,7 +3472,7 @@ Class GDIP
         
         ;####################################
         ; Call          GenericSerif(GpFontFamily **nativeFamily)
-        ; Description   Gets a FontFamily::FontFamily object that specifies a generic serif typeface.
+        ; Description   Gets a FontFamily::FontFamily object that specifies a generic serif typeface.
         ;          
         ; Params        GpFontFamily **nativeFamily
         ;          
@@ -3328,7 +3486,7 @@ Class GDIP
         
         ;####################################
         ; Call          GenericMonospace(GpFontFamily **nativeFamily)
-        ; Description   Gets a FontFamily::FontFamily object that specifies a generic monospace typeface.
+        ; Description   Gets a FontFamily::FontFamily object that specifies a generic monospace typeface.
         ;          
         ; Params        GpFontFamily **nativeFamily
         ;          
@@ -3445,7 +3603,7 @@ Class GDIP
         
         ;####################################
         ; Call          Graphics(HDC hdc, GpGraphics **graphics)
-        ; Description   Creates a Graphics object that is associated with a specified device context.
+        ; Description   Creates a Graphics object that is associated with a specified device context.
         ;          
         ; Params        HDC hdc, GpGraphics **graphics
         ;          
@@ -3459,7 +3617,7 @@ Class GDIP
         
         ;####################################
         ; Call          Graphics(HDC hdc, HANDLE hDevice, GpGraphics **graphics)
-        ; Description   Creates a Graphics object that is associated with a specified device context and a specified device.
+        ; Description   Creates a Graphics object that is associated with a specified device context and a specified device.
         ;          
         ; Params        HDC hdc, HANDLE hDevice, GpGraphics **graphics
         ;          
@@ -3473,7 +3631,7 @@ Class GDIP
         
         ;####################################
         ; Call          Graphics(HWND hwnd, GpGraphics **graphics)
-        ; Description   Creates a Graphics object that is associated with a specified window.
+        ; Description   Creates a Graphics object that is associated with a specified window.
         ;          
         ; Params        HWND hwnd, GpGraphics **graphics
         ;          
@@ -3487,7 +3645,7 @@ Class GDIP
         
         ;####################################
         ; Call          Graphics(HWND hwnd, GpGraphics **graphics)
-        ; Description   This function uses Image Color Management (ICM). It is called when the icm parameter of the Graphics::Graphics constructor is set to TRUE.
+        ; Description   This function uses Image Color Management (ICM). It is called when the icm parameter of the Graphics::Graphics constructor is set to TRUE.
         ;          
         ; Params        HWND hwnd, GpGraphics **graphics
         ;          
@@ -3501,7 +3659,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetHDC(GpGraphics* graphics, HDC * hdc)
-        ; Description   Gets a handle to the device context associated with this Graphics object.
+        ; Description   Gets a handle to the device context associated with this Graphics object.
         ;          
         ; Params        GpGraphics* graphics, HDC * hdc
         ;          
@@ -3515,7 +3673,7 @@ Class GDIP
         
         ;####################################
         ; Call          ReleaseHDC(GpGraphics* graphics, HDC hdc)
-        ; Description   Releases a device context handle obtained by a previous call to the Graphics::GetHDC method of this Graphics object.
+        ; Description   Releases a device context handle obtained by a previous call to the Graphics::GetHDC method of this Graphics object.
         ;          
         ; Params        GpGraphics* graphics, HDC hdc
         ;          
@@ -3529,7 +3687,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetCompositingMode(GpGraphics *graphics, CompositingMode compositingMode)
-        ; Description   Sets the compositing mode of this Graphics object.
+        ; Description   Sets the compositing mode of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, CompositingMode compositingMode
         ;          
@@ -3543,7 +3701,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetCompositingMode(GpGraphics *graphics, CompositingMode *compositingMode)
-        ; Description   Gets the compositing mode currently set for this Graphics object.
+        ; Description   Gets the compositing mode currently set for this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, CompositingMode *compositingMode
         ;          
@@ -3557,7 +3715,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetRenderingOrigin(GpGraphics *graphics, INT x, INT y)
-        ; Description   Sets the rendering origin of this Graphics object. The rendering origin is used to set the dither origin for 8-bits-per-pixel and 16-bits-per-pixel dithering and is also used to set the origin for hatch brushes. Syntax
+        ; Description   Sets the rendering origin of this Graphics object. The rendering origin is used to set the dither origin for 8-bits-per-pixel and 16-bits-per-pixel dithering and is also used to set the origin for hatch brushes. Syntax
         ;          
         ; Params        GpGraphics *graphics, INT x, INT y
         ;          
@@ -3571,7 +3729,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetRenderingOrigin(GpGraphics *graphics, INT *x, INT *y)
-        ; Description   Gets the rendering origin currently set for this Graphics object. The rendering origin is used to set the dither origin for 8-bits per pixel and 16-bits per pixel dithering and is also used to set the origin for hatch brushes.
+        ; Description   Gets the rendering origin currently set for this Graphics object. The rendering origin is used to set the dither origin for 8-bits per pixel and 16-bits per pixel dithering and is also used to set the origin for hatch brushes.
         ;          
         ; Params        GpGraphics *graphics, INT *x, INT *y
         ;          
@@ -3585,7 +3743,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetCompositingQuality(GpGraphics *graphics, CompositingQuality compositingQuality)
-        ; Description   Sets the compositing quality of this Graphics object.
+        ; Description   Sets the compositing quality of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, CompositingQuality compositingQuality
         ;          
@@ -3599,7 +3757,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetCompositingQuality(GpGraphics *graphics, CompositingQuality *compositingQuality)
-        ; Description   Gets the compositing quality currently set for this Graphics object.
+        ; Description   Gets the compositing quality currently set for this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, CompositingQuality *compositingQuality
         ;          
@@ -3613,7 +3771,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetSmoothingMode(GpGraphics *graphics, SmoothingMode smoothingMode)
-        ; Description   Sets the rendering quality of the Graphics object.
+        ; Description   Sets the rendering quality of the Graphics object.
         ;          
         ; Params        GpGraphics *graphics, SmoothingMode smoothingMode
         ;          
@@ -3627,7 +3785,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetSmoothingMode(GpGraphics *graphics, SmoothingMode *smoothingMode)
-        ; Description   Determines whether smoothing (antialiasing) is applied to the Graphics object.
+        ; Description   Determines whether smoothing (antialiasing) is applied to the Graphics object.
         ;          
         ; Params        GpGraphics *graphics, SmoothingMode *smoothingMode
         ;          
@@ -3641,7 +3799,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetPixelOffsetMode(GpGraphics* graphics, PixelOffsetMode pixelOffsetMode)
-        ; Description   Sets the pixel offset mode of this Graphics object.
+        ; Description   Sets the pixel offset mode of this Graphics object.
         ;          
         ; Params        GpGraphics* graphics, PixelOffsetMode pixelOffsetMode
         ;          
@@ -3655,7 +3813,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetPixelOffsetMode(GpGraphics *graphics, PixelOffsetMode *pixelOffsetMode)
-        ; Description   Gets the pixel offset mode currently set for this Graphics object.
+        ; Description   Gets the pixel offset mode currently set for this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, PixelOffsetMode *pixelOffsetMode
         ;          
@@ -3669,7 +3827,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetTextRenderingHint(GpGraphics *graphics, TextRenderingHint mode)
-        ; Description   Sets the text rendering mode of this Graphics object.
+        ; Description   Sets the text rendering mode of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, TextRenderingHint mode
         ;          
@@ -3683,7 +3841,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetTextRenderingHint(GpGraphics *graphics, TextRenderingHint *mode)
-        ; Description   Gets the text rendering mode currently set for this Graphics object.
+        ; Description   Gets the text rendering mode currently set for this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, TextRenderingHint *mode
         ;          
@@ -3697,7 +3855,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetTextContrast(GpGraphics *graphics, UINT contrast)
-        ; Description   Sets the contrast value of this Graphics object. The contrast value is used for antialiasing text.
+        ; Description   Sets the contrast value of this Graphics object. The contrast value is used for antialiasing text.
         ;          
         ; Params        GpGraphics *graphics, UINT contrast
         ;          
@@ -3711,7 +3869,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetTextContrast(GpGraphics *graphics, UINT * contrast)
-        ; Description   Gets the contrast value currently set for this Graphics object. The contrast value is used for antialiasing text.
+        ; Description   Gets the contrast value currently set for this Graphics object. The contrast value is used for antialiasing text.
         ;          
         ; Params        GpGraphics *graphics, UINT * contrast
         ;          
@@ -3725,7 +3883,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetInterpolationMode(GpGraphics *graphics, InterpolationMode interpolationMode)
-        ; Description   Sets the interpolation mode of this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
+        ; Description   Sets the interpolation mode of this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
         ;          
         ; Params        GpGraphics *graphics, InterpolationMode interpolationMode
         ;          
@@ -3739,7 +3897,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetInterpolationMode(GpGraphics *graphics, InterpolationMode *interpolationMode)
-        ; Description   Gets the interpolation mode currently set for this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
+        ; Description   Gets the interpolation mode currently set for this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
         ;          
         ; Params        GpGraphics *graphics, InterpolationMode *interpolationMode
         ;          
@@ -3753,7 +3911,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetTransform(GpGraphics *graphics, GpMatrix *matrix)
-        ; Description   Sets the world transformation of this Graphics object.
+        ; Description   Sets the world transformation of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpMatrix *matrix
         ;          
@@ -3767,7 +3925,7 @@ Class GDIP
         
         ;####################################
         ; Call          ResetTransform(GpGraphics *graphics)
-        ; Description   Sets the world transformation matrix of this Graphics object to the identity matrix.
+        ; Description   Sets the world transformation matrix of this Graphics object to the identity matrix.
         ;          
         ; Params        GpGraphics *graphics
         ;          
@@ -3781,7 +3939,7 @@ Class GDIP
         
         ;####################################
         ; Call          MultiplyTransform(GpGraphics *graphics, GDIPCONST GpMatrix *matrix, GpMatrixOrder order)
-        ; Description   Updates this Graphics object's world transformation matrix with the product of itself and another matrix.
+        ; Description   Updates this Graphics object's world transformation matrix with the product of itself and another matrix.
         ;          
         ; Params        GpGraphics *graphics, GDIPCONST GpMatrix *matrix, GpMatrixOrder order
         ;          
@@ -3795,7 +3953,7 @@ Class GDIP
         
         ;####################################
         ; Call          TranslateTransform(GpGraphics *graphics, REAL dx, REAL dy, GpMatrixOrder order)
-        ; Description   Updates this Graphics object's world transformation matrix with the product of itself and a translation matrix.
+        ; Description   Updates this Graphics object's world transformation matrix with the product of itself and a translation matrix.
         ;          
         ; Params        GpGraphics *graphics, REAL dx, REAL dy, GpMatrixOrder order
         ;          
@@ -3809,7 +3967,7 @@ Class GDIP
         
         ;####################################
         ; Call          ScaleTransform(GpGraphics *graphics, REAL sx, REAL sy, GpMatrixOrder order)
-        ; Description   Updates this Graphics object's world transformation matrix with the product of itself and a scaling matrix.
+        ; Description   Updates this Graphics object's world transformation matrix with the product of itself and a scaling matrix.
         ;          
         ; Params        GpGraphics *graphics, REAL sx, REAL sy, GpMatrixOrder order
         ;          
@@ -3823,7 +3981,7 @@ Class GDIP
         
         ;####################################
         ; Call          RotateTransform(GpGraphics *graphics, REAL angle, GpMatrixOrder order)
-        ; Description   Updates the world transformation matrix of this Graphics object with the product of itself and a rotation matrix.
+        ; Description   Updates the world transformation matrix of this Graphics object with the product of itself and a rotation matrix.
         ;          
         ; Params        GpGraphics *graphics, REAL angle, GpMatrixOrder order
         ;          
@@ -3837,7 +3995,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetTransform(GpGraphics *graphics, GpMatrix *matrix)
-        ; Description   Gets the world transformation matrix of this Graphics object.
+        ; Description   Gets the world transformation matrix of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpMatrix *matrix
         ;          
@@ -3865,7 +4023,7 @@ Class GDIP
 
         ;####################################
         ; Call          GetPageUnit(GpGraphics *graphics, GpUnit *unit)
-        ; Description   Gets the unit of measure currently set for this Graphics object.
+        ; Description   Gets the unit of measure currently set for this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpUnit *unit
         ;          
@@ -3879,7 +4037,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetPageScale(GpGraphics *graphics, REAL *scale)
-        ; Description   Gets the scaling factor currently set for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
+        ; Description   Gets the scaling factor currently set for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
         ;          
         ; Params        GpGraphics *graphics, REAL *scale
         ;          
@@ -3893,7 +4051,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetPageUnit(GpGraphics *graphics, GpUnit unit)
-        ; Description   Sets the unit of measure for this Graphics object. The page unit belongs to the page transformation, which converts page coordinates to device coordinates.
+        ; Description   Sets the unit of measure for this Graphics object. The page unit belongs to the page transformation, which converts page coordinates to device coordinates.
         ;          
         ; Params        GpGraphics *graphics, GpUnit unit
         ;          
@@ -3907,7 +4065,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetPageScale(GpGraphics *graphics, REAL scale)
-        ; Description   Sets the scaling factor for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
+        ; Description   Sets the scaling factor for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
         ;          
         ; Params        GpGraphics *graphics, REAL scale
         ;          
@@ -3921,7 +4079,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetDpiX(GpGraphics *graphics, REAL* dpi)
-        ; Description   Gets the horizontal resolution, in dots per inch, of the display device associated with this Graphics object.
+        ; Description   Gets the horizontal resolution, in dots per inch, of the display device associated with this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, REAL* dpi
         ;          
@@ -3935,7 +4093,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetDpiY(GpGraphics *graphics, REAL* dpi)
-        ; Description   Gets the vertical resolution, in dots per inch, of the display device associated with this Graphics object.
+        ; Description   Gets the vertical resolution, in dots per inch, of the display device associated with this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, REAL* dpi
         ;          
@@ -3949,7 +4107,7 @@ Class GDIP
         
         ;####################################
         ; Call          TransformPoints(GpGraphics *graphics, GpCoordinateSpace destSpace, GpCoordinateSpace srcSpace, GpPoint *points, INT count)
-        ; Description   Converts an array of points from one coordinate space to another. The conversion is based on the current world and page transformations of this Graphics object.
+        ; Description   Converts an array of points from one coordinate space to another. The conversion is based on the current world and page transformations of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpCoordinateSpace destSpace, GpCoordinateSpace srcSpace, GpPoint *points, INT count
         ;          
@@ -4397,7 +4555,7 @@ Class GDIP
         
         ;####################################
         ; Call          Clear(GpGraphics *graphics, ARGB color)
-        ; Description   Clears a Graphics object to a specified color.
+        ; Description   Clears a Graphics object to a specified color.
         ;          
         ; Params        GpGraphics *graphics, ARGB color
         ;          
@@ -4467,7 +4625,7 @@ Class GDIP
         
         ;####################################
         ; Call          GdipFillPolygon2(GpGraphics *graphics, GpBrush *brush, GDIPCONST GpPointF *points, INT count)
-        ; Description   This function fills a polygon with a brush. The points parameter specifies the vertices of the polygon. The count parameter specifies the number of vertices. The brush parameter specifies the brush object used to fill the polygon. The fill mode is FillModeAlternate.
+        ; Description   This function fills a polygon with a brush. The points parameter specifies the vertices of the polygon. The count parameter specifies the number of vertices. The brush parameter specifies the brush object used to fill the polygon. The fill mode is FillModeAlternate.
         ;          
         ; Params        GpGraphics *graphics, GpBrush *brush, GDIPCONST GpPointF *points, INT count
         ;          
@@ -4481,7 +4639,7 @@ Class GDIP
         
         ;####################################
         ; Call          GdipFillPolygon2I(GpGraphics *graphics, GpBrush *brush, GDIPCONST GpPoint *points, INT count)
-        ; Description   This function fills a polygon with a brush. The points parameter specifies the vertices of the polygon. The count parameter specifies the number of vertices. The brush parameter specifies the brush object used to fill the polygon. The fill mode is FillModeAlternate.
+        ; Description   This function fills a polygon with a brush. The points parameter specifies the vertices of the polygon. The count parameter specifies the number of vertices. The brush parameter specifies the brush object used to fill the polygon. The fill mode is FillModeAlternate.
         ;          
         ; Params        GpGraphics *graphics, GpBrush *brush, GDIPCONST GpPoint *points, INT count
         ;          
@@ -4747,7 +4905,7 @@ Class GDIP
         
         ;####################################
         ; Call          DrawImage(GpGraphics *graphics, GpImage *image, REAL dstx, REAL dsty, REAL dstwidth, REAL dstheight, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
-        ; Description   Draws an image.\nIn the flat function, the dstx, dsty, dstwidth, and dstheight parameters specify a rectangle that corresponds to the dstRect parameter in the wrapper method.
+        ; Description   Draws an image.\nIn the flat function, the dstx, dsty, dstwidth, and dstheight parameters specify a rectangle that corresponds to the dstRect parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, GpImage *image, REAL dstx, REAL dsty, REAL dstwidth, REAL dstheight, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData
         ;          
@@ -4761,7 +4919,7 @@ Class GDIP
         
         ;####################################
         ; Call          DrawImage(GpGraphics *graphics, GpImage *image, INT dstx, INT dsty, INT dstwidth, INT dstheight, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
-        ; Description   Draws an image.\nIn the flat function, the dstx, dsty, dstwidth, and dstheight parameters specify a rectangle that corresponds to the dstRect parameter in the wrapper method.
+        ; Description   Draws an image.\nIn the flat function, the dstx, dsty, dstwidth, and dstheight parameters specify a rectangle that corresponds to the dstRect parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, GpImage *image, INT dstx, INT dsty, INT dstwidth, INT dstheight, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData
         ;          
@@ -4817,7 +4975,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST PointF & destPoint, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST PointF & destPoint, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4831,7 +4989,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point & destPoint, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point & destPoint, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4845,7 +5003,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST RectF & destRect, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST RectF & destRect, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4859,7 +5017,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Rect & destRect, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Rect & destRect, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4873,7 +5031,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point * destPoints, INT count, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point * destPoints, INT count, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4887,7 +5045,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point & destPoint, GDIPCONST Rect & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point & destPoint, GDIPCONST Rect & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4901,7 +5059,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST RectF & destRect, GDIPCONST RectF & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST RectF & destRect, GDIPCONST RectF & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4915,7 +5073,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Rect & destRect, GDIPCONST Rect & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Rect & destRect, GDIPCONST Rect & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4929,7 +5087,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST PointF * destPoints, INT count, GDIPCONST RectF & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST PointF * destPoints, INT count, GDIPCONST RectF & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4943,7 +5101,7 @@ Class GDIP
         
         ;####################################
         ; Call          EnumerateMetafile( GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point * destPoints, INT count, GDIPCONST Rect & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes )
-        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
+        ; Description   Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
         ;          
         ; Params        GpGraphics * graphics, GDIPCONST GpMetafile * metafile, GDIPCONST Point * destPoints, INT count, GDIPCONST Rect & srcRect, Unit srcUnit, EnumerateMetafileProc callback, VOID * callbackData, GDIPCONST GpImageAttributes * imageAttributes 
         ;          
@@ -4971,7 +5129,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetClip(GpGraphics *graphics, GpGraphics *srcgraphics, CombineMode combineMode)
-        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and the clipping region of another Graphics object.\nThe g parameter in the wrapper method corresponds to the srcgraphics parameter in the flat function.
+        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and the clipping region of another Graphics object.\nThe g parameter in the wrapper method corresponds to the srcgraphics parameter in the flat function.
         ;          
         ; Params        GpGraphics *graphics, GpGraphics *srcgraphics, CombineMode combineMode
         ;          
@@ -4985,7 +5143,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetClip(GpGraphics *graphics, REAL x, REAL y, REAL width, REAL height, CombineMode combineMode)
-        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, REAL x, REAL y, REAL width, REAL height, CombineMode combineMode
         ;          
@@ -4999,7 +5157,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetClip(GpGraphics *graphics, INT x, INT y, INT width, INT height, CombineMode combineMode)
-        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, INT x, INT y, INT width, INT height, CombineMode combineMode
         ;          
@@ -5013,7 +5171,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetClip(GpGraphics *graphics, GpPath *path, CombineMode combineMode)
-        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a graphics path. If a figure in the path is not closed, this method treats the nonclosed figure as if it were closed by a straight line that connects the figure's starting and ending points.
+        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a graphics path. If a figure in the path is not closed, this method treats the nonclosed figure as if it were closed by a straight line that connects the figure's starting and ending points.
         ;          
         ; Params        GpGraphics *graphics, GpPath *path, CombineMode combineMode
         ;          
@@ -5027,7 +5185,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetClip(GpGraphics *graphics, GpRegion *region, CombineMode combineMode)
-        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a Region object.
+        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a Region object.
         ;          
         ; Params        GpGraphics *graphics, GpRegion *region, CombineMode combineMode
         ;          
@@ -5041,7 +5199,7 @@ Class GDIP
         
         ;####################################
         ; Call          SetClip(GpGraphics *graphics, HRGN hRgn, CombineMode combineMode)
-        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and a Windows Graphics Device Interface (GDI) region
+        ; Description   Updates the clipping region of this Graphics object to a region that is the combination of itself and a Windows Graphics Device Interface (GDI) region
         ;          
         ; Params        GpGraphics *graphics, HRGN hRgn, CombineMode combineMode
         ;          
@@ -5055,7 +5213,7 @@ Class GDIP
         
         ;####################################
         ; Call          ResetClip(GpGraphics *graphics)
-        ; Description   Sets the clipping region of this Graphics object to an infinite region.
+        ; Description   Sets the clipping region of this Graphics object to an infinite region.
         ;          
         ; Params        GpGraphics *graphics
         ;          
@@ -5069,7 +5227,7 @@ Class GDIP
         
         ;####################################
         ; Call          TranslateClip(GpGraphics *graphics, REAL dx, REAL dy)
-        ; Description   Translates the clipping region of this Graphics object.
+        ; Description   Translates the clipping region of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, REAL dx, REAL dy
         ;          
@@ -5083,7 +5241,7 @@ Class GDIP
         
         ;####################################
         ; Call          TranslateClip(GpGraphics *graphics, INT dx, INT dy)
-        ; Description   Translates the clipping region of this Graphics object.
+        ; Description   Translates the clipping region of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, INT dx, INT dy
         ;          
@@ -5097,7 +5255,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetClip(GpGraphics *graphics, GpRegion *region)
-        ; Description   Gets the clipping region of this Graphics object.
+        ; Description   Gets the clipping region of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpRegion *region
         ;          
@@ -5111,7 +5269,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetClipBounds(GpGraphics *graphics, GpRectF *rect)
-        ; Description   Gets a rectangle that encloses the clipping region of this Graphics object.
+        ; Description   Gets a rectangle that encloses the clipping region of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpRectF *rect
         ;          
@@ -5125,7 +5283,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetClipBounds(GpGraphics *graphics, GpRect *rect)
-        ; Description   Gets a rectangle that encloses the clipping region of this Graphics object.
+        ; Description   Gets a rectangle that encloses the clipping region of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GpRect *rect
         ;          
@@ -5139,7 +5297,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsClipEmpty(GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether the clipping region of this Graphics object is empty.
+        ; Description   Determines whether the clipping region of this Graphics object is empty.
         ;          
         ; Params        GpGraphics *graphics, BOOL *result
         ;          
@@ -5153,7 +5311,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetVisibleClipBounds(GpGraphics *graphics, GpRectF *rect)
-        ; Description   Gets a rectangle that encloses the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
+        ; Description   Gets a rectangle that encloses the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
         ;          
         ; Params        GpGraphics *graphics, GpRectF *rect
         ;          
@@ -5167,7 +5325,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetVisibleClipBounds(GpGraphics *graphics, GpRect *rect)
-        ; Description   Gets a rectangle that encloses the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
+        ; Description   Gets a rectangle that encloses the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
         ;          
         ; Params        GpGraphics *graphics, GpRect *rect
         ;          
@@ -5181,7 +5339,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisibleClipEmpty(GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether the visible clipping region of this Graphics object is empty. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
+        ; Description   Determines whether the visible clipping region of this Graphics object is empty. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
         ;          
         ; Params        GpGraphics *graphics, BOOL *result
         ;          
@@ -5195,7 +5353,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisible(GpGraphics *graphics, REAL x, REAL y, BOOL *result)
-        ; Description   Determines whether the specified point is inside the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x and y parameters in the flat function represent the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
+        ; Description   Determines whether the specified point is inside the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x and y parameters in the flat function represent the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, REAL x, REAL y, BOOL *result
         ;          
@@ -5209,7 +5367,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisible(GpGraphics *graphics, INT x, INT y, BOOL *result)
-        ; Description   Determines whether the specified point is inside the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x and y parameters in the flat function represent the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
+        ; Description   Determines whether the specified point is inside the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x and y parameters in the flat function represent the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, INT x, INT y, BOOL *result
         ;          
@@ -5223,7 +5381,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisible(GpGraphics *graphics, REAL x, REAL y, REAL width, REAL height, BOOL *result)
-        ; Description   Determines whether the specified rectangle intersects the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Determines whether the specified rectangle intersects the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, REAL x, REAL y, REAL width, REAL height, BOOL *result
         ;          
@@ -5237,7 +5395,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisible(GpGraphics *graphics, INT x, INT y, INT width, INT height, BOOL *result)
-        ; Description   Determines whether the specified rectangle intersects the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Determines whether the specified rectangle intersects the visible clipping region of this Graphics object. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpGraphics *graphics, INT x, INT y, INT width, INT height, BOOL *result
         ;          
@@ -5251,7 +5409,7 @@ Class GDIP
         
         ;####################################
         ; Call          Save(GpGraphics *graphics, GraphicsState *state)
-        ; Description   Saves the current state (transformations, clipping region, and quality settings) of this Graphics object. You can restore the state later by calling the Graphics::Restore method.
+        ; Description   Saves the current state (transformations, clipping region, and quality settings) of this Graphics object. You can restore the state later by calling the Graphics::Restore method.
         ;          
         ; Params        GpGraphics *graphics, GraphicsState *state
         ;          
@@ -5265,7 +5423,7 @@ Class GDIP
         
         ;####################################
         ; Call          Restore(GpGraphics *graphics, GraphicsState state)
-        ; Description   Sets the state of this Graphics object to the state stored by a previous call to the Graphics::Save method of this Graphics object.
+        ; Description   Sets the state of this Graphics object to the state stored by a previous call to the Graphics::Save method of this Graphics object.
         ;          
         ; Params        GpGraphics *graphics, GraphicsState state
         ;          
@@ -5321,7 +5479,7 @@ Class GDIP
         
         ;####################################
         ; Call          EndContainer(GpGraphics *graphics, GraphicsContainer state)
-        ; Description   Closes a graphics container that was previously opened by the Graphics::BeginContainer method.
+        ; Description   Closes a graphics container that was previously opened by the Graphics::BeginContainer method.
         ;          
         ; Params        GpGraphics *graphics, GraphicsContainer state
         ;          
@@ -5405,7 +5563,7 @@ Class GDIP
         
         ;####################################
         ; Call          GdipCreateStreamOnFile(GDIPCONST WCHAR * filename, UINT access, IStream **stream)
-        ; Description   Returns a pointer to an IStream interface based on a file. The filename parameter specifies the file. The access parameter is a set of flags that must include GENERIC_READ or GENERIC_WRITE. The stream parameter receives a pointer to the IStream interface.
+        ; Description   Returns a pointer to an IStream interface based on a file. The filename parameter specifies the file. The access parameter is a set of flags that must include GENERIC_READ or GENERIC_WRITE. The stream parameter receives a pointer to the IStream interface.
         ;          
         ; Params        GDIPCONST WCHAR * filename, UINT access, IStream **stream
         ;          
@@ -5419,7 +5577,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile(HMETAFILE hWmf, BOOL deleteWmf, GDIPCONST WmfPlaceableFileHeader * wmfPlaceableFileHeader, GpMetafile **metafile)
-        ; Description   Creates a Windows GDI+ Metafile::Metafile object for recording. The format will be placeable metafile.
+        ; Description   Creates a Windows GDI+ Metafile::Metafile object for recording. The format will be placeable metafile.
         ;          
         ; Params        HMETAFILE hWmf, BOOL deleteWmf, GDIPCONST WmfPlaceableFileHeader * wmfPlaceableFileHeader, GpMetafile **metafile
         ;          
@@ -5433,7 +5591,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile(HENHMETAFILE hEmf, BOOL deleteEmf, GpMetafile **metafile)
-        ; Description   Creates a Windows GDI+ Metafile::Metafile object for playback based on a Windows Graphics Device Interface (EMF) file.
+        ; Description   Creates a Windows GDI+ Metafile::Metafile object for playback based on a Windows Graphics Device Interface (EMF) file.
         ;          
         ; Params        HENHMETAFILE hEmf, BOOL deleteEmf, GpMetafile **metafile
         ;          
@@ -5447,7 +5605,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile(GDIPCONST WCHAR* file, GpMetafile **metafile)
-        ; Description   Creates a Metafile::Metafile object for playback.
+        ; Description   Creates a Metafile::Metafile object for playback.
         ;          
         ; Params        GDIPCONST WCHAR* file, GpMetafile **metafile
         ;          
@@ -5461,7 +5619,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile(IStream * stream, GpMetafile **metafile)
-        ; Description   Creates a Metafile::Metafile object from an IStream interface for playback.
+        ; Description   Creates a Metafile::Metafile object from an IStream interface for playback.
         ;          
         ; Params        IStream * stream, GpMetafile **metafile
         ;          
@@ -5475,7 +5633,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile( HDC referenceHdc, EmfType type, GDIPCONST GpRectF * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile )
-        ; Description   Creates a Metafile::Metafile object for recording.
+        ; Description   Creates a Metafile::Metafile object for recording.
         ;          
         ; Params        HDC referenceHdc, EmfType type, GDIPCONST GpRectF * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile 
         ;          
@@ -5489,7 +5647,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile( HDC referenceHdc, EmfType type, GDIPCONST GpRect * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile )
-        ; Description   Creates a Metafile::Metafile object for recording.
+        ; Description   Creates a Metafile::Metafile object for recording.
         ;          
         ; Params        HDC referenceHdc, EmfType type, GDIPCONST GpRect * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile 
         ;          
@@ -5503,7 +5661,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile( GDIPCONST WCHAR* fileName, HDC referenceHdc, EmfType type, GDIPCONST GpRectF * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile )
-        ; Description   Creates a Metafile::Metafile object for recording.
+        ; Description   Creates a Metafile::Metafile object for recording.
         ;          
         ; Params        GDIPCONST WCHAR* fileName, HDC referenceHdc, EmfType type, GDIPCONST GpRectF * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile 
         ;          
@@ -5517,7 +5675,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile( GDIPCONST WCHAR* fileName, HDC referenceHdc, EmfType type, GDIPCONST GpRect * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile )
-        ; Description   Creates a Metafile::Metafile object for recording.
+        ; Description   Creates a Metafile::Metafile object for recording.
         ;          
         ; Params        GDIPCONST WCHAR* fileName, HDC referenceHdc, EmfType type, GDIPCONST GpRect * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile 
         ;          
@@ -5531,7 +5689,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile( IStream * stream, HDC referenceHdc, EmfType type, GDIPCONST GpRectF * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile )
-        ; Description   Creates a Metafile::Metafile object for recording to an IStream interface.
+        ; Description   Creates a Metafile::Metafile object for recording to an IStream interface.
         ;          
         ; Params        IStream * stream, HDC referenceHdc, EmfType type, GDIPCONST GpRectF * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile 
         ;          
@@ -5545,7 +5703,7 @@ Class GDIP
         
         ;####################################
         ; Call          Metafile( IStream * stream, HDC referenceHdc, EmfType type, GDIPCONST GpRect * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile )
-        ; Description   Creates a Metafile::Metafile object for recording to an IStream interface.
+        ; Description   Creates a Metafile::Metafile object for recording to an IStream interface.
         ;          
         ; Params        IStream * stream, HDC referenceHdc, EmfType type, GDIPCONST GpRect * frameRect, MetafileFrameUnit frameUnit, GDIPCONST WCHAR * description, GpMetafile ** metafile 
         ;          
@@ -5573,7 +5731,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetDownLevelRasterizationLimit( GDIPCONST GpMetafile * metafile, UINT * metafileRasterizationLimitDpi )
-        ; Description   Gets the rasterization limit currently set for this metafile. The rasterization limit is the resolution used for certain brush bitmaps that are stored in the metafile. For a detailed explanation of the rasterization limit, see Metafile::SetDownLevelRasterizationLimit.
+        ; Description   Gets the rasterization limit currently set for this metafile. The rasterization limit is the resolution used for certain brush bitmaps that are stored in the metafile. For a detailed explanation of the rasterization limit, see Metafile::SetDownLevelRasterizationLimit.
         ;          
         ; Params        GDIPCONST GpMetafile * metafile, UINT * metafileRasterizationLimitDpi 
         ;          
@@ -5587,7 +5745,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetImageDecodersSize(UINT *numDecoders, UINT *size)
-        ; Description   Gets the number of available image decoders and the total size of the array of ImageCodecInfo objects that is returned by the GetImageDecoders function.
+        ; Description   Gets the number of available image decoders and the total size of the array of ImageCodecInfo objects that is returned by the GetImageDecoders function.
         ;          
         ; Params        UINT *numDecoders, UINT *size 
         ;          
@@ -5601,7 +5759,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetImageDecoders(UINT *numDecoders, UINT *size)
-        ; Description   Gets an array of ImageCodecInfo objects that contain information about the available image decoders.
+        ; Description   Gets an array of ImageCodecInfo objects that contain information about the available image decoders.
         ;          
         ; Params        UINT numDecoders, UINT size, ImageCodecInfo *decoders 
         ;          
@@ -5615,7 +5773,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetImageEncodersSize(UINT *numEncoders, UINT *size)
-        ; Description   Gets the number of available image encoders and the total size of the array of ImageCodecInfo objects that is returned by the GetImageEncoders function.
+        ; Description   Gets the number of available image encoders and the total size of the array of ImageCodecInfo objects that is returned by the GetImageEncoders function.
         ;          
         ; Params        UINT *numEncoders, UINT *size
         ;          
@@ -5629,7 +5787,7 @@ Class GDIP
         
         ;####################################
         ; Call          GetImageEncoders(UINT *numDecoders, UINT *size)
-        ; Description   Gets an array of ImageCodecInfo objects that contain information about the available image encoders.
+        ; Description   Gets an array of ImageCodecInfo objects that contain information about the available image encoders.
         ;          
         ; Params        UINT *numDecoders, UINT *size 
         ;          
@@ -5660,7 +5818,7 @@ Class GDIP
     {
         ;####################################
         ; Call          GraphicsPath(GpFillMode brushMode, GpPath **path)
-        ; Description   Creates a GraphicsPath object and initializes the fill mode. This is the default constructor.
+        ; Description   Creates a GraphicsPath object and initializes the fill mode. This is the default constructor.
         ;          
         ; Params        GpFillMode brushMode, GpPath **path
         ;          
@@ -5674,7 +5832,7 @@ Class GDIP
         
         ;####################################
         ; Call          GraphicsPath(GDIPCONST GpPointF* points, GDIPCONST BYTE* types, INT count, GpFillMode fillMode, GpPath **path)
-        ; Description   Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
+        ; Description   Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
         ;          
         ; Params        GDIPCONST GpPointF* points, GDIPCONST BYTE* types, INT count, GpFillMode fillMode, GpPath **path
         ;          
@@ -5688,7 +5846,7 @@ Class GDIP
         
         ;####################################
         ; Call          GraphicsPath(GDIPCONST GpPoint* points, GDIPCONST BYTE* types, INT count, GpFillMode fillMode, GpPath **path)
-        ; Description   Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
+        ; Description   Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
         ;          
         ; Params        GDIPCONST GpPoint* points, GDIPCONST BYTE* types, INT count, GpFillMode fillMode, GpPath **path
         ;          
@@ -5702,7 +5860,7 @@ Class GDIP
         
         ;####################################
         ; Call          GraphicsPath* Clone(GpPath* path, GpPath **clonePath)
-        ; Description   Creates a new GraphicsPath object, and initializes it with the contents of this GraphicsPath object.
+        ; Description   Creates a new GraphicsPath object, and initializes it with the contents of this GraphicsPath object.
         ;          
         ; Params        GpPath* path, GpPath **clonePath
         ;          
@@ -5716,7 +5874,7 @@ Class GDIP
         
         ;####################################
         ; Call          ~GraphicsPath(GpPath* path)
-        ; Description   Releases resources used by the GraphicsPath object.
+        ; Description   Releases resources used by the GraphicsPath object.
         ;          
         ; Params        GpPath* path
         ;          
@@ -6080,7 +6238,7 @@ Class GDIP
         
         ;####################################
         ; Call          AddRectangle(GpPath *path, REAL x, REAL y, REAL width, REAL height)
-        ; Description   Adds a rectangle to this path.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Adds a rectangle to this path.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpPath *path, REAL x, REAL y, REAL width, REAL height
         ;          
@@ -6332,7 +6490,7 @@ Class GDIP
         
         ;####################################
         ; Call          AddRectangle(GpPath *path, INT x, INT y, INT width, INT height)
-        ; Description   Adds a rectangle to this path.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Adds a rectangle to this path.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpPath *path, INT x, INT y, INT width, INT height
         ;          
@@ -6444,7 +6602,7 @@ Class GDIP
         
         ;####################################
         ; Call          Warp(GpPath *path, GpMatrix* matrix, GDIPCONST GpPointF *points, INT count, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, WarpMode warpMode, REAL flatness)
-        ; Description   Applies a warp transformation to this path. This method also flattens (converts to a sequence of straight lines) the path.\nThe srcx, srcy, srcwidth, and srcheight parameters in the flat function specify a rectangle that corresponds to the srcRect parameter in the wrapper method.
+        ; Description   Applies a warp transformation to this path. This method also flattens (converts to a sequence of straight lines) the path.\nThe srcx, srcy, srcwidth, and srcheight parameters in the flat function specify a rectangle that corresponds to the srcRect parameter in the wrapper method.
         ;          
         ; Params        GpPath *path, GpMatrix* matrix, GDIPCONST GpPointF *points, INT count, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, WarpMode warpMode, REAL flatness
         ;          
@@ -6500,7 +6658,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisible(GpPath* path, REAL x, REAL y, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
+        ; Description   Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
         ;          
         ; Params        GpPath* path, REAL x, REAL y, GpGraphics *graphics, BOOL *result
         ;          
@@ -6514,7 +6672,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsVisible(GpPath* path, INT x, INT y, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
+        ; Description   Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
         ;          
         ; Params        GpPath* path, INT x, INT y, GpGraphics *graphics, BOOL *result
         ;          
@@ -6528,7 +6686,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsOutlineVisible(GpPath* path, REAL x, REAL y, GpPen *pen, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
+        ; Description   Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
         ;          
         ; Params        GpPath* path, REAL x, REAL y, GpPen *pen, GpGraphics *graphics, BOOL *result
         ;          
@@ -6542,7 +6700,7 @@ Class GDIP
         
         ;####################################
         ; Call          IsOutlineVisible(GpPath* path, INT x, INT y, GpPen *pen, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
+        ; Description   Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
         ;          
         ; Params        GpPath* path, INT x, INT y, GpPen *pen, GpGraphics *graphics, BOOL *result
         ;          
@@ -6559,7 +6717,7 @@ Class GDIP
     {
         ;####################################
         ; Call          HatchBrush(GpHatchStyle hatchstyle, ARGB forecol, ARGB backcol, GpHatch **brush)
-        ; Description   Creates a HatchBrush object based on a hatch style, a foreground color, and a background color.
+        ; Description   Creates a HatchBrush object based on a hatch style, a foreground color, and a background color.
         ;          
         ; Params        GpHatchStyle hatchstyle, ARGB forecol, ARGB backcol, GpHatch **brush
         ;          
@@ -6615,11 +6773,11 @@ Class GDIP
         
     }
     
-Class Image
+    Class Image
     {
         ;####################################
         ; Call          Image(IStream* stream, GpImage **image)
-        ; Description   Creates an Image object based on a stream.\nThis flat function does not use Image Color Management (ICM).
+        ; Description   Creates an Image object based on a stream.\nThis flat function does not use Image Color Management (ICM).
         ;          
         ; Params        IStream* stream, GpImage **image
         ;          
@@ -6633,7 +6791,7 @@ Class Image
         
         ;####################################
         ; Call          Image(GDIPCONST WCHAR* filename, GpImage **image)
-        ; Description   Creates an Image object based on a file.\nThis flat function does not use ICM.
+        ; Description   Creates an Image object based on a file.\nThis flat function does not use ICM.
         ;          
         ; Params        GDIPCONST WCHAR* filename, GpImage **image
         ;          
@@ -6647,7 +6805,7 @@ Class Image
         
         ;####################################
         ; Call          Image(IStream* stream, GpImage **image)
-        ; Description   Creates an Image object based on a stream.\nThis flat function does not use ICM.
+        ; Description   Creates an Image object based on a stream.\nThis flat function does not use ICM.
         ;          
         ; Params        IStream* stream, GpImage **image
         ;          
@@ -6661,7 +6819,7 @@ Class Image
         
         ;####################################
         ; Call          Image(GDIPCONST WCHAR* filename, GpImage **image)
-        ; Description   Creates an Image object based on a file.\nThis flat function does not use ICM.
+        ; Description   Creates an Image object based on a file.\nThis flat function does not use ICM.
         ;          
         ; Params        GDIPCONST WCHAR* filename, GpImage **image
         ;          
@@ -6675,7 +6833,7 @@ Class Image
         
         ;####################################
         ; Call          Clone(GpImage *image, GpImage **cloneImage)
-        ; Description   Creates a new Image object and initializes it with the contents of this Image object.
+        ; Description   Creates a new Image object and initializes it with the contents of this Image object.
         ;          
         ; Params        GpImage *image, GpImage **cloneImage
         ;          
@@ -6689,7 +6847,7 @@ Class Image
         
         ;####################################
         ; Call          ~Image(GpImage *image)
-        ; Description   Releases resources used by the Image object.
+        ; Description   Releases resources used by the Image object.
         ;          
         ; Params        GpImage *image
         ;          
@@ -6759,7 +6917,7 @@ Class Image
         
         ;####################################
         ; Call          Graphics(GpImage *image, GpGraphics **graphics)
-        ; Description   Creates a Graphics object that is associated with an Image object.
+        ; Description   Creates a Graphics object that is associated with an Image object.
         ;          
         ; Params        GpImage *image, GpGraphics **graphics
         ;          
@@ -6787,7 +6945,7 @@ Class Image
         
         ;####################################
         ; Call          GetPhysicalDimension(GpImage *image, REAL *width, REAL *height)
-        ; Description   Gets the width and height of this image.\nIn the flat function, the width and height parameters together correspond to the size parameter in the wrapper method.
+        ; Description   Gets the width and height of this image.\nIn the flat function, the width and height parameters together correspond to the size parameter in the wrapper method.
         ;          
         ; Params        GpImage *image, REAL *width, REAL *height
         ;          
@@ -6871,7 +7029,7 @@ Class Image
         
         ;####################################
         ; Call          GetFlags(GpImage *image, UINT *flags)
-        ; Description   Gets a set of flags that indicate certain attributes of this Image object.
+        ; Description   Gets a set of flags that indicate certain attributes of this Image object.
         ;          
         ; Params        GpImage *image, UINT *flags
         ;          
@@ -6913,7 +7071,7 @@ Class Image
         
         ;####################################
         ; Call          GetThumbnailImage(GpImage *image, UINT thumbWidth, UINT thumbHeight, GpImage **thumbImage, GetThumbnailImageAbort callback, VOID * callbackData)
-        ; Description   Gets a thumbnail image from this Image object.
+        ; Description   Gets a thumbnail image from this Image object.
         ;          
         ; Params        GpImage *image, UINT thumbWidth, UINT thumbHeight, GpImage **thumbImage, GetThumbnailImageAbort callback, VOID * callbackData
         ;          
@@ -7025,7 +7183,7 @@ Class Image
         
         ;####################################
         ; Call          GetPalette(GpImage *image, ColorPalette *palette, INT size)
-        ; Description   Gets the ColorPalette of this Image object.
+        ; Description   Gets the ColorPalette of this Image object.
         ;          
         ; Params        GpImage *image, ColorPalette *palette, INT size
         ;          
@@ -7039,7 +7197,7 @@ Class Image
         
         ;####################################
         ; Call          SetPalette(GpImage *image, GDIPCONST ColorPalette *palette)
-        ; Description   Sets the color palette of this Image object.
+        ; Description   Sets the color palette of this Image object.
         ;          
         ; Params        GpImage *image, GDIPCONST ColorPalette *palette
         ;          
@@ -7053,7 +7211,7 @@ Class Image
         
         ;####################################
         ; Call          GetPaletteSize(GpImage *image, INT *size)
-        ; Description   Gets the size, in bytes, of the color palette of this Image object.
+        ; Description   Gets the size, in bytes, of the color palette of this Image object.
         ;          
         ; Params        GpImage *image, INT *size
         ;          
@@ -7067,7 +7225,7 @@ Class Image
         
         ;####################################
         ; Call          GetPropertyCount(GpImage *image, UINT* numOfProperty)
-        ; Description   Gets the pixel format of this Image object.
+        ; Description   Gets the pixel format of this Image object.
         ;          
         ; Params        GpImage *image, UINT* numOfProperty
         ;          
@@ -7081,7 +7239,7 @@ Class Image
         
         ;####################################
         ; Call          GetPropertyIdList(GpImage *image, UINT numOfProperty, PROPID* list)
-        ; Description   Gets a list of the property identifiers used in the metadata of this Image object.
+        ; Description   Gets a list of the property identifiers used in the metadata of this Image object.
         ;          
         ; Params        GpImage *image, UINT numOfProperty, PROPID* list
         ;          
@@ -7095,7 +7253,7 @@ Class Image
         
         ;####################################
         ; Call          GetPropertyItemSize(GpImage *image, PROPID propId, UINT* size)
-        ; Description   Gets the size, in bytes, of a specified property item of this Image object.
+        ; Description   Gets the size, in bytes, of a specified property item of this Image object.
         ;          
         ; Params        GpImage *image, PROPID propId, UINT* size
         ;          
@@ -7109,7 +7267,7 @@ Class Image
         
         ;####################################
         ; Call          GetPropertyItem(GpImage *image, PROPID propId,UINT propSize, PropertyItem* buffer)
-        ; Description   Gets a specified property item (piece of metadata) from this Image object.
+        ; Description   Gets a specified property item (piece of metadata) from this Image object.
         ;          
         ; Params        GpImage *image, PROPID propId,UINT propSize, PropertyItem* buffer
         ;          
@@ -7123,7 +7281,7 @@ Class Image
         
         ;####################################
         ; Call          GetPropertySize(GpImage *image, UINT* totalBufferSize, UINT* numProperties)
-        ; Description   Gets the total size, in bytes, of all the property items stored in this Image object. This method also gets the number of property items stored in this Image object.
+        ; Description   Gets the total size, in bytes, of all the property items stored in this Image object. This method also gets the number of property items stored in this Image object.
         ;          
         ; Params        GpImage *image, UINT* totalBufferSize, UINT* numProperties
         ;          
@@ -7137,7 +7295,7 @@ Class Image
         
         ;####################################
         ; Call          GetAllPropertyItems(GpImage *image, UINT totalBufferSize, UINT numProperties, PropertyItem* allItems)
-        ; Description   Gets all the property items (metadata) stored in this Image object.
+        ; Description   Gets all the property items (metadata) stored in this Image object.
         ;          
         ; Params        GpImage *image, UINT totalBufferSize, UINT numProperties, PropertyItem* allItems
         ;          
@@ -7151,7 +7309,7 @@ Class Image
         
         ;####################################
         ; Call          RemovePropertyItem(GpImage *image, PROPID propId)
-        ; Description   Removes a property item (piece of metadata) from this Image object.
+        ; Description   Removes a property item (piece of metadata) from this Image object.
         ;          
         ; Params        GpImage *image, PROPID propId
         ;          
@@ -7165,7 +7323,7 @@ Class Image
         
         ;####################################
         ; Call          SetPropertyItem(GpImage *image, GDIPCONST PropertyItem* item)
-        ; Description   Sets a property item (piece of metadata) for this Image object. If the item already exists, then its contents are updated; otherwise, a new item is added.
+        ; Description   Sets a property item (piece of metadata) for this Image object. If the item already exists, then its contents are updated; otherwise, a new item is added.
         ;          
         ; Params        GpImage *image, GDIPCONST PropertyItem* item
         ;          
@@ -7179,7 +7337,7 @@ Class Image
         
         ;####################################
         ; Call          FindFirstItem(GpImage *image, ImageItemData* item)
-        ; Description   Retrieves the description and the data size of the first metadata item in this Image object.
+        ; Description   Retrieves the description and the data size of the first metadata item in this Image object.
         ;          
         ; Params        GpImage *image, ImageItemData* item
         ;          
@@ -7193,7 +7351,7 @@ Class Image
         
         ;####################################
         ; Call          FindNextItem(GpImage *image, ImageItemData* item)
-        ; Description   Retrieves the description and the data size of the next metadata item in this Image object. This method is used along with the Image::FindFirstItem method to enumerate the metadata items stored in this ImImageage object.
+        ; Description   Retrieves the description and the data size of the next metadata item in this Image object. This method is used along with the Image::FindFirstItem method to enumerate the metadata items stored in this ImImageage object.
         ;          
         ; Params        GpImage *image, ImageItemData* item
         ;          
@@ -7207,7 +7365,7 @@ Class Image
         
         ;####################################
         ; Call          GetItemData(GpImage *image, ImageItemData* item)
-        ; Description   Gets one piece of metadata from this Image object.
+        ; Description   Gets one piece of metadata from this Image object.
         ;          
         ; Params        GpImage *image, ImageItemData* item
         ;          
@@ -7235,7 +7393,7 @@ Class Image
         
         ;####################################
         ; Call          ConvertToEmfPlus(const GpGraphics* refGraphics, GpMetafile* metafile, BOOL* conversionSuccess, EmfType emfType, const WCHAR* description, GpMetafile** out_metafile)
-        ; Description   Converts this Metafile object to the EMF+ format.
+        ; Description   Converts this Metafile object to the EMF+ format.
         ;          
         ; Params        const GpGraphics* refGraphics, GpMetafile* metafile, BOOL* conversionSuccess, EmfType emfType, const WCHAR* description, GpMetafile** out_metafile
         ;          
@@ -7249,7 +7407,7 @@ Class Image
         
         ;####################################
         ; Call          ConvertToEmfPlus(const GpGraphics* refGraphics, GpMetafile* metafile, BOOL* conversionSuccess, const WCHAR* filename, EmfType emfType, const WCHAR* description, GpMetafile** out_metafile)
-        ; Description   Converts this Metafile object to the EMF+ format.
+        ; Description   Converts this Metafile object to the EMF+ format.
         ;          
         ; Params        const GpGraphics* refGraphics, GpMetafile* metafile, BOOL* conversionSuccess, const WCHAR* filename, EmfType emfType, const WCHAR* description, GpMetafile** out_metafile
         ;          
@@ -7263,7 +7421,7 @@ Class Image
         
         ;####################################
         ; Call          ConvertToEmfPlus(const GpGraphics* refGraphics, GpMetafile* metafile, BOOL* conversionSuccess, IStream* stream, EmfType emfType, const WCHAR* description, GpMetafile** out_metafile)
-        ; Description   Converts this Metafile object to the EMF+ format.
+        ; Description   Converts this Metafile object to the EMF+ format.
         ;          
         ; Params        const GpGraphics* refGraphics, GpMetafile* metafile, BOOL* conversionSuccess, IStream* stream, EmfType emfType, const WCHAR* description, GpMetafile** out_metafile
         ;          
@@ -7294,7 +7452,7 @@ Class Image
     {
         ;####################################
         ; Call          ImageAttributes(GpImageAttributes **imageattr)
-        ; Description   Creates an ImageAttributes object.
+        ; Description   Creates an ImageAttributes object.
         ;          
         ; Params        GpImageAttributes **imageattr
         ;          
@@ -7308,7 +7466,7 @@ Class Image
         
         ;####################################
         ; Call          Clone(GDIPCONST GpImageAttributes *imageattr, GpImageAttributes **cloneImageattr)
-        ; Description   Makes a copy of this ImageAttributes object.
+        ; Description   Makes a copy of this ImageAttributes object.
         ;          
         ; Params        GDIPCONST GpImageAttributes *imageattr, GpImageAttributes **cloneImageattr
         ;          
@@ -7322,7 +7480,7 @@ Class Image
         
         ;####################################
         ; Call          ~ImageAttributes(GpImageAttributes *imageattr)
-        ; Description   Releases resources used by the ImageAttributes object.
+        ; Description   Releases resources used by the ImageAttributes object.
         ;          
         ; Params        GpImageAttributes *imageattr
         ;          
@@ -7364,7 +7522,7 @@ Class Image
         
         ;####################################
         ; Call          SetColorMatrix(IN ColorAdjustType type = ColorAdjustTypeDefault)(GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, GDIPCONST ColorMatrix* colorMatrix, GDIPCONST ColorMatrix* grayMatrix, ColorMatrixFlags flags)
-        ; Description   Sets the color-adjustment matrix for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate color adjustment is enabled for the category specified by the type parameter. ImageAttributes::SetColorMatrix sets enableFlag to TRUE, and ImageAttributes::ClearColorMatrix sets enableFlag to FALSE.\nClears the color-adjustment matrix for a specified category. The grayMatrix parameter specifies a matrix to be used for adjusting gray shades when the value of the flags parameter is ColorMatrixFlagsAltGray.
+        ; Description   Sets the color-adjustment matrix for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate color adjustment is enabled for the category specified by the type parameter. ImageAttributes::SetColorMatrix sets enableFlag to TRUE, and ImageAttributes::ClearColorMatrix sets enableFlag to FALSE.\nClears the color-adjustment matrix for a specified category. The grayMatrix parameter specifies a matrix to be used for adjusting gray shades when the value of the flags parameter is ColorMatrixFlagsAltGray.
         ;          
         ; Params        GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, GDIPCONST ColorMatrix* colorMatrix, GDIPCONST ColorMatrix* grayMatrix, ColorMatrixFlags flags
         ;          
@@ -7378,7 +7536,7 @@ Class Image
         
         ;####################################
         ; Call          SetThreshold(IN ColorAdjustType type = ColorAdjustTypeDefault)(GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, REAL threshold)
-        ; Description   Sets the threshold (transparency range) for a specified category.\nThe enableFlag parameter in the flat function is a Boolean value that specifies whether a separate threshold is enabled for the category specified by the type parameter. ImageAttributes::SetThreshold sets enableFlag to TRUE, and ImageAttributes::ClearThreshold sets enableFlag to FALSE.Clears the threshold value for a specified category.
+        ; Description   Sets the threshold (transparency range) for a specified category.\nThe enableFlag parameter in the flat function is a Boolean value that specifies whether a separate threshold is enabled for the category specified by the type parameter. ImageAttributes::SetThreshold sets enableFlag to TRUE, and ImageAttributes::ClearThreshold sets enableFlag to FALSE.Clears the threshold value for a specified category.
         ;          
         ; Params        GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, REAL threshold
         ;          
@@ -7392,7 +7550,7 @@ Class Image
         
         ;####################################
         ; Call          SetGamma(IN ColorAdjustType type = ColorAdjustTypeDefault)(GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, REAL gamma)
-        ; Description   Sets the gamma value for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate gamma is enabled for the category specified by the type parameter. ImageAttributes::SetGamma sets enableFlag to TRUE, and ImageAttributes::ClearGamma sets enableFlag to FALSE.\nDisables gamma correction for a specified category.
+        ; Description   Sets the gamma value for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate gamma is enabled for the category specified by the type parameter. ImageAttributes::SetGamma sets enableFlag to TRUE, and ImageAttributes::ClearGamma sets enableFlag to FALSE.\nDisables gamma correction for a specified category.
         ;          
         ; Params        GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, REAL gamma
         ;          
@@ -7406,7 +7564,7 @@ Class Image
         
         ;####################################
         ; Call          SetNoOp(IN ColorAdjustType type = ColorAdjustTypeDefault)(GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag)
-        ; Description   Turns off color adjustment for a specified category. You can call the ImageAttributes::ClearNoOp method to reinstate the color-adjustment settings that were in place before the call to ImageAttributes::SetNoOp method . The enableFlag parameter in the flat function is a Boolean value that specifies whether a color adjustment is enabled for the category specified by the type parameter. ImageAttributes::SetNoOp sets enableFlag to TRUE, and ImageAttributes::ClearNoOp sets enableFlag to FALSE.\nClears the NoOp setting for a specified category.
+        ; Description   Turns off color adjustment for a specified category. You can call the ImageAttributes::ClearNoOp method to reinstate the color-adjustment settings that were in place before the call to ImageAttributes::SetNoOp method . The enableFlag parameter in the flat function is a Boolean value that specifies whether a color adjustment is enabled for the category specified by the type parameter. ImageAttributes::SetNoOp sets enableFlag to TRUE, and ImageAttributes::ClearNoOp sets enableFlag to FALSE.\nClears the NoOp setting for a specified category.
         ;          
         ; Params        GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag
         ;          
@@ -7448,7 +7606,7 @@ Class Image
         
         ;####################################
         ; Call          SetOutputChannelColorProfile(IN ColorAdjustType type = ColorAdjustTypeDefault)(GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, GDIPCONST WCHAR *colorProfileFilename)
-        ; Description   Sets the output channel color-profile file for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate output channel color profile is enabled for the category specified by the type parameter. ImageAttributes::SetOutputChannelColorProfile sets enableFlag to TRUE, and ImageAttributes::ClearOutputChannelColorProfile sets enableFlag to FALSE.\nClears the output channel color profile setting for a specified category.
+        ; Description   Sets the output channel color-profile file for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate output channel color profile is enabled for the category specified by the type parameter. ImageAttributes::SetOutputChannelColorProfile sets enableFlag to TRUE, and ImageAttributes::ClearOutputChannelColorProfile sets enableFlag to FALSE.\nClears the output channel color profile setting for a specified category.
         ;          
         ; Params        GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, GDIPCONST WCHAR *colorProfileFilename
         ;          
@@ -7462,7 +7620,7 @@ Class Image
         
         ;####################################
         ; Call          SetRemapTable(IN ColorAdjustType type = ColorAdjustTypeDefault)(GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, UINT mapSize, GDIPCONST ColorMap *map)
-        ; Description   Sets the color-remap table for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate color remap table is enabled for the category specified by the type parameter. ImageAttributes::SetRemapTable sets enableFlag to TRUE, and ImageAttributes::ClearRemapTable sets enableFlag to FALSE.\nClears the color-remap table for a specified category.
+        ; Description   Sets the color-remap table for a specified category. The enableFlag parameter in the flat function is a Boolean value that specifies whether a separate color remap table is enabled for the category specified by the type parameter. ImageAttributes::SetRemapTable sets enableFlag to TRUE, and ImageAttributes::ClearRemapTable sets enableFlag to FALSE.\nClears the color-remap table for a specified category.
         ;          
         ; Params        GpImageAttributes *imageattr, ColorAdjustType type, BOOL enableFlag, UINT mapSize, GDIPCONST ColorMap *map
         ;          
@@ -7476,7 +7634,7 @@ Class Image
         
         ;####################################
         ; Call          SetWrapMode(GpImageAttributes *imageAttr, WrapMode wrap, ARGB argb, BOOL clamp )
-        ; Description   Sets the wrap mode of this ImageAttributes object
+        ; Description   Sets the wrap mode of this ImageAttributes object
         ;          
         ; Params        GpImageAttributes *imageAttr, WrapMode wrap, ARGB argb, BOOL clamp 
         ;          
@@ -7490,7 +7648,7 @@ Class Image
         
         ;####################################
         ; Call          GdipSetImageAttributesICMMode(GpImageAttributes *imageAttr, BOOL on)
-        ; Description   This function sets an internal state variable to the value specified by the on parameter. If this value is TRUE, Image Color Management (ICM) is used for all color adjustment. If the value is FALSE, ICM is not used.
+        ; Description   This function sets an internal state variable to the value specified by the on parameter. If this value is TRUE, Image Color Management (ICM) is used for all color adjustment. If the value is FALSE, ICM is not used.
         ;          
         ; Params        GpImageAttributes *imageAttr, BOOL on
         ;          
@@ -7518,7 +7676,7 @@ Class Image
         
         ;####################################
         ; Call          GdipSetImageAttributesCachedBackground(GpImageAttributes *imageattr, BOOL enableFlag)
-        ; Description   Sets or clears the CachedBackground member of a specified GpImageAttributes object. GDI+ does not use the CachedBackground member, so calling this function has no effect. The imageattr parameter specifies the GpImageAttributes object. The enableFlag parameter specifies whether the CachedBackground member is set (TRUE) or cleared (FALSE).
+        ; Description   Sets or clears the CachedBackground member of a specified GpImageAttributes object. GDI+ does not use the CachedBackground member, so calling this function has no effect. The imageattr parameter specifies the GpImageAttributes object. The enableFlag parameter specifies whether the CachedBackground member is set (TRUE) or cleared (FALSE).
         ;          
         ; Params        GpImageAttributes *imageattr, BOOL enableFlag 
         ;          
@@ -7535,7 +7693,7 @@ Class Image
     {
         ;####################################
         ; Call          LinearGradientBrush(GDIPCONST GpPointF* point1, GDIPCONST GpPointF* point2, ARGB color1, ARGB color2, GpWrapMode wrapMode, GpLineGradient **lineGradient)
-        ; Description   Creates a LinearGradientBrush object from a set of boundary points and boundary colors.\nLinearGradientBrush(IN const PointF& point1, IN const PointF& point2, IN const Color& color1, IN const Color& color2) The wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
+        ; Description   Creates a LinearGradientBrush object from a set of boundary points and boundary colors.\nLinearGradientBrush(IN const PointF& point1, IN const PointF& point2, IN const Color& color1, IN const Color& color2) The wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
         ;          
         ; Params        GDIPCONST GpPointF* point1, GDIPCONST GpPointF* point2, ARGB color1, ARGB color2, GpWrapMode wrapMode, GpLineGradient **lineGradient
         ;          
@@ -7549,7 +7707,7 @@ Class Image
         
         ;####################################
         ; Call          LinearGradientBrush(GDIPCONST GpPoint* point1, GDIPCONST GpPoint* point2, ARGB color1, ARGB color2, GpWrapMode wrapMode, GpLineGradient **lineGradient)
-        ; Description   Creates a LinearGradientBrush object from a set of boundary points and boundary colors.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
+        ; Description   Creates a LinearGradientBrush object from a set of boundary points and boundary colors.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
         ;          
         ; Params        GDIPCONST GpPoint* point1, GDIPCONST GpPoint* point2, ARGB color1, ARGB color2, GpWrapMode wrapMode, GpLineGradient **lineGradient
         ;          
@@ -7563,7 +7721,7 @@ Class Image
         
         ;####################################
         ; Call          LinearGradientBrush(GDIPCONST GpRectF* rect, ARGB color1, ARGB color2, LinearGradientMode mode, GpWrapMode wrapMode, GpLineGradient **lineGradient)
-        ; Description   Creates a LinearGradientBrush object based on a rectangle and mode of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
+        ; Description   Creates a LinearGradientBrush object based on a rectangle and mode of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
         ;          
         ; Params        GDIPCONST GpRectF* rect, ARGB color1, ARGB color2, LinearGradientMode mode, GpWrapMode wrapMode, GpLineGradient **lineGradient
         ;          
@@ -7577,7 +7735,7 @@ Class Image
         
         ;####################################
         ; Call          LinearGradientBrush(GDIPCONST GpRect* rect, ARGB color1, ARGB color2, LinearGradientMode mode, GpWrapMode wrapMode, GpLineGradient **lineGradient)
-        ; Description   Creates a LinearGradientBrush object based on a rectangle and mode of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
+        ; Description   Creates a LinearGradientBrush object based on a rectangle and mode of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
         ;          
         ; Params        GDIPCONST GpRect* rect, ARGB color1, ARGB color2, LinearGradientMode mode, GpWrapMode wrapMode, GpLineGradient **lineGradient
         ;          
@@ -7591,7 +7749,7 @@ Class Image
         
         ;####################################
         ; Call          LinearGradientBrush(GDIPCONST GpRectF* rect, ARGB color1, ARGB color2, REAL angle, BOOL isAngleScalable, GpWrapMode wrapMode, GpLineGradient **lineGradient)
-        ; Description   Creates a LinearGradientBrush object from a rectangle and angle of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
+        ; Description   Creates a LinearGradientBrush object from a rectangle and angle of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
         ;          
         ; Params        GDIPCONST GpRectF* rect, ARGB color1, ARGB color2, REAL angle, BOOL isAngleScalable, GpWrapMode wrapMode, GpLineGradient **lineGradient
         ;          
@@ -7605,7 +7763,7 @@ Class Image
         
         ;####################################
         ; Call          LinearGradientBrush(GDIPCONST GpRect* rect, ARGB color1, ARGB color2, REAL angle, BOOL isAngleScalable, GpWrapMode wrapMode, GpLineGradient **lineGradient)
-        ; Description   Creates a LinearGradientBrush object from a rectangle and angle of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
+        ; Description   Creates a LinearGradientBrush object from a rectangle and angle of direction.\nThe wrapMode parameter in the flat function is a member of the WrapMode enumeration that specifies how areas filled with the brush are tiled.
         ;          
         ; Params        GDIPCONST GpRect* rect, ARGB color1, ARGB color2, REAL angle, BOOL isAngleScalable, GpWrapMode wrapMode, GpLineGradient **lineGradient
         ;          
@@ -7717,7 +7875,7 @@ Class Image
         
         ;####################################
         ; Call          GetBlend(GpLineGradient *brush, REAL *blend, REAL* positions, INT count)
-        ; Description   Gets the blend factors and their corresponding blend positions from a LinearGradientBrush object.
+        ; Description   Gets the blend factors and their corresponding blend positions from a LinearGradientBrush object.
         ;          
         ; Params        GpLineGradient *brush, REAL *blend, REAL* positions, INT count
         ;          
@@ -7945,7 +8103,7 @@ Class Image
     {
         ;####################################
         ; Call          Matrix(GpMatrix **matrix)
-        ; Description   Creates and initializes a Matrix::Matrix object that represents the identity matrix.
+        ; Description   Creates and initializes a Matrix::Matrix object that represents the identity matrix.
         ;          
         ; Params        GpMatrix **matrix
         ;          
@@ -7959,7 +8117,7 @@ Class Image
         
         ;####################################
         ; Call          Matrix(REAL m11, REAL m12, REAL m21, REAL m22, REAL dx, REAL dy, GpMatrix **matrix)
-        ; Description   Creates and initializes a Matrix::Matrix object based on six numbers that define an affine transformation.
+        ; Description   Creates and initializes a Matrix::Matrix object based on six numbers that define an affine transformation.
         ;          
         ; Params        REAL m11, REAL m12, REAL m21, REAL m22, REAL dx, REAL dy, GpMatrix **matrix
         ;          
@@ -7973,7 +8131,7 @@ Class Image
         
         ;####################################
         ; Call          Matrix(GDIPCONST GpRectF *rect, GDIPCONST GpPointF *dstplg, GpMatrix **matrix)
-        ; Description   Creates a Matrix::Matrix object based on a rectangle and a point.
+        ; Description   Creates a Matrix::Matrix object based on a rectangle and a point.
         ;          
         ; Params        GDIPCONST GpRectF *rect, GDIPCONST GpPointF *dstplg, GpMatrix **matrix
         ;          
@@ -7987,7 +8145,7 @@ Class Image
         
         ;####################################
         ; Call          Matrix(GDIPCONST GpRect *rect, GDIPCONST GpPoint *dstplg, GpMatrix **matrix)
-        ; Description   Creates a Matrix::Matrix object based on a rectangle and a point.
+        ; Description   Creates a Matrix::Matrix object based on a rectangle and a point.
         ;          
         ; Params        GDIPCONST GpRect *rect, GDIPCONST GpPoint *dstplg, GpMatrix **matrix
         ;          
@@ -8001,7 +8159,7 @@ Class Image
         
         ;####################################
         ; Call          Clone(GpMatrix *matrix, GpMatrix **cloneMatrix)
-        ; Description   The Matrix::Clone method creates a new Matrix object that is a copy of this Matrix object.
+        ; Description   The Matrix::Clone method creates a new Matrix object that is a copy of this Matrix object.
         ;          
         ; Params        GpMatrix *matrix, GpMatrix **cloneMatrix
         ;          
@@ -8015,7 +8173,7 @@ Class Image
         
         ;####################################
         ; Call          ~Matrix(GpMatrix *matrix)
-        ; Description   Cleans up resources used by a Matrix::Matrix object.
+        ; Description   Cleans up resources used by a Matrix::Matrix object.
         ;          
         ; Params        GpMatrix *matrix
         ;          
@@ -8029,7 +8187,7 @@ Class Image
         
         ;####################################
         ; Call          SetElements(GpMatrix *matrix, REAL m11, REAL m12, REAL m21, REAL m22, REAL dx, REAL dy)
-        ; Description   The Matrix::SetElements method sets the elements of this matrix.
+        ; Description   The Matrix::SetElements method sets the elements of this matrix.
         ;          
         ; Params        GpMatrix *matrix, REAL m11, REAL m12, REAL m21, REAL m22, REAL dx, REAL dy
         ;          
@@ -8043,7 +8201,7 @@ Class Image
         
         ;####################################
         ; Call          Multiply(GpMatrix *matrix, GpMatrix* matrix2, GpMatrixOrder order)
-        ; Description   The Matrix::Multiply method updates this matrix with the product of itself and another matrix.
+        ; Description   The Matrix::Multiply method updates this matrix with the product of itself and another matrix.
         ;          
         ; Params        GpMatrix *matrix, GpMatrix* matrix2, GpMatrixOrder order
         ;          
@@ -8057,7 +8215,7 @@ Class Image
         
         ;####################################
         ; Call          Translate(GpMatrix *matrix, REAL offsetX, REAL offsetY, GpMatrixOrder order)
-        ; Description   The Matrix::Translate method updates this matrix with the product of itself and a translation matrix.
+        ; Description   The Matrix::Translate method updates this matrix with the product of itself and a translation matrix.
         ;          
         ; Params        GpMatrix *matrix, REAL offsetX, REAL offsetY, GpMatrixOrder order
         ;          
@@ -8071,7 +8229,7 @@ Class Image
         
         ;####################################
         ; Call          Scale(GpMatrix *matrix, REAL scaleX, REAL scaleY, GpMatrixOrder order)
-        ; Description   The Matrix::Scale method updates this matrix with the product of itself and a scaling matrix.
+        ; Description   The Matrix::Scale method updates this matrix with the product of itself and a scaling matrix.
         ;          
         ; Params        GpMatrix *matrix, REAL scaleX, REAL scaleY, GpMatrixOrder order
         ;          
@@ -8085,7 +8243,7 @@ Class Image
         
         ;####################################
         ; Call          Rotate(GpMatrix *matrix, REAL angle, GpMatrixOrder order)
-        ; Description   The Matrix::Rotate method updates this matrix with the product of itself and a rotation matrix.
+        ; Description   The Matrix::Rotate method updates this matrix with the product of itself and a rotation matrix.
         ;          
         ; Params        GpMatrix *matrix, REAL angle, GpMatrixOrder order
         ;          
@@ -8099,7 +8257,7 @@ Class Image
         
         ;####################################
         ; Call          Shear(GpMatrix *matrix, REAL shearX, REAL shearY, GpMatrixOrder order)
-        ; Description   The Matrix::Shear method updates this matrix with the product of itself and a shearing matrix.
+        ; Description   The Matrix::Shear method updates this matrix with the product of itself and a shearing matrix.
         ;          
         ; Params        GpMatrix *matrix, REAL shearX, REAL shearY, GpMatrixOrder order
         ;          
@@ -8113,7 +8271,7 @@ Class Image
         
         ;####################################
         ; Call          Invert(GpMatrix *matrix)
-        ; Description   If this matrix is invertible, the Matrix::Invert method replaces the elements of this matrix with the elements of its inverse.
+        ; Description   If this matrix is invertible, the Matrix::Invert method replaces the elements of this matrix with the elements of its inverse.
         ;          
         ; Params        GpMatrix *matrix
         ;          
@@ -8127,7 +8285,7 @@ Class Image
         
         ;####################################
         ; Call          TransformPoints(GpMatrix *matrix, GpPointF *pts, INT count)
-        ; Description   The Matrix::TransformPoints method multiplies each point in an array by this matrix. Each point is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
+        ; Description   The Matrix::TransformPoints method multiplies each point in an array by this matrix. Each point is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
         ;          
         ; Params        GpMatrix *matrix, GpPointF *pts, INT count
         ;          
@@ -8141,7 +8299,7 @@ Class Image
         
         ;####################################
         ; Call          TransformPoints(GpMatrix *matrix, GpPoint *pts, INT count)
-        ; Description   The Matrix::TransformPoints method multiplies each point in an array by this matrix. Each point is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
+        ; Description   The Matrix::TransformPoints method multiplies each point in an array by this matrix. Each point is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
         ;          
         ; Params        GpMatrix *matrix, GpPoint *pts, INT count
         ;          
@@ -8155,7 +8313,7 @@ Class Image
         
         ;####################################
         ; Call          TransformVectors(GpMatrix *matrix, GpPointF *pts, INT count)
-        ; Description   The Matrix::TransformVectors method multiplies each vector in an array by this matrix. The translation elements of this matrix (third row) are ignored. Each vector is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
+        ; Description   The Matrix::TransformVectors method multiplies each vector in an array by this matrix. The translation elements of this matrix (third row) are ignored. Each vector is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
         ;          
         ; Params        GpMatrix *matrix, GpPointF *pts, INT count
         ;          
@@ -8169,7 +8327,7 @@ Class Image
         
         ;####################################
         ; Call          TransformVectors(GpMatrix *matrix, GpPoint *pts, INT count)
-        ; Description   The Matrix::TransformVectors method multiplies each vector in an array by this matrix. The translation elements of this matrix (third row) are ignored. Each vector is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
+        ; Description   The Matrix::TransformVectors method multiplies each vector in an array by this matrix. The translation elements of this matrix (third row) are ignored. Each vector is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
         ;          
         ; Params        GpMatrix *matrix, GpPoint *pts, INT count
         ;          
@@ -8183,7 +8341,7 @@ Class Image
         
         ;####################################
         ; Call          GetElements(GDIPCONST GpMatrix *matrix, REAL *matrixOut)
-        ; Description   The Matrix::GetElements method gets the elements of this matrix. The elements are placed in an array in the order m11, m12, m21, m22, m31, m32, where mij denotes the element in row i, column j.
+        ; Description   The Matrix::GetElements method gets the elements of this matrix. The elements are placed in an array in the order m11, m12, m21, m22, m31, m32, where mij denotes the element in row i, column j.
         ;          
         ; Params        GDIPCONST GpMatrix *matrix, REAL *matrixOut
         ;          
@@ -8197,7 +8355,7 @@ Class Image
         
         ;####################################
         ; Call          IsInvertible(GDIPCONST GpMatrix *matrix, BOOL *result)
-        ; Description   The Matrix::IsInvertible method determines whether this matrix is invertible.
+        ; Description   The Matrix::IsInvertible method determines whether this matrix is invertible.
         ;          
         ; Params        GDIPCONST GpMatrix *matrix, BOOL *result
         ;          
@@ -8211,7 +8369,7 @@ Class Image
         
         ;####################################
         ; Call          IsIdentity(GDIPCONST GpMatrix *matrix, BOOL *result)
-        ; Description   The Matrix::IsIdentity method determines whether this matrix is the identity matrix.
+        ; Description   The Matrix::IsIdentity method determines whether this matrix is the identity matrix.
         ;          
         ; Params        GDIPCONST GpMatrix *matrix, BOOL *result
         ;          
@@ -8225,7 +8383,7 @@ Class Image
         
         ;####################################
         ; Call          Equals(GDIPCONST GpMatrix *matrix, GDIPCONST GpMatrix *matrix2, BOOL *result)
-        ; Description   The Matrix::Equals method determines whether the elements of this matrix are equal to the elements of another matrix.
+        ; Description   The Matrix::Equals method determines whether the elements of this matrix are equal to the elements of another matrix.
         ;          
         ; Params        GDIPCONST GpMatrix *matrix, GDIPCONST GpMatrix *matrix2, BOOL *result
         ;          
@@ -8273,7 +8431,7 @@ Class Image
     {
         ;####################################
         ; Call          GdiplusNotificationHook(OUT ULONG_PTR *token)
-        ; Description   The GdiplusStartup function returns (in its output parameter) a pointer to a GdiplusStartupOutput structure. One of the members of the structure is a pointer to a notification hook function that has the same signature as GdiplusNotificationHook.\nThere are two ways you can call the notification hook function; you can use the pointer returned by GdiplusStartup or you can call GdiplusNotificationHook. In fact, GdiplusNotificationHook simply verifies that you have suppressed the background thread and then calls the notification hook function that is returned by GdiplusStartup.\nThe token parameter receives an identifier that you should later pass in a corresponding call to the notification unhook function.
+        ; Description   The GdiplusStartup function returns (in its output parameter) a pointer to a GdiplusStartupOutput structure. One of the members of the structure is a pointer to a notification hook function that has the same signature as GdiplusNotificationHook.\nThere are two ways you can call the notification hook function; you can use the pointer returned by GdiplusStartup or you can call GdiplusNotificationHook. In fact, GdiplusNotificationHook simply verifies that you have suppressed the background thread and then calls the notification hook function that is returned by GdiplusStartup.\nThe token parameter receives an identifier that you should later pass in a corresponding call to the notification unhook function.
         ;          
         ; Params        OUT ULONG_PTR *token
         ;          
@@ -8287,7 +8445,7 @@ Class Image
         
         ;####################################
         ; Call          GdiplusNotificationUnhook(ULONG_PTR token)
-        ; Description   The GdiplusStartup function returns (in its output parameter) a pointer to a GdiplusStartupOutput structure. One of the members of the structure is a pointer to a notification unhook function that has the same signature as GdiplusNotificationUnhook.\nThere are two ways you can call the notification unhook function; you can use the pointer returned by GdiplusStartup or you can call GdiplusNotificationUnhook. In fact, GdiplusNotificationUnhook simply verifies that you have suppressed the background thread and then calls the notification unhook function that is returned by GdiplusStartup.\nWhen you call the notification unhook function, pass the token that you previously received from a corresponding call to the notification hook function. If you do not do this, there will be resource leaks that won't be cleaned up until the process exits.
+        ; Description   The GdiplusStartup function returns (in its output parameter) a pointer to a GdiplusStartupOutput structure. One of the members of the structure is a pointer to a notification unhook function that has the same signature as GdiplusNotificationUnhook.\nThere are two ways you can call the notification unhook function; you can use the pointer returned by GdiplusStartup or you can call GdiplusNotificationUnhook. In fact, GdiplusNotificationUnhook simply verifies that you have suppressed the background thread and then calls the notification unhook function that is returned by GdiplusStartup.\nWhen you call the notification unhook function, pass the token that you previously received from a corresponding call to the notification hook function. If you do not do this, there will be resource leaks that won't be cleaned up until the process exits.
         ;          
         ; Params        ULONG_PTR token
         ;          
@@ -8304,7 +8462,7 @@ Class Image
     {
         ;####################################
         ; Call          PathGradientBrush(GDIPCONST GpPointF* points, INT count, GpWrapMode wrapMode, GpPathGradient **polyGradient)
-        ; Description   Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
+        ; Description   Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
         ;          
         ; Params        GDIPCONST GpPointF* points, INT count, GpWrapMode wrapMode, GpPathGradient **polyGradient
         ;          
@@ -8318,7 +8476,7 @@ Class Image
         
         ;####################################
         ; Call          PathGradientBrush(GDIPCONST GpPoint* points, INT count, GpWrapMode wrapMode, GpPathGradient **polyGradient)
-        ; Description   Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
+        ; Description   Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
         ;          
         ; Params        GDIPCONST GpPoint* points, INT count, GpWrapMode wrapMode, GpPathGradient **polyGradient
         ;          
@@ -8332,7 +8490,7 @@ Class Image
         
         ;####################################
         ; Call          PathGradientBrush(GDIPCONST GpPath* path, GpPathGradient **polyGradient)
-        ; Description   Creates a PathGradientBrush object based on a GraphicsPath object.
+        ; Description   Creates a PathGradientBrush object based on a GraphicsPath object.
         ;          
         ; Params        GDIPCONST GpPath* path, GpPathGradient **polyGradient
         ;          
@@ -8839,7 +8997,7 @@ Class Image
     {
         ;####################################
         ; Call          GraphicsPathIterator(GpPathIterator **iterator, GpPath* path)
-        ; Description   Creates a new GraphicsPathIterator object and associates it with a GraphicsPath object.
+        ; Description   Creates a new GraphicsPathIterator object and associates it with a GraphicsPath object.
         ;          
         ; Params        GpPathIterator **iterator, GpPath* path
         ;          
@@ -8853,7 +9011,7 @@ Class Image
         
         ;####################################
         ; Call          ~GraphicsPathIterator(GpPathIterator *iterator)
-        ; Description   Releases resources used by the GraphicsPathIterator object.
+        ; Description   Releases resources used by the GraphicsPathIterator object.
         ;          
         ; Params        GpPathIterator *iterator
         ;          
@@ -8965,7 +9123,7 @@ Class Image
         
         ;####################################
         ; Call          GdipPathIterIsValid(GpPathIterator* iterator, BOOL* valid)
-        ; Description   This function passes a Boolean value that indicates whether the path iterator specified by the iterator parameter is valid. The output parameter valid receives the result.
+        ; Description   This function passes a Boolean value that indicates whether the path iterator specified by the iterator parameter is valid. The output parameter valid receives the result.
         ;          
         ; Params        GpPathIterator* iterator, BOOL* valid
         ;          
@@ -9007,7 +9165,7 @@ Class Image
         
         ;####################################
         ; Call          Enumerate(GpPathIterator* iterator, INT* resultCount, GpPointF *points, BYTE *types, INT count)
-        ; Description   Copies the path's data points to a PointF array and copies the path's point types to a BYTE array.
+        ; Description   Copies the path's data points to a PointF array and copies the path's point types to a BYTE array.
         ;          
         ; Params        GpPathIterator* iterator, INT* resultCount, GpPointF *points, BYTE *types, INT count
         ;          
@@ -9021,7 +9179,7 @@ Class Image
         
         ;####################################
         ; Call          CopyData(GpPathIterator* iterator, INT* resultCount, GpPointF* points, BYTE* types, INT startIndex, INT endIndex)
-        ; Description   Copies a subset of the path's data points to a PointF array and copies a subset of the path's point types to a BYTE array.
+        ; Description   Copies a subset of the path's data points to a PointF array and copies a subset of the path's point types to a BYTE array.
         ;          
         ; Params        GpPathIterator* iterator, INT* resultCount, GpPointF* points, BYTE* types, INT startIndex, INT endIndex
         ;          
@@ -9038,7 +9196,7 @@ Class Image
     {
         ;####################################
         ; Call          Pen(ARGB color, REAL width, GpUnit unit, GpPen **pen)
-        ; Description   Creates a Pen object that uses a specified color and width.\nThe unit parameter of the flat function is a member of the Unit enumeration that specifies the unit of measure for the width of the pen.
+        ; Description   Creates a Pen object that uses a specified color and width.\nThe unit parameter of the flat function is a member of the Unit enumeration that specifies the unit of measure for the width of the pen.
         ;          
         ; Params        ARGB color, REAL width, GpUnit unit, GpPen **pen
         ;          
@@ -9052,7 +9210,7 @@ Class Image
         
         ;####################################
         ; Call          Pen(GpBrush *brush, REAL width, GpUnit unit, GpPen **pen)
-        ; Description   Creates a Pen object that uses the attributes of a brush and a real number to set the width of this Pen object.\nThe unit parameter of the flat function is a member of the Unit enumeration that specifies the unit of measure for the width of the pen.
+        ; Description   Creates a Pen object that uses the attributes of a brush and a real number to set the width of this Pen object.\nThe unit parameter of the flat function is a member of the Unit enumeration that specifies the unit of measure for the width of the pen.
         ;          
         ; Params        GpBrush *brush, REAL width, GpUnit unit, GpPen **pen
         ;          
@@ -9080,7 +9238,7 @@ Class Image
         
         ;####################################
         ; Call          ~Pen(GpPen *pen)
-        ; Description   Releases resources used by the Pen object.
+        ; Description   Releases resources used by the Pen object.
         ;          
         ; Params        GpPen *pen
         ;          
@@ -9094,7 +9252,7 @@ Class Image
         
         ;####################################
         ; Call          SetWidth(GpPen *pen, REAL width)
-        ; Description   Sets the width for this Pen object.
+        ; Description   Sets the width for this Pen object.
         ;          
         ; Params        GpPen *pen, REAL width
         ;          
@@ -9108,7 +9266,7 @@ Class Image
         
         ;####################################
         ; Call          GetWidth(GpPen *pen, REAL *width)
-        ; Description   Gets the width currently set for this Pen object.
+        ; Description   Gets the width currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, REAL *width
         ;          
@@ -9122,7 +9280,7 @@ Class Image
         
         ;####################################
         ; Call          GdipSetPenUnit(GpPen *pen, GpUnit unit)
-        ; Description   This function sets the unit of measure for the pen specified by the pen parameter to the value specified by the unit parameter. The unit parameter is a member of the Unit enumeration that specifies the unit of measure for the width of the pen.
+        ; Description   This function sets the unit of measure for the pen specified by the pen parameter to the value specified by the unit parameter. The unit parameter is a member of the Unit enumeration that specifies the unit of measure for the width of the pen.
         ;          
         ; Params        GpPen *pen, GpUnit unit
         ;          
@@ -9136,7 +9294,7 @@ Class Image
         
         ;####################################
         ; Call          GdipGetPenUnit(GpPen *pen, GpUnit *unit)
-        ; Description   This function gets the unit of measure for the pen specified by the pen parameter. The unit parameter receives a member of the Unit enumeration that indicates the unit of measure for the width of the pen.
+        ; Description   This function gets the unit of measure for the pen specified by the pen parameter. The unit parameter receives a member of the Unit enumeration that indicates the unit of measure for the width of the pen.
         ;          
         ; Params        GpPen *pen, GpUnit *unit
         ;          
@@ -9164,7 +9322,7 @@ Class Image
         
         ;####################################
         ; Call          SetStartCap(GpPen *pen, GpLineCap startCap)
-        ; Description   Sets the start cap for this Pen object.
+        ; Description   Sets the start cap for this Pen object.
         ;          
         ; Params        GpPen *pen, GpLineCap startCap
         ;          
@@ -9178,7 +9336,7 @@ Class Image
         
         ;####################################
         ; Call          SetEndCap(GpPen *pen, GpLineCap endCap)
-        ; Description   Sets the end cap for this Pen object.
+        ; Description   Sets the end cap for this Pen object.
         ;          
         ; Params        GpPen *pen, GpLineCap endCap
         ;          
@@ -9192,7 +9350,7 @@ Class Image
         
         ;####################################
         ; Call          SetDashCap(GpPen *pen, GpDashCap dashCap)
-        ; Description   Sets the dash cap style for this Pen object.
+        ; Description   Sets the dash cap style for this Pen object.
         ;          
         ; Params        GpPen *pen, GpDashCap dashCap
         ;          
@@ -9206,7 +9364,7 @@ Class Image
         
         ;####################################
         ; Call          GetStartCap(GpPen *pen, GpLineCap *startCap)
-        ; Description   Gets the start cap currently set for this Pen object.
+        ; Description   Gets the start cap currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpLineCap *startCap
         ;          
@@ -9220,7 +9378,7 @@ Class Image
         
         ;####################################
         ; Call          GetEndCap(GpPen *pen, GpLineCap *endCap)
-        ; Description   Gets the end cap currently set for this Pen object.
+        ; Description   Gets the end cap currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpLineCap *endCap
         ;          
@@ -9234,7 +9392,7 @@ Class Image
         
         ;####################################
         ; Call          GetDashCap(GpPen *pen, GpDashCap *dashCap)
-        ; Description   Gets the dash cap style currently set for this Pen object.
+        ; Description   Gets the dash cap style currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpDashCap *dashCap
         ;          
@@ -9248,7 +9406,7 @@ Class Image
         
         ;####################################
         ; Call          SetLineJoin(GpPen *pen, GpLineJoin lineJoin)
-        ; Description   Sets the line join for this Pen object.
+        ; Description   Sets the line join for this Pen object.
         ;          
         ; Params        GpPen *pen, GpLineJoin lineJoin
         ;          
@@ -9262,7 +9420,7 @@ Class Image
         
         ;####################################
         ; Call          GetLineJoin(GpPen *pen, GpLineJoin *lineJoin)
-        ; Description   Gets the line join for this Pen object.
+        ; Description   Gets the line join for this Pen object.
         ;          
         ; Params        GpPen *pen, GpLineJoin *lineJoin
         ;          
@@ -9276,7 +9434,7 @@ Class Image
         
         ;####################################
         ; Call          SetCustomStartCap(GpPen *pen, GpCustomLineCap* customCap)
-        ; Description   Sets the custom start cap for this Pen object.
+        ; Description   Sets the custom start cap for this Pen object.
         ;          
         ; Params        GpPen *pen, GpCustomLineCap* customCap
         ;          
@@ -9290,7 +9448,7 @@ Class Image
         
         ;####################################
         ; Call          GetCustomStartCap(GpPen *pen, GpCustomLineCap** customCap)
-        ; Description   Gets the custom start cap for this Pen object.
+        ; Description   Gets the custom start cap for this Pen object.
         ;          
         ; Params        GpPen *pen, GpCustomLineCap** customCap
         ;          
@@ -9304,7 +9462,7 @@ Class Image
         
         ;####################################
         ; Call          SetCustomEndCap(GpPen *pen, GpCustomLineCap* customCap)
-        ; Description   Sets the custom end cap currently set for this Pen object
+        ; Description   Sets the custom end cap currently set for this Pen object
         ;          
         ; Params        GpPen *pen, GpCustomLineCap* customCap
         ;          
@@ -9318,7 +9476,7 @@ Class Image
         
         ;####################################
         ; Call          GetCustomEndCap(GpPen *pen, GpCustomLineCap** customCap)
-        ; Description   Gets the custom end cap currently set for this Pen object
+        ; Description   Gets the custom end cap currently set for this Pen object
         ;          
         ; Params        GpPen *pen, GpCustomLineCap** customCap
         ;          
@@ -9332,7 +9490,7 @@ Class Image
         
         ;####################################
         ; Call          SetMiterLimit(GpPen *pen, REAL miterLimit)
-        ; Description   Sets the miter length currently set for this Pen object.
+        ; Description   Sets the miter length currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, REAL miterLimit
         ;          
@@ -9346,7 +9504,7 @@ Class Image
         
         ;####################################
         ; Call          GetMiterLimit(GpPen *pen, REAL *miterLimit)
-        ; Description   Gets the miter length currently set for this Pen object.
+        ; Description   Gets the miter length currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, REAL *miterLimit
         ;          
@@ -9360,7 +9518,7 @@ Class Image
         
         ;####################################
         ; Call          SetAlignment(GpPen *pen, GpPenAlignment penMode)
-        ; Description   Sets the alignment currently set for this Pen object.
+        ; Description   Sets the alignment currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpPenAlignment penMode
         ;          
@@ -9374,7 +9532,7 @@ Class Image
         
         ;####################################
         ; Call          GetAlignment(GpPen *pen, GpPenAlignment *penMode)
-        ; Description   Sets the alignment currently set for this Pen object.
+        ; Description   Sets the alignment currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpPenAlignment *penMode
         ;          
@@ -9388,7 +9546,7 @@ Class Image
         
         ;####################################
         ; Call          SetTransform(GpPen *pen, GpMatrix *matrix)
-        ; Description   Sets the world transformation matrix currently set for this Pen object.
+        ; Description   Sets the world transformation matrix currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpMatrix *matrix
         ;          
@@ -9402,7 +9560,7 @@ Class Image
         
         ;####################################
         ; Call          GetTransform(GpPen *pen, GpMatrix *matrix)
-        ; Description   Gets the world transformation matrix currently set for this Pen object.
+        ; Description   Gets the world transformation matrix currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpMatrix *matrix
         ;          
@@ -9416,7 +9574,7 @@ Class Image
         
         ;####################################
         ; Call          ResetTransform(GpPen *pen)
-        ; Description   Sets the world transformation matrix of this Pen object to the identity matrix.
+        ; Description   Sets the world transformation matrix of this Pen object to the identity matrix.
         ;          
         ; Params        GpPen *pen
         ;          
@@ -9444,7 +9602,7 @@ Class Image
         
         ;####################################
         ; Call          ScaleTransform(GpPen *pen, REAL sx, REAL sy, GpMatrixOrder order)
-        ; Description   Sets the Pen object's world transformation matrix equal to the product of itself and a scaling matrix.
+        ; Description   Sets the Pen object's world transformation matrix equal to the product of itself and a scaling matrix.
         ;          
         ; Params        GpPen *pen, REAL sx, REAL sy, GpMatrixOrder order
         ;          
@@ -9458,7 +9616,7 @@ Class Image
         
         ;####################################
         ; Call          RotateTransform(GpPen *pen, REAL angle, GpMatrixOrder order)
-        ; Description   Updates the world transformation matrix of this Pen object with the product of itself and a rotation matrix.
+        ; Description   Updates the world transformation matrix of this Pen object with the product of itself and a rotation matrix.
         ;          
         ; Params        GpPen *pen, REAL angle, GpMatrixOrder order
         ;          
@@ -9472,7 +9630,7 @@ Class Image
         
         ;####################################
         ; Call          SetColor(GpPen *pen, ARGB argb)
-        ; Description   Sets the color for this Pen object.
+        ; Description   Sets the color for this Pen object.
         ;          
         ; Params        GpPen *pen, ARGB argb
         ;          
@@ -9486,7 +9644,7 @@ Class Image
         
         ;####################################
         ; Call          GetColor(GpPen *pen, ARGB *argb)
-        ; Description   Gets the color for this Pen object.
+        ; Description   Gets the color for this Pen object.
         ;          
         ; Params        GpPen *pen, ARGB *argb
         ;          
@@ -9500,7 +9658,7 @@ Class Image
         
         ;####################################
         ; Call          SetBrush(GpPen *pen, GpBrush *brush)
-        ; Description   Sets the Brush object that a pen uses to fill a line.
+        ; Description   Sets the Brush object that a pen uses to fill a line.
         ;          
         ; Params        GpPen *pen, GpBrush *brush
         ;          
@@ -9514,7 +9672,7 @@ Class Image
         
         ;####################################
         ; Call          GetBrush(GpPen *pen, GpBrush **brush)
-        ; Description   Gets the Brush object that a pen uses to fill a line.
+        ; Description   Gets the Brush object that a pen uses to fill a line.
         ;          
         ; Params        GpPen *pen, GpBrush **brush
         ;          
@@ -9528,7 +9686,7 @@ Class Image
         
         ;####################################
         ; Call          GetPenType(GpPen *pen, GpPenType* type)
-        ; Description   Gets the type currently set for this Pen object.
+        ; Description   Gets the type currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpPenType* type
         ;          
@@ -9542,7 +9700,7 @@ Class Image
         
         ;####################################
         ; Call          GetDashStyle(GpPen *pen, GpDashStyle *dashstyle)
-        ; Description   Gets the dash style currently set for this Pen object.
+        ; Description   Gets the dash style currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpDashStyle *dashstyle
         ;          
@@ -9556,7 +9714,7 @@ Class Image
         
         ;####################################
         ; Call          SetDashStyle(GpPen *pen, GpDashStyle dashstyle)
-        ; Description   Sets the dash style currently set for this Pen object.
+        ; Description   Sets the dash style currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GpDashStyle dashstyle
         ;          
@@ -9612,7 +9770,7 @@ Class Image
         
         ;####################################
         ; Call          SetDashPattern(GpPen *pen, GDIPCONST REAL *dash, INT count)
-        ; Description   Sets an array of custom dashes and spaces currently set for this Pen object.
+        ; Description   Sets an array of custom dashes and spaces currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GDIPCONST REAL *dash, INT count
         ;          
@@ -9626,7 +9784,7 @@ Class Image
         
         ;####################################
         ; Call          GetDashPattern(GpPen *pen, REAL *dash, INT count)
-        ; Description   Gets an array of custom dashes and spaces currently set for this Pen object.
+        ; Description   Gets an array of custom dashes and spaces currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, REAL *dash, INT count
         ;          
@@ -9654,7 +9812,7 @@ Class Image
         
         ;####################################
         ; Call          SetCompoundArray(GpPen *pen, GDIPCONST REAL *dash, INT count)
-        ; Description   Sets the compound array currently set for this Pen object.
+        ; Description   Sets the compound array currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, GDIPCONST REAL *dash, INT count
         ;          
@@ -9668,7 +9826,7 @@ Class Image
         
         ;####################################
         ; Call          GetCompoundArray(GpPen *pen, REAL *dash, INT count)
-        ; Description   Gets the compound array currently set for this Pen object.
+        ; Description   Gets the compound array currently set for this Pen object.
         ;          
         ; Params        GpPen *pen, REAL *dash, INT count
         ;          
@@ -9727,7 +9885,7 @@ Class Image
         
         ;####################################
         ; Call          Region(GpPath *path, GpRegion **region)
-        ; Description   Creates a region that is defined by a GraphicsPath object and has a fill mode that is contained in the GraphicsPath object.
+        ; Description   Creates a region that is defined by a GraphicsPath object and has a fill mode that is contained in the GraphicsPath object.
         ;          
         ; Params        GpPath *path, GpRegion **region
         ;          
@@ -9783,7 +9941,7 @@ Class Image
         
         ;####################################
         ; Call          ~Region(GpRegion *region)
-        ; Description   Releases resources used by the Region object.
+        ; Description   Releases resources used by the Region object.
         ;          
         ; Params        GpRegion *region
         ;          
@@ -9825,7 +9983,7 @@ Class Image
         
         ;####################################
         ; Call          Intersect(GpRegion *region, GDIPCONST GpRectF *rect, CombineMode combineMode)
-        ; Description   Updates this region to the portion of itself that intersects the specified rectangle's interior.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the region and rectangle are combined.
+        ; Description   Updates this region to the portion of itself that intersects the specified rectangle's interior.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the region and rectangle are combined.
         ;          
         ; Params        GpRegion *region, GDIPCONST GpRectF *rect, CombineMode combineMode
         ;          
@@ -9839,7 +9997,7 @@ Class Image
         
         ;####################################
         ; Call          Intersect(GpRegion *region, GDIPCONST GpRect *rect, CombineMode combineMode)
-        ; Description   Updates this region to the portion of itself that intersects the specified rectangle's interior.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the region and rectangle are combined.
+        ; Description   Updates this region to the portion of itself that intersects the specified rectangle's interior.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the region and rectangle are combined.
         ;          
         ; Params        GpRegion *region, GDIPCONST GpRect *rect, CombineMode combineMode
         ;          
@@ -9853,7 +10011,7 @@ Class Image
         
         ;####################################
         ; Call          Intersect(GpRegion *region, GpPath *path, CombineMode combineMode)
-        ; Description   Updates this region to the portion of itself that intersects the specified path's interior.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the region and path are combined.
+        ; Description   Updates this region to the portion of itself that intersects the specified path's interior.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the region and path are combined.
         ;          
         ; Params        GpRegion *region, GpPath *path, CombineMode combineMode
         ;          
@@ -9867,7 +10025,7 @@ Class Image
         
         ;####################################
         ; Call          Intersect(GpRegion *region, GpRegion *region2, CombineMode combineMode)
-        ; Description   Updates this region to the portion of itself that intersects another region.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the regions are combined.
+        ; Description   Updates this region to the portion of itself that intersects another region.\nThe combineMode parameter in the flat function is a member of the CombineMode enumeration that specifies how the regions are combined.
         ;          
         ; Params        GpRegion *region, GpRegion *region2, CombineMode combineMode
         ;          
@@ -10035,7 +10193,7 @@ Class Image
         
         ;####################################
         ; Call          IsVisible(GpRegion *region, REAL x, REAL y, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a point is inside this region.\nThe x and y parameters in the flat function specify the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
+        ; Description   Determines whether a point is inside this region.\nThe x and y parameters in the flat function specify the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
         ;          
         ; Params        GpRegion *region, REAL x, REAL y, GpGraphics *graphics, BOOL *result
         ;          
@@ -10049,7 +10207,7 @@ Class Image
         
         ;####################################
         ; Call          IsVisible(GpRegion *region, INT x, INT y, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a point is inside this region.\nThe x and y parameters in the flat function specify the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
+        ; Description   Determines whether a point is inside this region.\nThe x and y parameters in the flat function specify the x and y coordinates of a point that corresponds to the point parameter in the wrapper method.
         ;          
         ; Params        GpRegion *region, INT x, INT y, GpGraphics *graphics, BOOL *result
         ;          
@@ -10063,7 +10221,7 @@ Class Image
         
         ;####################################
         ; Call          IsVisible(GpRegion *region, REAL x, REAL y, REAL width, REAL height, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a rectangle intersects this region.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Determines whether a rectangle intersects this region.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpRegion *region, REAL x, REAL y, REAL width, REAL height, GpGraphics *graphics, BOOL *result
         ;          
@@ -10077,7 +10235,7 @@ Class Image
         
         ;####################################
         ; Call          IsVisible(GpRegion *region, INT x, INT y, INT width, INT height, GpGraphics *graphics, BOOL *result)
-        ; Description   Determines whether a rectangle intersects this region.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
+        ; Description   Determines whether a rectangle intersects this region.\nThe x, y, width, and height parameters in the flat function specify a rectangle that corresponds to the rect parameter in the wrapper method.
         ;          
         ; Params        GpRegion *region, INT x, INT y, INT width, INT height, GpGraphics *graphics, BOOL *result
         ;          
@@ -10136,7 +10294,7 @@ Class Image
     {
         ;####################################
         ; Call          SolidBrush(ARGB color, GpSolidFill **brush)
-        ; Description   Creates a SolidBrush object based on a color
+        ; Description   Creates a SolidBrush object based on a color
         ;          
         ; Params        ARGB color, GpSolidFill **brush
         ;          
@@ -10182,7 +10340,7 @@ Class Image
     {
         ;####################################
         ; Call          StringFormat( INT formatAttributes, LANGID language, GpStringFormat **format )
-        ; Description   Creates a StringFormat object based on string format flags and a language.
+        ; Description   Creates a StringFormat object based on string format flags and a language.
         ;          
         ; Params        INT formatAttributes, LANGID language, GpStringFormat **format 
         ;          
@@ -10196,7 +10354,7 @@ Class Image
         
         ;####################################
         ; Call          GenericDefault(GpStringFormat **format)
-        ; Description   Creates a generic, default StringFormat object.
+        ; Description   Creates a generic, default StringFormat object.
         ;          
         ; Params        GpStringFormat **format
         ;          
@@ -10210,7 +10368,7 @@ Class Image
         
         ;####################################
         ; Call          GenericTypographic(GpStringFormat **format)
-        ; Description   Creates a generic, typographic StringFormat object.
+        ; Description   Creates a generic, typographic StringFormat object.
         ;          
         ; Params        GpStringFormat **format
         ;          
@@ -10224,7 +10382,7 @@ Class Image
         
         ;####################################
         ; Call          ~StringFormat(GpStringFormat *format)
-        ; Description   Releases resources used by the StringFormat object.
+        ; Description   Releases resources used by the StringFormat object.
         ;          
         ; Params        GpStringFormat *format
         ;          
@@ -10238,7 +10396,7 @@ Class Image
         
         ;####################################
         ; Call          StringFormat(GDIPCONST GpStringFormat *format, GpStringFormat **newFormat)
-        ; Description   Creates a StringFormat object from another StringFormat object.
+        ; Description   Creates a StringFormat object from another StringFormat object.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, GpStringFormat **newFormat
         ;          
@@ -10252,7 +10410,7 @@ Class Image
         
         ;####################################
         ; Call          SetFormatFlags(GpStringFormat *format, INT flags)
-        ; Description   Sets the format flags for this StringFormat object. The format flags determine most of the characteristics of a StringFormat object.
+        ; Description   Sets the format flags for this StringFormat object. The format flags determine most of the characteristics of a StringFormat object.
         ;          
         ; Params        GpStringFormat *format, INT flags
         ;          
@@ -10266,7 +10424,7 @@ Class Image
         
         ;####################################
         ; Call          GetFormatFlags(GDIPCONST GpStringFormat *format, INT *flags)
-        ; Description   Gets the string format flags for this StringFormat object.
+        ; Description   Gets the string format flags for this StringFormat object.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, INT *flags
         ;          
@@ -10280,7 +10438,7 @@ Class Image
         
         ;####################################
         ; Call          SetAlignment(GpStringFormat *format, StringAlignment align)
-        ; Description   Sets the line alignment of this StringFormat object in relation to the origin of the layout rectangle. The line alignment setting specifies how to align the string vertically in the layout rectangle. The layout rectangle is used to position the displayed string.
+        ; Description   Sets the line alignment of this StringFormat object in relation to the origin of the layout rectangle. The line alignment setting specifies how to align the string vertically in the layout rectangle. The layout rectangle is used to position the displayed string.
         ;          
         ; Params        GpStringFormat *format, StringAlignment align
         ;          
@@ -10294,7 +10452,7 @@ Class Image
         
         ;####################################
         ; Call          GetAlignment(GDIPCONST GpStringFormat *format, StringAlignment *align)
-        ; Description   Gets an element of the StringAlignment enumeration that indicates the character alignment of this StringFormat object in relation to the origin of the layout rectangle. A layout rectangle is used to position the displayed string.
+        ; Description   Gets an element of the StringAlignment enumeration that indicates the character alignment of this StringFormat object in relation to the origin of the layout rectangle. A layout rectangle is used to position the displayed string.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, StringAlignment *align
         ;          
@@ -10308,7 +10466,7 @@ Class Image
         
         ;####################################
         ; Call          SetLineAlignment(GpStringFormat *format, StringAlignment align)
-        ; Description   Sets the line alignment of this StringFormat object in relation to the origin of the layout rectangle. The line alignment setting specifies how to align the string vertically in the layout rectangle. The layout rectangle is used to position the displayed string.
+        ; Description   Sets the line alignment of this StringFormat object in relation to the origin of the layout rectangle. The line alignment setting specifies how to align the string vertically in the layout rectangle. The layout rectangle is used to position the displayed string.
         ;          
         ; Params        GpStringFormat *format, StringAlignment align
         ;          
@@ -10322,7 +10480,7 @@ Class Image
         
         ;####################################
         ; Call          GetLineAlignment(GDIPCONST GpStringFormat *format, StringAlignment *align)
-        ; Description   Gets an element of the StringAlignment enumeration that indicates the line alignment of this StringFormat object in relation to the origin of the layout rectangle. The line alignment setting specifies how to align the string vertically in the layout rectangle. The layout rectangle is used to position the displayed string.
+        ; Description   Gets an element of the StringAlignment enumeration that indicates the line alignment of this StringFormat object in relation to the origin of the layout rectangle. The line alignment setting specifies how to align the string vertically in the layout rectangle. The layout rectangle is used to position the displayed string.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, StringAlignment *align
         ;          
@@ -10336,7 +10494,7 @@ Class Image
         
         ;####################################
         ; Call          SetTrimming( GpStringFormat *format, StringTrimming trimming )
-        ; Description   Sets the trimming style for this StringFormat object. The trimming style determines how to trim a string so that it fits into the layout rectangle.
+        ; Description   Sets the trimming style for this StringFormat object. The trimming style determines how to trim a string so that it fits into the layout rectangle.
         ;          
         ; Params        GpStringFormat *format, StringTrimming trimming 
         ;          
@@ -10350,7 +10508,7 @@ Class Image
         
         ;####################################
         ; Call          GetTrimming( GDIPCONST GpStringFormat *format, StringTrimming *trimming )
-        ; Description   Gets an element of the StringTrimming enumeration that indicates the trimming style of this StringFormat object. The trimming style determines how to trim characters from a string that is too large to fit in the layout rectangle.
+        ; Description   Gets an element of the StringTrimming enumeration that indicates the trimming style of this StringFormat object. The trimming style determines how to trim characters from a string that is too large to fit in the layout rectangle.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, StringTrimming *trimming 
         ;          
@@ -10378,7 +10536,7 @@ Class Image
         
         ;####################################
         ; Call          GetHotkeyPrefix(GDIPCONST GpStringFormat *format, INT *hotkeyPrefix)
-        ; Description   Gets an element of the HotkeyPrefix enumeration that indicates the type of processing that is performed on a string when a hot key prefix, an ampersand (&), is encountered.
+        ; Description   Gets an element of the HotkeyPrefix enumeration that indicates the type of processing that is performed on a string when a hot key prefix, an ampersand (&), is encountered.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, INT *hotkeyPrefix
         ;          
@@ -10392,7 +10550,7 @@ Class Image
         
         ;####################################
         ; Call          SetTabStops(GpStringFormat *format, REAL firstTabOffset, INT count, GDIPCONST REAL *tabStops)
-        ; Description   Sets the offsets for tab stops in this StringFormat object.
+        ; Description   Sets the offsets for tab stops in this StringFormat object.
         ;          
         ; Params        GpStringFormat *format, REAL firstTabOffset, INT count, GDIPCONST REAL *tabStops
         ;          
@@ -10406,7 +10564,7 @@ Class Image
         
         ;####################################
         ; Call          GetTabStops(GDIPCONST GpStringFormat *format, INT count, REAL *firstTabOffset, REAL *tabStops)
-        ; Description   Gets the offsets of the tab stops in this StringFormat object.
+        ; Description   Gets the offsets of the tab stops in this StringFormat object.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, INT count, REAL *firstTabOffset, REAL *tabStops
         ;          
@@ -10420,7 +10578,7 @@ Class Image
         
         ;####################################
         ; Call          GetTabStopCount(GDIPCONST GpStringFormat *format, INT * count)
-        ; Description   Gets the number of tab-stop offsets in this StringFormat object.
+        ; Description   Gets the number of tab-stop offsets in this StringFormat object.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, INT * count
         ;          
@@ -10448,7 +10606,7 @@ Class Image
         
         ;####################################
         ; Call          GetDigitSubstitutionMethod(GDIPCONST GpStringFormat *format, LANGID *language, StringDigitSubstitute *substitute)
-        ; Description   gets an element of the StringDigitSubstitute enumeration that indicates the digit substitution method that is used by this StringFormat object.\nThe language parameter in the flat function is a 16-bit value that specifies the language to use.
+        ; Description   gets an element of the StringDigitSubstitute enumeration that indicates the digit substitution method that is used by this StringFormat object.\nThe language parameter in the flat function is a 16-bit value that specifies the language to use.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, LANGID *language, StringDigitSubstitute *substitute
         ;          
@@ -10462,7 +10620,7 @@ Class Image
         
         ;####################################
         ; Call          GetMeasurableCharacterRangeCount( GDIPCONST GpStringFormat *format, INT *count )
-        ; Description   gets the number of measurable character ranges that are currently set. The character ranges that are set can be measured in a string by using the Graphics::MeasureCharacterRanges method.
+        ; Description   gets the number of measurable character ranges that are currently set. The character ranges that are set can be measured in a string by using the Graphics::MeasureCharacterRanges method.
         ;          
         ; Params        GDIPCONST GpStringFormat *format, INT *count 
         ;          
@@ -10476,7 +10634,7 @@ Class Image
         
         ;####################################
         ; Call          SetMeasurableCharacterRanges( GpStringFormat *format, INT rangeCount, GDIPCONST CharacterRange *ranges )
-        ; Description   Sets a series of character ranges for this StringFormat object that, when in a string, can be measured by the Graphics::MeasureCharacterRanges method.
+        ; Description   Sets a series of character ranges for this StringFormat object that, when in a string, can be measured by the Graphics::MeasureCharacterRanges method.
         ;          
         ; Params        GpStringFormat *format, INT rangeCount, GDIPCONST CharacterRange *ranges 
         ;          
@@ -10567,7 +10725,7 @@ Class Image
     {
         ;####################################
         ; Call          TextureBrush(GpImage *image, GpWrapMode wrapmode, GpTexture **texture)
-        ; Description   Creates a TextureBrush object based on an image and a wrap mode. The size of the brush defaults to the size of the image, so the entire image is used by the brush.
+        ; Description   Creates a TextureBrush object based on an image and a wrap mode. The size of the brush defaults to the size of the image, so the entire image is used by the brush.
         ;          
         ; Params        GpImage *image, GpWrapMode wrapmode, GpTexture **texture
         ;          
@@ -10581,7 +10739,7 @@ Class Image
         
         ;####################################
         ; Call          TextureBrush(GpImage *image, GpWrapMode wrapmode, REAL x, REAL y, REAL width, REAL height, GpTexture **texture)
-        ; Description   Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
+        ; Description   Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
         ;          
         ; Params        GpImage *image, GpWrapMode wrapmode, REAL x, REAL y, REAL width, REAL height, GpTexture **texture
         ;          
@@ -10595,7 +10753,7 @@ Class Image
         
         ;####################################
         ; Call          TextureBrush(GpImage *image, GDIPCONST GpImageAttributes *imageAttributes, REAL x, REAL y, REAL width, REAL height, GpTexture **texture)
-        ; Description   Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.\nThe x, y, width, and height parameters of the flat function define a rectangle that corresponds to the dstRect parameter of the wrapper method.
+        ; Description   Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.\nThe x, y, width, and height parameters of the flat function define a rectangle that corresponds to the dstRect parameter of the wrapper method.
         ;          
         ; Params        GpImage *image, GDIPCONST GpImageAttributes *imageAttributes, REAL x, REAL y, REAL width, REAL height, GpTexture **texture
         ;          
@@ -10609,7 +10767,7 @@ Class Image
         
         ;####################################
         ; Call          TextureBrush(GpImage *image, GpWrapMode wrapmode, INT x, INT y, INT width, INT height, GpTexture **texture)
-        ; Description   Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
+        ; Description   Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
         ;          
         ; Params        GpImage *image, GpWrapMode wrapmode, INT x, INT y, INT width, INT height, GpTexture **texture
         ;          
@@ -10623,7 +10781,7 @@ Class Image
         
         ;####################################
         ; Call          TextureBrush(GpImage *image, GDIPCONST GpImageAttributes *imageAttributes, INT x, INT y, INT width, INT height, GpTexture **texture)
-        ; Description   Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.\nThe x, y, width, and height parameters of the flat function define a rectangle that corresponds to the dstRect parameter of the wrapper method.
+        ; Description   Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.\nThe x, y, width, and height parameters of the flat function define a rectangle that corresponds to the dstRect parameter of the wrapper method.
         ;          
         ; Params        GpImage *image, GDIPCONST GpImageAttributes *imageAttributes, INT x, INT y, INT width, INT height, GpTexture **texture
         ;          
@@ -10763,7 +10921,7 @@ Class Image
         
         ;####################################
         ; Call          GetImage(GpTexture *brush, GpImage **image)
-        ; Description   Gets a pointer to the Image object that is defined by this texture brush.
+        ; Description   Gets a pointer to the Image object that is defined by this texture brush.
         ;          
         ; Params        GpTexture *brush, GpImage **image
         ;          
@@ -10776,118 +10934,16 @@ Class Image
         }
         
     }
+*/
     
     
-    
-    ;## GENERATORS ##
-    
-    ;####################################################################################################################
-    ; Call          generate_colors()                                                                                   |
-    ; Description   Generates an object containing all the hex colors from CSS3/X11.                                    |
-    ;___________________________________________________________________________________________________________________|
-    generate_colorName() {
-        this.color := {}
-        
-        ; Black and gray/grey                                   ; White                                             
-        ,this.colorName.Black                := 0x000000        ,this.colorName.MistyRose            := 0xFFE4E1         
-        ,this.colorName.DarkSlateGray        := 0x2F4F4F        ,this.colorName.AntiqueWhite         := 0xFAEBD7         
-        ,this.colorName.DarkSlateGrey        := 0x2F4F4F        ,this.colorName.Linen                := 0xFAF0E6         
-        ,this.colorName.DimGray              := 0x696969        ,this.colorName.Beige                := 0xF5F5DC         
-        ,this.colorName.DimGrey              := 0x696969        ,this.colorName.WhiteSmoke           := 0xF5F5F5         
-        ,this.colorName.SlateGray            := 0x708090        ,this.colorName.LavenderBlush        := 0xFFF0F5         
-        ,this.colorName.SlateGrey            := 0x708090        ,this.colorName.OldLace              := 0xFDF5E6         
-        ,this.colorName.Gray                 := 0x808080        ,this.colorName.AliceBlue            := 0xF0F8FF         
-        ,this.colorName.Grey                 := 0x808080        ,this.colorName.Seashell             := 0xFFF5EE         
-        ,this.colorName.LightSlateGray       := 0x778899        ,this.colorName.GhostWhite           := 0xF8F8FF         
-        ,this.colorName.LightSlateGrey       := 0x778899        ,this.colorName.Honeydew             := 0xF0FFF0         
-        ,this.colorName.DarkGray             := 0xA9A9A9        ,this.colorName.FloralWhite          := 0xFFFAF0         
-        ,this.colorName.DarkGrey             := 0xA9A9A9        ,this.colorName.Azure                := 0xF0FFFF         
-        ,this.colorName.Silver               := 0xC0C0C0        ,this.colorName.MintCream            := 0xF5FFFA         
-        ,this.colorName.LightGray            := 0xD3D3D3        ,this.colorName.Snow                 := 0xFFFAFA         
-        ,this.colorName.LightGrey            := 0xD3D3D3        ,this.colorName.Ivory                := 0xFFFFF0         
-        ,this.colorName.Gainsboro            := 0xDCDCDC        ,this.colorName.White                := 0xFFFFFF         
-                                                                                                                           
-        ; Red                                                   ; Pink
-        ,this.colorName.DarkRed              := 0x8B0000        ,this.colorName.MediumVioletRed      := 0xC71585
-        ,this.colorName.Red                  := 0xFF0000        ,this.colorName.DeepPink             := 0xFF1493
-        ,this.colorName.Firebrick            := 0xB22222        ,this.colorName.PaleVioletRed        := 0xDB7093
-        ,this.colorName.Crimson              := 0xDC143C        ,this.colorName.HotPink              := 0xFF69B4
-        ,this.colorName.IndianRed            := 0xCD5C5C        ,this.colorName.LightPink            := 0xFFB6C1
-        ,this.colorName.LightCoral           := 0xF08080        ,this.colorName.Pink                 := 0xFFC0CB
-        ,this.colorName.Salmon               := 0xFA8072        
-        ,this.colorName.DarkSalmon           := 0xE9967A        
-        ,this.colorName.LightSalmon          := 0xFFA07A        
-                                                                                                                           
-        ; Blue                                                  ; Purple, violet, and magenta                           
-        ,this.colorName.Navy                 := 0x000080        ,this.colorName.Indigo               := 0x4B0082             
-        ,this.colorName.DarkBlue             := 0x00008B        ,this.colorName.Purple               := 0x800080             
-        ,this.colorName.MediumBlue           := 0x0000CD        ,this.colorName.DarkMagenta          := 0x8B008B             
-        ,this.colorName.Blue                 := 0x0000FF        ,this.colorName.DarkViolet           := 0x9400D3             
-        ,this.colorName.MidnightBlue         := 0x191970        ,this.colorName.DarkSlateBlue        := 0x483D8B             
-        ,this.colorName.RoyalBlue            := 0x4169E1        ,this.colorName.BlueViolet           := 0x8A2BE2             
-        ,this.colorName.SteelBlue            := 0x4682B4        ,this.colorName.DarkOrchid           := 0x9932CC             
-        ,this.colorName.DodgerBlue           := 0x1E90FF        ,this.colorName.Fuchsia              := 0xFF00FF             
-        ,this.colorName.DeepSkyBlue          := 0x00BFFF        ,this.colorName.Magenta              := 0xFF00FF             
-        ,this.colorName.CornflowerBlue       := 0x6495ED        ,this.colorName.SlateBlue            := 0x6A5ACD             
-        ,this.colorName.SkyBlue              := 0x87CEEB        ,this.colorName.MediumSlateBlue      := 0x7B68EE             
-        ,this.colorName.LightSkyBlue         := 0x87CEFA        ,this.colorName.MediumOrchid         := 0xBA55D3             
-        ,this.colorName.LightSteelBlue       := 0xB0C4DE        ,this.colorName.MediumPurple         := 0x9370DB             
-        ,this.colorName.LightBlue            := 0xADD8E6        ,this.colorName.Orchid               := 0xDA70D6             
-        ,this.colorName.PowderBlue           := 0xB0E0E6        ,this.colorName.Violet               := 0xEE82EE             
-                                                                ,this.colorName.Plum                 := 0xDDA0DD            
-                                                                ,this.colorName.Thistle              := 0xD8BFD8            
-                                                                ,this.colorName.Lavender             := 0xE6E6FA            
-                                                                                                                           
-        ; Green                                                 ; Cyan                                                       
-        ,this.colorName.DarkGreen            := 0x006400        ,this.colorName.Teal                 := 0x008080             
-        ,this.colorName.Green                := 0x008000        ,this.colorName.DarkCyan             := 0x008B8B             
-        ,this.colorName.DarkOliveGreen       := 0x556B2F        ,this.colorName.LightSeaGreen        := 0x20B2AA             
-        ,this.colorName.ForestGreen          := 0x228B22        ,this.colorName.CadetBlue            := 0x5F9EA0             
-        ,this.colorName.SeaGreen             := 0x2E8B57        ,this.colorName.DarkTurquoise        := 0x00CED1             
-        ,this.colorName.Olive                := 0x808000        ,this.colorName.MediumTurquoise      := 0x48D1CC             
-        ,this.colorName.OliveDrab            := 0x6B8E23        ,this.colorName.Turquoise            := 0x40E0D0             
-        ,this.colorName.MediumSeaGreen       := 0x3CB371        ,this.colorName.Aqua                 := 0x00FFFF             
-        ,this.colorName.LimeGreen            := 0x32CD32        ,this.colorName.Cyan                 := 0x00FFFF             
-        ,this.colorName.Lime                 := 0x00FF00        ,this.colorName.Aquamarine           := 0x7FFFD4             
-        ,this.colorName.SpringGreen          := 0x00FF7F        ,this.colorName.PaleTurquoise        := 0xAFEEEE             
-        ,this.colorName.MediumSpringGreen    := 0x00FA9A        ,this.colorName.LightCyan            := 0xE0FFFF             
-        ,this.colorName.DarkSeaGreen         := 0x8FBC8F                                                                     
-        ,this.colorName.MediumAquamarine     := 0x66CDAA        ; Orange                                                     
-        ,this.colorName.YellowGreen          := 0x9ACD32        ,this.colorName.OrangeRed            := 0xFF4500             
-        ,this.colorName.LawnGreen            := 0x7CFC00        ,this.colorName.Tomato               := 0xFF6347             
-        ,this.colorName.Chartreuse           := 0x7FFF00        ,this.colorName.DarkOrange           := 0xFF8C00             
-        ,this.colorName.LightGreen           := 0x90EE90        ,this.colorName.Coral                := 0xFF7F50             
-        ,this.colorName.GreenYellow          := 0xADFF2F        ,this.colorName.Orange               := 0xFFA500             
-        ,this.colorName.PaleGreen            := 0x98FB98        
-                                                                                                                           
-        ; Brown                                                 ; Yellow                                                   
-        ,this.colorName.Maroon               := 0x800000        ,this.colorName.DarkKhaki            := 0xBDB76B            
-        ,this.colorName.Brown                := 0xA52A2A        ,this.colorName.Gold                 := 0xFFD700            
-        ,this.colorName.SaddleBrown          := 0x8B4513        ,this.colorName.Khaki                := 0xF0E68C            
-        ,this.colorName.Sienna               := 0xA0522D        ,this.colorName.PeachPuff            := 0xFFDAB9            
-        ,this.colorName.Chocolate            := 0xD2691E        ,this.colorName.Yellow               := 0xFFFF00            
-        ,this.colorName.DarkGoldenrod        := 0xB8860B        ,this.colorName.PaleGoldenrod        := 0xEEE8AA            
-        ,this.colorName.Peru                 := 0xCD853F        ,this.colorName.Moccasin             := 0xFFE4B5            
-        ,this.colorName.RosyBrown            := 0xBC8F8F        ,this.colorName.PapayaWhip           := 0xFFEFD5            
-        ,this.colorName.Goldenrod            := 0xDAA520        ,this.colorName.LightGoldenrodYellow := 0xFAFAD2            
-        ,this.colorName.SandyBrown           := 0xF4A460        ,this.colorName.LemonChiffon         := 0xFFFACD            
-        ,this.colorName.Tan                  := 0xD2B48C        ,this.colorName.LightYellow          := 0xFFFFE0            
-        ,this.colorName.Burlywood            := 0xDEB887                                                                     
-        ,this.colorName.Wheat                := 0xF5DEB3                                                                     
-        ,this.colorName.NavajoWhite          := 0xFFDEAD                                                                     
-        ,this.colorName.Bisque               := 0xFFE4C4                                                                     
-        ,this.colorName.BlanchedAlmond       := 0xFFEBCD                                                                     
-        ,this.colorName.Cornsilk             := 0xFFF8DC                                                                     
-        Return
-    }
-}
 
 /*
 ### IDEAS ###
 Add a "cup" class as a container to hold pens and brushes
     Add a method to "empty" the cup of all brushes and pens
     Add a method to list all stored brushes and pens
-    
+
 */
 
     ;___________________________________________________________________________________________________________________|
@@ -10909,7005 +10965,1485 @@ Add a "cup" class as a container to hold pens and brushes
     ; Return                                                                                                            |
     ;___________________________________________________________________________________________________________________|
     
-Class GDIP
-{
-    ; ## Functions ##
-    ;###################################################################################################################|
-    ; Call              |                                                                                               |
-    ; Description       Cleans up resources used by Windows GDI+                                                        |
-    ;                                                                                                                   |
-    ; Param                                                                                                             |
-    ;                                                                                                                   |
-    ; Return                                                                                                            |
-    ;___________________________________________________________________________________________________________________|
-    GdiplusShutdown(token)
-    {
-        ;void GdiplusShutdown(
-        ;    ULONG_PTR token
-        ;)
-        Return
-    }
-        
-    ;###################################################################################################################|
-    ; Call                                                                                                              |
-    ; Description                                                                                                       |
-    ;                                                                                                                   |
-    ; Param                                                                                                             |
-    ;                                                                                                                   |
-    ; Return                                                                                                            |
-    ;___________________________________________________________________________________________________________________|
-     GdiplusStartup()
-    {
-        ; Status GdiplusStartup(
-        ;   ULONG_PTR                 *token,
-        ;   const GdiplusStartupInput *input,
-        ;   GdiplusStartupOutput      *output
-        ; );
-        Return
-    }
-        
-    ; 
-    ; Builds a line cap that looks like an arrow. This is a subclass of CustomLineCap.
-    Class AdjustableArrowCap
-    {
-        ; ## Methods ##
-        ; Creates an adjustable arrow line cap with specified height and width. Can be filled or unfilled. Middle inset defaults to zero.
-        AdjustableArrowCap()
-        {
-            Return
-        }
-        
-        ; Gets height of arrow cap. The height is the distance from the base of the arrow to its vertex.
-        GetHeight()
-        {
-            Return
-        }
-        
-        ; Gets value of inset. The middle inset is the number of units that the midpoint of the base shifts towards the vertex.
-        GetMiddleInset()
-        {
-            Return
-        }
-        
-        ; Gets width of arrow cap. The width is the distance between the endpoints of the base of the arrow.
-        GetWidth()
-        {
-            Return
-        }
-        
-        ; Determines whether the arrow cap is filled.
-        IsFilled()
-        {
-            Return
-        }
-        
-        ; Sets fill state of the arrow cap. If the arrow cap is not filled, only the outline is drawn.
-        SetFillState()
-        {
-            Return
-        }
-        
-        ; Sets height of the arrow cap. This is the distance from the base of the arrow to its vertex.
-        SetHeight()
-        {
-            Return
-        }
-        
-        ; Sets number of units that the midpoint of the base shifts towards the vertex.
-        SetMiddleInset()
-        {
-            Return
-        }
-        
-        ; Sets width of the arrow cap. The width is the distance between the endpoints of the base of the arrow.
-        SetWidth()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Inherits from the Image class. The Image class provides saving and loading methods for vector images (metafiles)                                 ; and raster images (bitmaps).
-    Class Bitmap
-    {
-        ; ## Methods ##
-        ; Creates a new Bitmap object by applying a specified effect to an existing Bitmap object.
-        ApplyEffectThe()
-        {
-            Return
-        }
-        
-        ; Alters this Bitmap object by applying a specified effect.
-        ApplyEffectThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a BITMAPINFO structure and an array of pixel data.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an image file.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a handle to a Windows Windows Graphics Device Interface (GDI)                                 ; bitmap and a handle to a GDI palette.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an icon.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an application or DLL instance handle and the name of a bitmap resource.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a DirectDraw surface. The Bitmap object maintains a reference to DirectDraw surface until Bitmap object is deleted or goes out of scope.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a Graphics object, a width, and a height.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an array of bytes along with size and format information.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object of a specified size and pixel format. The pixel data must be provided after the Bitmap::Bitmap object is constructed.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an IStream COM interface.
-        Bitmap()
-        {
-            Return
-        }
-        
-        ; Creates a new Bitmap object by copying a portion of this bitmap.
-        CloneThe()
-        {
-            Return
-        }
-        
-        ; Creates a new Bitmap object by copying a portion of this bitmap.
-        CloneThe()
-        {
-            Return
-        }
-        
-        ; Creates a new Bitmapobject by copying a portion of this bitmap.
-        CloneThe()
-        {
-            Return
-        }
-        
-        ; Creates a new Bitmapobject by copying a portion of this bitmap.
-        CloneThe()
-        {
-            Return
-        }
-        
-        ; Converts a bitmap to a specified pixel format. The original pixel data in the bitmap is replaced by the new pixel data.
-        ConvertFormatThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a BITMAPINFO structure and an array of pixel data.
-        FromBITMAPINFOThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a DirectDraw surface. The Bitmap object maintains a reference to the DirectDraw surface until the Bitmap object is deleted.
-        FromDirectDrawSurface()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an image file.
-        FromFileThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a handle to a Windows Graphics Device Interface (GDI)                                 ; bitmap and a handle to a GDI palette.
-        FromHBITMAPThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a handle to an icon.
-        FromHICONThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on an application or DLL instance handle and the name of a bitmap resource.
-        FromResourceThe()
-        {
-            Return
-        }
-        
-        ; Creates a Bitmap object based on a stream.
-        FromStreamThe()
-        {
-            Return
-        }
-        
-        ; Creates a Windows Graphics Device Interface (GDI)                                 ; bitmap from this Bitmap object.
-        GetHBITMAPThe()
-        {
-            Return
-        }
-        
-        ; Creates an icon from this Bitmap object.
-        GetHICONThe()
-        {
-            Return
-        }
-        
-        ; Returns one or more histograms for specified color channels of this Bitmap object.
-        GetHistogramThe()
-        {
-            Return
-        }
-        
-        ; The number of elements (in an array of UINTs)                                 ; that you must allocate before you call the Bitmap::GetHistogram method of a Bitmap object.
-        GetHistogramSizeThe()
-        {
-            Return
-        }
-        
-        ; Gets the color of a specified pixel in this bitmap.
-        GetPixelThe()
-        {
-            Return
-        }
-        
-        ; Initializes a standard, optimal, or custom color palette.
-        InitializePaletteThe()
-        {
-            Return
-        }
-        
-        ; Locks a rectangular portion of this bitmap and provides a temporary buffer that you can use to read or write pixel data in a specified format.
-        LockBitsThe()
-        {
-            Return
-        }
-        
-        ; Sets the color of a specified pixel in this bitmap.
-        SetPixelThe()
-        {
-            Return
-        }
-        
-        ; Sets the resolution of this Bitmap object.
-        SetResolutionThe()
-        {
-            Return
-        }
-        
-        ; Unlocks a portion of this bitmap that was previously locked by a call to Bitmap::LockBits.
-        UnlockBitsThe()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Used by the Bitmap::LockBits and Bitmap::UnlockBits methods of the Bitmap class. A BitmapData object stores attributes of a bitmap.
-    Class BitmapData
-    {
-        ; ## Methods ##
-    }
-        
-    ; Enables you to apply a Gaussian blur effect to a bitmap and specify the nature of the blur.
-    Class Blur
-    {
-        ; ## Methods ##
-        ; Blur object.
-        BlurCreates()
-        {
-            Return
-        }
-        
-        ; Gets current values of Blur object parameters.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets value for Blur object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Enables you to change the brightness and contrast of a bitmap. 
-    Class BrightnessContrast
-    {
-        ; ## Methods ##
-        ; Creates a new BrightnessContrast object.
-        BrightnessContrast()
-        {
-            Return
-        }
-        
-        ; Gets current values of the parameters of this BrightnessContrast object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets parameters of this BrightnessContrast object.    
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; An abstract base class that defines a Brush object. A Brush object is used to paint the interior of graphics shapes, such as rectangles, ellipses, pies, polygons, and paths.
-    Class Brush
-    {
-        ; ## Methods ##
-        ; Creates a copy of a Brush object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Returns a value indicating this Brush object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets the type of this brush.
-        GetType()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Stores a bitmap in a format that is optimized for display on a particular device.
-    Class CachedBitmap
-    {
-        ; ## Methods ##
-        ; Create a CachedBitmap object based on a Bitmap object and Graphics object.
-        CachedBitmap()
-        {
-            Return
-        }
-        
-        ; Copy constructor for CachedBitmap.
-        CachedBitmap()
-        {
-            Return
-        }
-        
-        ; Returns a value indicating if CachedBitmap object was constructed successfully.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Specifies a range of character positions within a string
-    Class CharacterRange
-    {
-        ; ## Constructors ##
-        ; Creates a CharacterRange object with data members set to zero.
-        CharacterRange()
-        {
-            Return
-        }
-        
-        ; Creates a CharacterRange object and initializes data members to the values specified.    
-        CharacterRange(INT,INT)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        operator=()                                                         ; The operator= method sets a CharacterRange object equal to the specified CharacterRange object.
-    }
-        
-    ; An object that stores a 32-bit value representing a color. The value contains four 8-bit components: alpha, red, green, and blue (respectively)
-    Class Color
-    {
-        ; ## Constructors ##
-        ; Creates Color object and initializes it to opaque black. This is the default constructor.
-        Color()
-        {
-            Return
-        }
-        
-        ; Creates Color object using an ARGB value.
-        Color(ARGB)
-        {
-            Return
-        }
-        
-        ; Creates Color object using specified values for the red, green, and blue components. This constructor sets the alpha component to 255 (opaque).
-        Color(BYTE,BYTE,BYTE)
-        {
-            Return
-        }
-        
-        ; Creates Color object using specified values for the alpha, red, green, and blue components.     
-        Color(BYTE,BYTE,BYTE,BYTE)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; Gets alpha component of Color object.
-        GetA()
-        {
-            Return
-        }
-        
-        ; Gets alpha component of Color object.
-        GetAlpha()
-        {
-            Return
-        }
-        
-        ; Gets blue component of Color object.
-        GetB()
-        {
-            Return
-        }
-        
-        ; Gets blue component of Color object.
-        GetBlue()
-        {
-            Return
-        }
-        
-        ; Gets green component of Color object.
-        GetG()
-        {
-            Return
-        }
-        
-        ; Gets green component of Color object.
-        GetGreen()
-        {
-            Return
-        }
-        
-        ; Gets red component of Color object.
-        GetR()
-        {
-            Return
-        }
-        
-        ; Gets red component of Color object.
-        GetRed()
-        {
-            Return
-        }
-        
-        ; Gets ARGB value of this Color object.
-        GetValue()
-        {
-            Return
-        }
-        
-        ; Creates a 32-bit value using the specified alpha, red, green, and blue components.
-        MakeARGB()
-        {
-            Return
-        }
-        
-        ; Uses a GDICOLORREF value to set the ARGB value of this Color object.
-        SetFromCOLORREF()
-        {
-            Return
-        }
-        
-        ; Sets the color of this Color object.
-        SetValue()
-        {
-            Return
-        }
-        
-        ; Converts this Color object's ARGB value to a GDICOLORREF value.
-        ToCOLORREF()
-        {
-            Return
-        }
-        
-    }
-        
-    ; The ColorBalance class enables you to change the color balance (relative amounts of red, green, and blue)                                 ; of a bitmap.
-    Class ColorBalance
-    {
-        ; ## Methods ##
-        ; Create new ColorBalance object.
-        ColorBalance()
-        {
-            Return
-        }
-        
-        ; Gets the current values of the parameters of this ColorBalance object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this ColorBalance object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Eight different image adjustments: Exposure, density, contrast, highlight, shadow, midtone, white saturation, black saturation
-    Class ColorCurve
-    {
-        ; ## Methods ##
-        ; Creates a ColorCurve object.
-        ColorCurve()
-        {
-            Return
-        }
-        
-        ; Gets the current values of the parameters of this ColorCurve object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this ColorCurve object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Use lookup tables to make custom color adjustments to bitmaps. A ColorLUTParams structure has four members, each being a lookup table for : alpha, red, green, or blue.
-    Class ColorLUT
-    {
-        ; ## Methods ##
-        ; Creates a new ColorLUT object.
-        ColorLUT()
-        {
-            Return
-        }
-        
-        ; Gets the current values of the parameters of this ColorLUT object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this ColorLUT object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Enables you to apply an affine transformation to a bitmap.
-    Class ColorMatrixEffect
-    {
-        ; ## Methods ##
-        ; Creates a ColorMatrixEffect object.
-        ColorMatrixEffect()
-        {
-            Return
-        }
-        
-        ; Gets the elements of the current 5x5 color matrix of this ColorMatrixEffect object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets the 5x5 color matrix of this ColorMatrixEffect object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Encapsulates a custom line cap. A line cap defines the style of graphic used to draw the ends of a line. It can be various shapes, such as a square, circle, or diamond. A custom line cap is defined by the path that draws it.
-    Class CustomLineCap
-    {
-        ; ## Methods ##
-        ; Copies the contents of the existing object into a new CustomLineCap object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Copy constructor for CustomLineCap.
-        CustomLineCap()
-        {
-            Return
-        }
-        
-        ; Creates a CustomLineCap object.
-        CustomLineCap()
-        {
-            Return
-        }
-        
-        ; Creates a CustomLineCap object.
-        CustomLineCap()
-        {
-            Return
-        }
-        
-        ; Gets the style of the base cap. The base cap is a LineCap object used as a cap at the end of a line along with this CustomLineCap object.
-        GetBaseCap()
-        {
-            Return
-        }
-        
-        ; Gets the distance between the base cap to the start of the line.
-        GetBaseInset()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this CustomLineCap object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets the end cap styles for both the start line cap and the end line cap. Line caps are LineCap objects that end the individual lines within a path.
-        GetStrokeCaps()
-        {
-            Return
-        }
-        
-        ; Returns the style of LineJoin used to join multiple lines in the same GraphicsPath object.
-        GetStrokeJoin()
-        {
-            Return
-        }
-        
-        ; Gets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen object used to draw a line. The default value of 1.0 does not scale the line cap.
-        GetWidthScale()
-        {
-            Return
-        }
-        
-        ; Sets the LineCap that appears as part of this CustomLineCap at the end of a line.
-        SetBaseCap()
-        {
-            Return
-        }
-        
-        ; Sets the base inset value of this custom line cap. This is the distance between the end of a line and the base cap.
-        SetBaseInset()
-        {
-            Return
-        }
-        
-        ; Sets the LineCap object used to start and end lines within the GraphicsPath object that defines this CustomLineCap object.
-        SetStrokeCap()
-        {
-            Return
-        }
-        
-        ; Sets the LineCap objects used to start and end lines within the GraphicsPath object that defines this CustomLineCap object.
-        SetStrokeCaps()
-        {
-            Return
-        }
-        
-        ; Sets the style of line join for the stroke. The line join specifies how two lines that intersect within the GraphicsPath object that makes up the custom line cap are joined.
-        SetStrokeJoin()
-        {
-            Return
-        }
-        
-        ; Sets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen used to draw lines. The default value of 1.0 does not scale the line cap.
-        SetWidthScale()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Serves as a base class for eleven classes that you can use to apply effects and adjustments to bitmaps. 
-    Class Effect
-    {
-        ; ## Constructors ##
-        ; Creates an Effect object
-        Effect()
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; Gets a pointer to a set of lookup tables created by a previous call to the Bitmap::ApplyEffect method.
-        GetAuxData()
-        {
-            Return
-        }
-        
-        ; Gets the size, in bytes, of the auxiliary data created by a previous call to the Bitmap::ApplyEffect method.
-        GetAuxDataSize()
-        {
-            Return
-        }
-        
-        ; Gets the total size, in bytes, of the parameters currently set for this Effect. The Effect::GetParameterSize method is usually called on an object that is an instance of a descendant of the Effect class.
-        GetParameterSize()
-        {
-            Return
-        }
-        
-        ; Sets or clears a flag that specifies whether the Bitmap::ApplyEffect method should return a pointer to the auxiliary data that it creates.
-        UseAuxData()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Holds a parameter that can be passed to an image encoder.
-    Class EncoderParameter
-    {
-        ; ## Methods ##
-    }
-        
-    ; An array of EncoderParameter objects along with a data member that specifies the number of EncoderParameter objects in the array.
-    Class EncoderParameters
-    {
-        ; ## Methods ##
-    }
-        
-    ; Encapsulates the characteristics, such as family, height, size, and style (or combination of styles), of a specific font. A Font object is used when drawing strings.
-    Class Font
-    {
-        ; ## Methods ##
-        ; Creates a new Font object based on this Font object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Font class. For a complete class listing, see Font Class.
-        Font()
-        {
-            Return
-        }
-        
-        ; Creates a Font object based on a FontFamily object, a size, a font style, and a unit of measurement.
-        Font()
-        {
-            Return
-        }
-        
-        ; Creates a Font object based on a font family, a size, a font style, a unit of measurement, and a FontCollection object.
-        Font()
-        {
-            Return
-        }
-        
-        ; This topic lists the constructors of the Font class. For a complete class listing, see Font Class.
-        Font()
-        {
-            Return
-        }
-        
-        ; Creates a Font object based on the Windows Graphics Device Interface (GDI)                                 ; font object that is currently selected into a specified device context. This constructor is provided for compatibility with GDI.
-        Font()
-        {
-            Return
-        }
-        
-        ; Creates a Font object indirectly from a Windows Graphics Device Interface (GDI)                                 ; logical font by using a handle to a GDILOGFONT structure.
-        Font()
-        {
-            Return
-        }
-        
-        ; Creates a Font object directly from a Windows Graphics Device Interface (GDI)                                 ; logical font.
-        Font()
-        {
-            Return
-        }
-        
-        ; Creates a Font object directly from a Windows Graphics Device Interface (GDI)                                 ; logical font.
-        Font()
-        {
-            Return
-        }
-        
-        ; Gets the font family on which this font is based.
-        GetFamily()
-        {
-            Return
-        }
-        
-        ; Gets the line spacing of this font in the current unit of a specified Graphics object.
-        GetHeight()
-        {
-            Return
-        }
-        
-        ; Gets the line spacing, in pixels, of this font.
-        GetHeight()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this Font object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Uses a LOGFONTA structure to get the attributes of this Font object.
-        GetLogFontA()
-        {
-            Return
-        }
-        
-        ; Uses a LOGFONTW structure to get the attributes of this Font object.
-        GetLogFontW()
-        {
-            Return
-        }
-        
-        ; Returns the font size (commonly called the em size)                                 ; of this Font object. The size is in the units of this Font object.
-        GetSize()
-        {
-            Return
-        }
-        
-        ; Gets the style of this font's typeface.
-        GetStyle()
-        {
-            Return
-        }
-        
-        ; Returns the unit of measure of this Font object.
-        GetUnit()
-        {
-            Return
-        }
-        
-        ; Determines whether this Font object was created successfully.
-        IsAvailable()
-        {
-            Return
-        }
-        
-                                                                                                                                                                                           
-    FontCollection                          
-        
-        ; ## Methods ##
-        ; Creates an empty FontCollection object.
-        FontCollection()
-        {
-            Return
-        }
-        
-        ; Creates an empty FontCollection object.
-        FontCollection()
-        {
-            Return
-        }
-        
-        ; Gets the font families contained in this font collection.
-        GetFamilies()
-        {
-            Return
-        }
-        
-        ; Gets the number of font families contained in this font collection.
-        GetFamilyCount()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the result of this FontCollection object's previous method call.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Encapsulates a set of fonts that make up a font family. A font family is a group of fonts that have the same typeface but different styles.
-    Class FontFamily
-    {
-        ; ## Methods ##
-        ; Creates a new FontFamily object based on this FontFamily object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Creates an empty FontFamily object.
-        FontFamily()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the FontFamily class. For a complete class listing, see FontFamilyClass.
-        FontFamily()
-        {
-            Return
-        }
-        
-        ; Creates a FontFamily object based on a specified font family.
-        FontFamily()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the FontFamily class. For a complete class listing, see FontFamilyClass.
-        FontFamily()
-        {
-            Return
-        }
-        
-        ; Gets a FontFamily object that specifies a generic monospace typeface.
-        GenericMonospace()
-        {
-            Return
-        }
-        
-        ; Gets a FontFamily object that specifies a generic sans serif typeface.
-        GenericSansSerif()
-        {
-            Return
-        }
-        
-        ; Gets a FontFamily object that represents a generic serif typeface.
-        GenericSerif()
-        {
-            Return
-        }
-        
-        ; Gets the cell ascent, in design units, of this font family for the specified style or style combination.
-        GetCellAscent()
-        {
-            Return
-        }
-        
-        ; Gets the cell descent, in design units, of this font family for the specified style or style combination.
-        GetCellDescent()
-        {
-            Return
-        }
-        
-        ; Gets the size (commonly called em size or em height), in design units, of this font family.
-        GetEmHeight()
-        {
-            Return
-        }
-        
-        ; Gets the name of this font family.
-        GetFamilyName()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this FontFamily object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets the line spacing, in design units, of this font family for the specified style or style combination. The line spacing is the vertical distance between the base lines of two consecutive lines of text.
-        GetLineSpacing()
-        {
-            Return
-        }
-        
-        ; Determines whether this FontFamily object was created successfully.
-        IsAvailable()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified style is available for this font family.
-        IsStyleAvailable()
-        {
-            Return
-        }
-        
-                                                                                                                                                                                               
-    GdiplusBase                                                                                                             
-        
-        ; ## Methods ##
-        operator delete()                                                   ; The operator delete method deallocates memory for one GDI+ object.
-        operator delete[]()                                                 ; The operator delete[] method allocates memory for an array of GDI+ objects.
-        operator new()                                                      ; The operator new method allocates memory for one GDI+ object.
-        operator new[]()                                                    ; The operator new[] method allocates memory for an array of GDI+ objects.
-                                                                                                            
-    Graphics
-        
-        ; ## Methods ##
-        ; Adds a text comment to an existing metafile.
-        AddMetafileComment()
-        {
-            Return
-        }
-        
-        ; Begins a new graphics container.
-        BeginContainer()
-        {
-            Return
-        }
-        
-        ; Begins a new graphics container.
-        BeginContainer()
-        {
-            Return
-        }
-        
-        ; Begins a new graphics container.              
-        BeginContainer()
-        {
-            Return
-        }
-        
-        ; Clears a Graphicsobject to a specified color.
-        Clear()
-        {
-            Return
-        }
-        
-        ; Draws an arc. The arc is part of an ellipse.
-        DrawArc()
-        {
-            Return
-        }
-        
-        ; Draws an arc. The arc is part of an ellipse.
-        DrawArc()
-        {
-            Return
-        }
-        
-        ; Draws an arc. The arc is part of an ellipse.
-        DrawArc()
-        {
-            Return
-        }
-        
-        ; Draws an arc.
-        DrawArc()
-        {
-            Return
-        }
-        
-        ; Draws a Bezier spline.
-        DrawBezier()
-        {
-            Return
-        }
-        
-        ; Draws a Bezier spline.
-        DrawBezier()
-        {
-            Return
-        }
-        
-        ; Draws a Bezier spline.
-        DrawBezier()
-        {
-            Return
-        }
-        
-        ; Draws a Bezier spline.
-        DrawBezier()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of connected B?zier splines.
-        DrawBeziers()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of connected Bezier splines.
-        DrawBeziers()
-        {
-            Return
-        }
-        
-        ; Draws the image stored in a CachedBitmap object.
-        DrawCachedBitmap()
-        {
-            Return
-        }
-        
-        ; Draws a closed cardinal spline.
-        DrawClosedCurve()
-        {
-            Return
-        }
-        
-        ; Draws a closed cardinal spline.
-        DrawClosedCurve()
-        {
-            Return
-        }
-        
-        ; Draws a closed cardinal spline.
-        DrawClosedCurve()
-        {
-            Return
-        }
-        
-        ; Draws a closed cardinal spline.
-        DrawClosedCurve()
-        {
-            Return
-        }
-        
-        ; Draws a cardinal spline.
-        DrawCurve()
-        {
-            Return
-        }
-        
-        ; Draws a cardinal spline.
-        DrawCurve()
-        {
-            Return
-        }
-        
-        ; Draws a cardinal spline.
-        DrawCurve()
-        {
-            Return
-        }
-        
-        ; Draws a cardinal spline.
-        DrawCurve()
-        {
-            Return
-        }
-        
-        ; Draws a cardinal spline.
-        DrawCurve()
-        {
-            Return
-        }
-        
-        ; Draws a cardinal spline.
-        DrawCurve()
-        {
-            Return
-        }
-        
-        ; Draws characters at the specified positions. The method gives the client complete control over the appearance of text. The method assumes that the client has already set up the format and layout to be applied.
-        DrawDriverString()
-        {
-            Return
-        }
-        
-        ; Draws an ellipse.
-        DrawEllipse()
-        {
-            Return
-        }
-        
-        ; Draws an ellipse.
-        DrawEllipse()
-        {
-            Return
-        }
-        
-        ; Draws an ellipse.
-        DrawEllipse()
-        {
-            Return
-        }
-        
-        ; Draws an ellipse.
-        DrawEllipse()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws a specified portion of an image at a specified location.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image at a specified location.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image at a specified location.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws an image.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws a portion of an image after applying a specified effect.
-        DrawImage()
-        {
-            Return
-        }
-        
-        ; Draws a line that connects two points.
-        DrawLine()
-        {
-            Return
-        }
-        
-        ; Draws a line that connects two points.
-        DrawLine()
-        {
-            Return
-        }
-        
-        ; Draws a line that connects two points.
-        DrawLine()
-        {
-            Return
-        }
-        
-        ; Draws a line that connects two points.
-        DrawLine()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of connected lines.
-        DrawLines()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of connected lines.
-        DrawLines()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of lines and curves defined by a GraphicsPath object.
-        DrawPath()
-        {
-            Return
-        }
-        
-        ; Draws a pie.
-        DrawPie()
-        {
-            Return
-        }
-        
-        ; Draws a pie.
-        DrawPie()
-        {
-            Return
-        }
-        
-        ; Draws a pie.
-        DrawPie()
-        {
-            Return
-        }
-        
-        ; Draws a pie.
-        DrawPie()
-        {
-            Return
-        }
-        
-        ; Draws a polygon.
-        DrawPolygon()
-        {
-            Return
-        }
-        
-        ; Draws a polygon.
-        DrawPolygon()
-        {
-            Return
-        }
-        
-        ; Draws a rectangle.
-        DrawRectangle()
-        {
-            Return
-        }
-        
-        ; Draws a rectangle.
-        DrawRectangle()
-        {
-            Return
-        }
-        
-        ; Draws a rectangle.
-        DrawRectangle()
-        {
-            Return
-        }
-        
-        ; Draws a rectangle.
-        DrawRectangle()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of rectangles.
-        DrawRectangles()
-        {
-            Return
-        }
-        
-        ; Draws a sequence of rectangles.
-        DrawRectangles()
-        {
-            Return
-        }
-        
-        ; Draws a string based on a font and an origin for the string.
-        DrawString()
-        {
-            Return
-        }
-        
-        ; Draws a string based on a font, a string origin, and a format.
-        DrawString()
-        {
-            Return
-        }
-        
-        ; Draws a string based on a font, a layout rectangle, and a format.
-        DrawString()
-        {
-            Return
-        }
-        
-        ; Closes a graphics container that was previously opened by the Graphics::BeginContainer method.
-        EndContainer()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-        EnumerateMetafile()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region to the portion of itself that does not intersect the specified rectangle.
-        ExcludeClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region to the portion of itself that does not intersect the specified rectangle.
-        ExcludeClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region with the portion of itself that does not overlap the specified region.
-        ExcludeClip()
-        {
-            Return
-        }
-        
-        ; Creates a closed cardinal spline from an array of points and uses a brush to fill the interior of the spline.
-        FillClosedCurve()
-        {
-            Return
-        }
-        
-        ; Creates a closed cardinal spline from an array of points and uses a brush to fill, according to a specified mode, the interior of the spline.
-        FillClosedCurve()
-        {
-            Return
-        }
-        
-        ; Creates a closed cardinal spline from an array of points and uses a brush to fill the interior of the spline.
-        FillClosedCurve()
-        {
-            Return
-        }
-        
-        ; Creates a closed cardinal spline from an array of points and uses a brush to fill, according to a specified mode, the interior of the spline.
-        FillClosedCurve()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of an ellipse that is specified by a rectangle.
-        FillEllipse()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of an ellipse that is specified by a rectangle.
-        FillEllipse()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of an ellipse that is specified by coordinates and dimensions.
-        FillEllipse()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of an ellipse that is specified by coordinates and dimensions.
-        FillEllipse()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a path. If a figure in the path is not closed, this method treats the nonclosed figure as if it were closed by a straight line that connects the figure's starting and ending points.
-        FillPath()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a pie.
-        FillPie()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a pie.
-        FillPie()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a pie.
-        FillPie()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a pie.
-        FillPie()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a polygon.
-        FillPolygon()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a polygon.
-        FillPolygon()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a polygon.
-        FillPolygon()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a polygon.
-        FillPolygon()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a rectangle.
-        FillRectangle()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a rectangle.
-        FillRectangle()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a rectangle.
-        FillRectangle()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a rectangle.
-        FillRectangle()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a sequence of rectangles.
-        FillRectangles()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill the interior of a sequence of rectangles.
-        FillRectangles()
-        {
-            Return
-        }
-        
-        ; Uses a brush to fill a specified region.
-        FillRegion()
-        {
-            Return
-        }
-        
-        ; Flushes all pending graphics operations.
-        Flush()
-        {
-            Return
-        }
-        
-        ; Creates a Graphics object that is associated with a specified device context.
-        FromHDC()
-        {
-            Return
-        }
-        
-        ; Creates a Graphics object that is associated with a specified device context and a specified device.
-        FromHDC()
-        {
-            Return
-        }
-        
-        ; Creates a Graphicsobject that is associated with a specified window.
-        FromHWND()
-        {
-            Return
-        }
-        
-        ; Creates a Graphicsobject that is associated with a specified Image object.
-        FromImage()
-        {
-            Return
-        }
-        
-        ; Gets the clipping region of this Graphics object.
-        GetClip()
-        {
-            Return
-        }
-        
-        ; Gets a rectangle that encloses the clipping region of this Graphics object.
-        GetClipBounds()
-        {
-            Return
-        }
-        
-        ; Gets a rectangle that encloses the clipping region of this Graphics object.
-        GetClipBounds()
-        {
-            Return
-        }
-        
-        ; Gets the compositing mode currently set for this Graphics object.
-        GetCompositingMode()
-        {
-            Return
-        }
-        
-        ; Gets the compositing quality currently set for this Graphics object.
-        GetCompositingQuality()
-        {
-            Return
-        }
-        
-        ; Gets the horizontal resolution, in dots per inch, of the display device associated with this Graphics object.
-        GetDpiX()
-        {
-            Return
-        }
-        
-        ; Gets the vertical resolution, in dots per inch, of the display device associated with this Graphics object.
-        GetDpiY()
-        {
-            Return
-        }
-        
-        ; Gets a Windows halftone palette.
-        GetHalftonePalette()
-        {
-            Return
-        }
-        
-        ; Gets a handle to the device context associated with this Graphics object.
-        GetHDC()
-        {
-            Return
-        }
-        
-        ; Gets the interpolation mode currently set for this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
-        GetInterpolationMode()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this Graphics object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets the nearest color to the color that is passed in. This method works on 8-bits per pixel or lower display devices for which there is an 8-bit color palette.
-        GetNearestColor()
-        {
-            Return
-        }
-        
-        ; Gets the scaling factor currently set for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
-        GetPageScale()
-        {
-            Return
-        }
-        
-        ; Gets the unit of measure currently set for this Graphics object.
-        GetPageUnit()
-        {
-            Return
-        }
-        
-        ; Gets the pixel offset mode currently set for this Graphics object.
-        GetPixelOffsetMode()
-        {
-            Return
-        }
-        
-        ; Gets the rendering origin currently set for this Graphics object.
-        GetRenderingOrigin()
-        {
-            Return
-        }
-        
-        ; Determines whether smoothing (antialiasing)                                 ; is applied to the Graphics object.
-        GetSmoothingMode()
-        {
-            Return
-        }
-        
-        ; Gets the contrast value currently set for this Graphics object. The contrast value is used for antialiasing text.
-        GetTextContrast()
-        {
-            Return
-        }
-        
-        ; Returns the text rendering mode currently set for this Graphics object.
-        GetTextRenderingHint()
-        {
-            Return
-        }
-        
-        ; Gets the world transformation matrix of this Graphics object.
-        GetTransform()
-        {
-            Return
-        }
-        
-        ; Gets a rectangle that encloses the visible clipping region of this Graphics object.
-        GetVisibleClipBounds()
-        {
-            Return
-        }
-        
-        ; Gets a rectangle that encloses the visible clipping region of this Graphics object.
-        GetVisibleClipBounds()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
-        Graphics()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
-        Graphics()
-        {
-            Return
-        }
-        
-        ; Creates a Graphics object that is associated with a specified device context.
-        Graphics()
-        {
-            Return
-        }
-        
-        ; Creates a Graphics object that is associated with a specified device context and a specified device.
-        Graphics()
-        {
-            Return
-        }
-        
-        ; Creates a Graphics object that is associated with a specified window.
-        Graphics()
-        {
-            Return
-        }
-        
-        ; Creates a Graphics object that is associated with an Image object.
-        Graphics()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to the portion of the specified rectangle that intersects with the current clipping region of this Graphics object.
-        IntersectClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object.
-        IntersectClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to the portion of the specified region that intersects with the current clipping region of this Graphics object.
-        IntersectClip()
-        {
-            Return
-        }
-        
-        ; Determines whether the clipping region of this Graphics object is empty.
-        IsClipEmpty()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether the visible clipping region of this Graphics object is empty. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
-        IsVisibleClipEmpty()
-        {
-            Return
-        }
-        
-        ; Gets a set of regions each of which bounds a range of character positions within a string.
-        MeasureCharacterRanges()
-        {
-            Return
-        }
-        
-        ; Measures the bounding box for the specified characters and their corresponding positions.
-        MeasureDriverString()
-        {
-            Return
-        }
-        
-        ; Measures the extent of the string in the specified font, format, and layout rectangle.
-        MeasureString()
-        {
-            Return
-        }
-        
-        ; Measures the extent of the string in the specified font and layout rectangle.
-        MeasureString()
-        {
-            Return
-        }
-        
-        ; Measures the extent of the string in the specified font, format, and layout rectangle.
-        MeasureString()
-        {
-            Return
-        }
-        
-        ; Measures the extent of the string in the specified font and layout rectangle.
-        MeasureString()
-        {
-            Return
-        }
-        
-        ; Measures the extent of the string in the specified font, format, and layout rectangle.
-        MeasureString()
-        {
-            Return
-        }
-        
-        ; Updates this Graphics object's world transformation matrix with the product of itself and another matrix.
-        MultiplyTransform()
-        {
-            Return
-        }
-        
-        ; Releases a device context handle obtained by a previous call to the Graphics::GetHDC method of this Graphics object.
-        ReleaseHDC()
-        {
-            Return
-        }
-        
-        ; Sets the clipping region of this Graphics object to an infinite region.
-        ResetClip()
-        {
-            Return
-        }
-        
-        ; Sets the world transformation matrix of this Graphics object to the identity matrix.
-        ResetTransform()
-        {
-            Return
-        }
-        
-        ; Sets the state of this Graphics object to the state stored by a previous call to the Graphics::Save method of this Graphics object.
-        Restore()
-        {
-            Return
-        }
-        
-        ; Updates the world transformation matrix of this Graphics object with the product of itself and a rotation matrix.
-        RotateTransform()
-        {
-            Return
-        }
-        
-        ; Saves the current state (transformations, clipping region, and quality settings)                                 ; of this Graphics object. You can restore the state later by calling the Graphics::Restore method.
-        Save()
-        {
-            Return
-        }
-        
-        ; Updates this Graphics object's world transformation matrix with the product of itself and a scaling matrix.
-        ScaleTransform()
-        {
-            Return
-        }
-        
-        ; Not used in Windows GDI+ versions 1.0 and 1.1.
-        SetAbort()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object.
-        SetClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a graphics path.
-        SetClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.
-        SetClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.
-        SetClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a Region object.
-        SetClip()
-        {
-            Return
-        }
-        
-        ; Updates the clipping region of this Graphics object to a region that is the combination of itself and a Windows Graphics Device Interface (GDI)                                 ; region.
-        SetClip()
-        {
-            Return
-        }
-        
-        ; Sets the compositing mode of this Graphics object.
-        SetCompositingMode()
-        {
-            Return
-        }
-        
-        ; Sets the compositing quality of this Graphics object.
-        SetCompositingQuality()
-        {
-            Return
-        }
-        
-        ; Sets the interpolation mode of this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
-        SetInterpolationMode()
-        {
-            Return
-        }
-        
-        ; Sets the scaling factor for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
-        SetPageScale()
-        {
-            Return
-        }
-        
-        ; Sets the unit of measure for this Graphics object. The page unit belongs to the page transformation, which converts page coordinates to device coordinates.
-        SetPageUnit()
-        {
-            Return
-        }
-        
-        ; Sets the pixel offset mode of this Graphics object.
-        SetPixelOffsetMode()
-        {
-            Return
-        }
-        
-        ; Sets the rendering origin of this Graphics object. The rendering origin is used to set the dither origin for 8-bits-per-pixel and 16-bits-per-pixel dithering and is also used to set the origin for hatch brushes.
-        SetRenderingOrigin()
-        {
-            Return
-        }
-        
-        ; Sets the rendering quality of the Graphics object.
-        SetSmoothingMode()
-        {
-            Return
-        }
-        
-        ; Sets the contrast value of this Graphics object. The contrast value is used for antialiasing text.
-        SetTextContrast()
-        {
-            Return
-        }
-        
-        ; Sets the text rendering mode of this Graphics object.
-        SetTextRenderingHint()
-        {
-            Return
-        }
-        
-        ; Sets the world transformation of this Graphics object.
-        SetTransform()
-        {
-            Return
-        }
-        
-        ; Converts an array of points from one coordinate space to another. The conversion is based on the current world and page transformations of this Graphics object.
-        TransformPoints()
-        {
-            Return
-        }
-        
-        ; Converts an array of points from one coordinate space to another. The conversion is based on the current world and page transformations of this Graphics object.
-        TransformPoints()
-        {
-            Return
-        }
-        
-        ; Translates the clipping region of this Graphics object.
-        TranslateClip()
-        {
-            Return
-        }
-        
-        ; Translates the clipping region of this Graphics object.
-        TranslateClip()
-        {
-            Return
-        }
-        
-        ; Updates this Graphics object's world transformation matrix with the product of itself and a translation matrix.
-        TranslateTransform()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Stores a sequence of lines, curves, and shapes. You can also place markers in the sequence, so that you can draw selected portions of the path.
-    Class GraphicsPath
-    {
-        ; ## Methods ##
-        ; Adds an elliptical arc to the current figure of this path.
-        AddArc()
-        {
-            Return
-        }
-        
-        ; Adds an elliptical arc to the current figure of this path.
-        AddArc()
-        {
-            Return
-        }
-        
-        ; Adds an elliptical arc to the current figure of this path.
-        AddArc()
-        {
-            Return
-        }
-        
-        ; Adds an elliptical arc to the current figure of this path.
-        AddArc()
-        {
-            Return
-        }
-        
-        ; Adds a Bezier spline to the current figure of this path.
-        AddBezier()
-        {
-            Return
-        }
-        
-        ; Adds a Bezier spline to the current figure of this path.
-        AddBezier()
-        {
-            Return
-        }
-        
-        ; Adds a Bezier spline to the current figure of this path.
-        AddBezier()
-        {
-            Return
-        }
-        
-        ; Adds a Bezier spline to the current figure of this path.
-        AddBezier()
-        {
-            Return
-        }
-        
-        ; Adds a sequence of connected Bezier splines to the current figure of this path.
-        AddBeziers()
-        {
-            Return
-        }
-        
-        ; Adds a sequence of connected Bezier splines to the current figure of this path.
-        AddBeziers()
-        {
-            Return
-        }
-        
-        ; Adds a closed cardinal spline to this path.
-        AddClosedCurve()
-        {
-            Return
-        }
-        
-        ; Adds a closed cardinal spline to this path.
-        AddClosedCurve()
-        {
-            Return
-        }
-        
-        ; Adds a closed cardinal spline to this path.
-        AddClosedCurve()
-        {
-            Return
-        }
-        
-        ; Adds a closed cardinal spline to this path.
-        AddClosedCurve()
-        {
-            Return
-        }
-        
-        ; Adds a cardinal spline to the current figure of this path.
-        AddCurve()
-        {
-            Return
-        }
-        
-        ; Adds a cardinal spline to the current figure of this path.
-        AddCurve()
-        {
-            Return
-        }
-        
-        ; Adds a cardinal spline to the current figure of this path.
-        AddCurve()
-        {
-            Return
-        }
-        
-        ; Adds a cardinal spline to the current figure of this path.
-        AddCurve()
-        {
-            Return
-        }
-        
-        ; Adds a cardinal spline to the current figure of this path.
-        AddCurve()
-        {
-            Return
-        }
-        
-        ; Adds a cardinal spline to the current figure of this path.
-        AddCurve()
-        {
-            Return
-        }
-        
-        ; Adds an ellipse to this path.
-        AddEllipse()
-        {
-            Return
-        }
-        
-        ; Adds an ellipse to this path.
-        AddEllipse()
-        {
-            Return
-        }
-        
-        ; Adds an ellipse to this path.
-        AddEllipse()
-        {
-            Return
-        }
-        
-        ; Adds an ellipse to this path.
-        AddEllipse()
-        {
-            Return
-        }
-        
-        ; Adds a line to the current figure of this path.
-        AddLine()
-        {
-            Return
-        }
-        
-        ; Adds a line to the current figure of this path.
-        AddLine()
-        {
-            Return
-        }
-        
-        ; Adds a line to the current figure of this path.
-        AddLine()
-        {
-            Return
-        }
-        
-        ; Adds a line to the current figure of this path.
-        AddLine()
-        {
-            Return
-        }
-        
-        ; Adds a sequence of connected lines to the current figure of this path.
-        AddLines()
-        {
-            Return
-        }
-        
-        ; Adds a sequence of connected lines to the current figure of this path.
-        AddLines()
-        {
-            Return
-        }
-        
-        ; Adds a path to this path.
-        AddPath()
-        {
-            Return
-        }
-        
-        ; Adds a pie to this path.
-        AddPie()
-        {
-            Return
-        }
-        
-        ; Adds a pie to this path.
-        AddPie()
-        {
-            Return
-        }
-        
-        ; Adds a pie to this path.
-        AddPie()
-        {
-            Return
-        }
-        
-        ; Adds a pie to this path.
-        AddPie()
-        {
-            Return
-        }
-        
-        ; Adds a polygon to this path.
-        AddPolygon()
-        {
-            Return
-        }
-        
-        ; Adds a polygon to this path.
-        AddPolygon()
-        {
-            Return
-        }
-        
-        ; Adds a rectangle to this path.
-        AddRectangle()
-        {
-            Return
-        }
-        
-        ; Adds a rectangle to this path.
-        AddRectangle()
-        {
-            Return
-        }
-        
-        ; Adds a sequence of rectangles to this path
-        AddRectangles()
-        {
-            Return
-        }
-        
-        ; Adds a sequence of rectangles to this path.
-        AddRectangles()
-        {
-            Return
-        }
-        
-        ; Adds the outlines of a string to this path.
-        AddString()
-        {
-            Return
-        }
-        
-        ; Adds the outline of a string to this path.
-        AddString()
-        {
-            Return
-        }
-        
-        ; Adds the outline of a string to this path.
-        AddString()
-        {
-            Return
-        }
-        
-        ; Adds the outline of a string to this path.
-        AddString()
-        {
-            Return
-        }
-        
-        ; Clears the markers from this path.
-        ClearMarkers()
-        {
-            Return
-        }
-        
-        ; Creates a new GraphicsPath object, and initializes it with the contents of this GraphicsPath object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Closes all open figures in this path.
-        CloseAllFigures()
-        {
-            Return
-        }
-        
-        ; Closes the current figure of this path.
-        CloseFigure()
-        {
-            Return
-        }
-        
-        ; Applies a transformation to this path and converts each curve in the path to a sequence of connected lines.
-        Flatten()
-        {
-            Return
-        }
-        
-        ; Gets a bounding rectangle for this path.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets a bounding rectangle for this path.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets the fill mode of this path.
-        GetFillMode()
-        {
-            Return
-        }
-        
-        ; Gets the ending point of the last figure in this path.
-        GetLastPoint()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this GraphicsPath object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets an array of points and an array of point types from this path. Together, these two arrays define the lines, curves, figures, and markers of this path.
-        GetPathData()
-        {
-            Return
-        }
-        
-        ; Gets this path's array of points. The array contains the endpoints and control points of the lines and Bezier splines that are used to draw the path.
-        GetPathPoints()
-        {
-            Return
-        }
-        
-        ; Gets this path's array of points.
-        GetPathPoints()
-        {
-            Return
-        }
-        
-        ; Gets this path's array of point types.
-        GetPathTypes()
-        {
-            Return
-        }
-        
-        ; Gets the number of points in this path's array of data points. This is the same as the number of types in the path's array of point types.
-        GetPointCount()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the GraphicsPath class. For a complete class listing, see GraphicsPath Class.
-        GraphicsPath()
-        {
-            Return
-        }
-        
-        ; Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
-        GraphicsPath()
-        {
-            Return
-        }
-        
-        ; Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
-        GraphicsPath()
-        {
-            Return
-        }
-        
-        ; Creates a GraphicsPath object and initializes the fill mode. This is the default constructor.
-        GraphicsPath()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the GraphicsPath class. For a complete class listing, see GraphicsPath Class.
-        GraphicsPath()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphicsobject and a specified pen.
-        IsOutlineVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point touches the outline of a path.
-        IsOutlineVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
-        IsOutlineVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
-        IsOutlineVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point lies in an area.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphicsobject.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Transforms and flattens this path, and then converts this path's data points so that they represent only the outline of the path.
-        Outline()
-        {
-            Return
-        }
-        
-        ; Empties the path and sets the fill mode to FillModeAlternate.
-        Reset()
-        {
-            Return
-        }
-        
-        ; Reverses the order of the points that define this path's lines and curves.
-        Reverse()
-        {
-            Return
-        }
-        
-        ; Sets the fill mode of this path.
-        SetFillMode()
-        {
-            Return
-        }
-        
-        ; Designates the last point in this path as a marker point.
-        SetMarker()
-        {
-            Return
-        }
-        
-        ; Starts a new figure without closing the current figure. Subsequent points added to this path are added to the new figure.
-        StartFigure()
-        {
-            Return
-        }
-        
-        ; Multiplies each of this path's data points by a specified matrix.
-        Transform()
-        {
-            Return
-        }
-        
-        ; Applies a warp transformation to this path. The GraphicsPath::Warp method also flattens (converts to a sequence of straight lines)                                 ; the path.
-        Warp()
-        {
-            Return
-        }
-        
-        ; Replaces this path with curves that enclose the area that is filled when this path is drawn by a specified pen. The GraphicsPath::Widen method also flattens the path.
-        Widen()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Provides methods for isolating selected subsets of the path stored in a GraphicsPath object.
-    Class GraphicsPathIterator
-    {
-        ; ## Methods ##
-        ; Copies a subset of the path's data points to a PointF array and copies a subset of the path's point types to a BYTE array.
-        CopyData()
-        {
-            Return
-        }
-        
-        ; Copies the path's data points to a PointF array and copies the path's point types to a BYTE array.
-        Enumerate()
-        {
-            Return
-        }
-        
-        ; Returns the number of data points in the path.
-        GetCount()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this GraphicsPathIterator object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Returns the number of subpaths (also called figures)                                 ; in the path.
-        GetSubpathCount()
-        {
-            Return
-        }
-        
-        ; Creates a new GraphicsPathIterator object and associates it with a GraphicsPath object.
-        GraphicsPathIterator()
-        {
-            Return
-        }
-        
-        ; Copy constructor for GraphicsPathIterator.
-        GraphicsPathIterator()
-        {
-            Return
-        }
-        
-        ; Determines whether the path has any curves.
-        HasCurve()
-        {
-            Return
-        }
-        
-        ; Gets the next marker-delimited section of this iterator's associated path.
-        NextMarker()
-        {
-            Return
-        }
-        
-        ; Gets the starting index and the ending index of a section.
-        NextMarker()
-        {
-            Return
-        }
-        
-        ; Gets the starting index and the ending index of the next group of data points that all have the same type.
-        NextPathType()
-        {
-            Return
-        }
-        
-        ; Gets the next figure (subpath)                                 ; from this iterator's associated path.
-        NextSubpath()
-        {
-            Return
-        }
-        
-        ; Gets the starting index and the ending index of the next subpath.
-        NextSubpath()
-        {
-            Return
-        }
-        
-        ; Rewinds this iterator to the beginning of its associated path.
-        Rewind()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Defines a rectangular brush with a hatch style, a foreground color, and a background color. There are six hatch styles.
-    Class HatchBrush
-    {
-        ; ## Inherit ##   The HatchBrush class implements Brush.
-        
-        ; ## Methods ##
-        ; Gets the background color of this hatch brush.
-        GetBackgroundColor()
-        {
-            Return
-        }
-        
-        ; Gets the foreground color of this hatch brush.
-        GetForegroundColor()
-        {
-            Return
-        }
-        
-        ; Gets the hatch style of this hatch brush.
-        GetHatchStyle()
-        {
-            Return
-        }
-        
-        ; Copy constructor for HatchBrush.
-        HatchBrush()
-        {
-            Return
-        }
-        
-        ; Creates a HatchBrush object based on a hatch style, foreground color, and background color.
-        HatchBrush()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Enables you to change the hue, saturation, and lightness of a bitmap.
-    Class HueSaturationLightness
-    {
-        ; ## Constructors ##
-        ; ## Inherit ##   The HueSaturationLightness class implements Effect.
-        
-        ; ## Methods ##
-        ; Gets the current values of the parameters of this HueSaturationLightness object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Creates a HueSaturationLightness object.
-        HueSaturationLightness()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this HueSaturationLightness object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Provides methods for loading and saving raster images (bitmaps)                                 ; and vector images (metafiles).
-    Class Image
-    {
-        ; ## Inherit ##   The Image class implements GdiplusBase.
-        
-        ; ## Methods ##
-        ; Creates a new Image object and initializes it with the contents of this Image object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Retrieves the description and the data size of the first metadata item in this Image object.
-        FindFirstItem()
-        {
-            Return
-        }
-        
-        ; Used along with the Image::FindFirstItem method to enumerate the metadata items stored in this Image object.
-        FindNextItem()
-        {
-            Return
-        }
-        
-        ; Creates an Image object based on a file.
-        FromFile()
-        {
-            Return
-        }
-        
-        ; Creates a new Image object based on a stream.
-        FromStream()
-        {
-            Return
-        }
-        
-        ; Gets all the property items (metadata)                                 ; stored in this Image object.
-        GetAllPropertyItems()
-        {
-            Return
-        }
-        
-        ; Gets the bounding rectangle for this image.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets a list of the parameters supported by a specified image encoder.
-        GetEncoderParameterList()
-        {
-            Return
-        }
-        
-        ; Gets the size, in bytes, of the parameter list for a specified image encoder.
-        GetEncoderParameterListSize()
-        {
-            Return
-        }
-        
-        ; Gets a set of flags that indicate certain attributes of this Image object.
-        GetFlags()
-        {
-            Return
-        }
-        
-        ; Gets the number of frames in a specified dimension of this Image object.
-        GetFrameCount()
-        {
-            Return
-        }
-        
-        ; Gets the number of frame dimensions in this Image object.
-        GetFrameDimensionsCount()
-        {
-            Return
-        }
-        
-        ; Gets the identifiers for the frame dimensions of this Image object.
-        GetFrameDimensionsList()
-        {
-            Return
-        }
-        
-        ; Gets the image height, in pixels, of this image.
-        GetHeight()
-        {
-            Return
-        }
-        
-        ; Gets the horizontal resolution, in dots per inch, of this image.
-        GetHorizontalResolution()
-        {
-            Return
-        }
-        
-        ; Gets one piece of metadata from this Image object.
-        GetItemData()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this Image object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets the ColorPalette of this Image object.
-        GetPalette()
-        {
-            Return
-        }
-        
-        ; Gets the size, in bytes, of the color palette of this Image object.
-        GetPaletteSize()
-        {
-            Return
-        }
-        
-        ; Gets the width and height of this image.
-        GetPhysicalDimension()
-        {
-            Return
-        }
-        
-        ; Gets the pixel format of this Image object.
-        GetPixelFormat()
-        {
-            Return
-        }
-        
-        ; Gets the number of properties (pieces of metadata)                                 ; stored in this Image object.
-        GetPropertyCount()
-        {
-            Return
-        }
-        
-        ; Gets a list of the property identifiers used in the metadata of this Image object.
-        GetPropertyIdList()
-        {
-            Return
-        }
-        
-        ; Gets a specified property item (piece of metadata)                                 ; from this Image object.
-        GetPropertyItem()
-        {
-            Return
-        }
-        
-        ; Gets the size, in bytes, of a specified property item of this Image object.
-        GetPropertyItemSize()
-        {
-            Return
-        }
-        
-        ; Gets the total size, in bytes, of all the property items stored in this Image object. The Image::GetPropertySize method also gets the number of property items stored in this Image object.
-        GetPropertySize()
-        {
-            Return
-        }
-        
-        ; Gets a globally unique identifier ( GUID)                                 ; that identifies the format of this Image object. GUIDs that identify various file formats are defined in Gdiplusimaging.h.
-        GetRawFormat()
-        {
-            Return
-        }
-        
-        ; Gets a thumbnail image from this Image object.
-        GetThumbnailImage()
-        {
-            Return
-        }
-        
-        ; Gets the type (bitmap or metafile)                                 ; of this Image object.
-        GetType()
-        {
-            Return
-        }
-        
-        ; Gets the vertical resolution, in dots per inch, of this image.
-        GetVerticalResolution()
-        {
-            Return
-        }
-        
-        ; Gets the width, in pixels, of this image.
-        GetWidth()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Image class. For a complete class listing, see Image Class.
-        Image()
-        {
-            Return
-        }
-        
-        ; Creates an Image object based on a file.
-        Image()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Image class. For a complete class listing, see Image Class.
-        Image()
-        {
-            Return
-        }
-        
-        ; Creates an Image object based on a stream.
-        Image()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Image class. For a complete class listing, see Image Class.
-        Image()
-        {
-            Return
-        }
-        
-        ; Removes a property item (piece of metadata)                                 ; from this Image object.
-        RemovePropertyItem()
-        {
-            Return
-        }
-        
-        ; Rotates and flips this image.
-        RotateFlip()
-        {
-            Return
-        }
-        
-        ; Saves this image to a file.
-        Save()
-        {
-            Return
-        }
-        
-        ; Saves this image to a stream.
-        Save()
-        {
-            Return
-        }
-        
-        ; Adds a frame to a file or stream specified in a previous call to the Save method.
-        SaveAdd()
-        {
-            Return
-        }
-        
-        ; Adds a frame to a file or stream specified in a previous call to the Save method.
-        SaveAdd()
-        {
-            Return
-        }
-        
-        ; Selects the frame in this Image object specified by a dimension and an index.
-        SelectActiveFrame()
-        {
-            Return
-        }
-        
-        ; Sets the object whose Abort method is called periodically during time-consuming rendering operation.
-        SetAbort()
-        {
-            Return
-        }
-        
-        ; Sets the color palette of this Image object.
-        SetPalette()
-        {
-            Return
-        }
-        
-        ; Sets a property item (piece of metadata)                                 ; for this Image object. If the item already exists, then its contents are updated; otherwise, a new item is added.
-        SetPropertyItem()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Contains information about how bitmap and metafile colors are manipulated during rendering.                                                                    
-    Class ImageAttributes
-    {
-        ; ## Inherit ##   The ImageAttributes class implements GdiplusBase.
-        
-        ; ## Methods ##
-        ; Clears the brush color-remap table of this ImageAttributes object.
-        ClearBrushRemapTable()
-        {
-            Return
-        }
-        
-        ; Clears the color key (transparency range)                                 ; for a specified category.
-        ClearColorKey()
-        {
-            Return
-        }
-        
-        ; Clears the color-adjustment matrix and the grayscale-adjustment matrix for a specified category.
-        ClearColorMatrices()
-        {
-            Return
-        }
-        
-        ; Clears the color-adjustment matrix for a specified category.
-        ClearColorMatrix()
-        {
-            Return
-        }
-        
-        ; Disables gamma correction for a specified category.
-        ClearGamma()
-        {
-            Return
-        }
-        
-        ; Clears the NoOp setting for a specified category.
-        ClearNoOp()
-        {
-            Return
-        }
-        
-        ; Clears the cyan-magenta-yellow-black (CMYK)                                 ; output channel setting for a specified category.
-        ClearOutputChannel()
-        {
-            Return
-        }
-        
-        ; Clears the output channel color profile setting for a specified category.
-        ClearOutputChannelColorProfile()
-        {
-            Return
-        }
-        
-        ; Clears the color-remap table for a specified category.
-        ClearRemapTable()
-        {
-            Return
-        }
-        
-        ; Clears the threshold value for a specified category.
-        ClearThreshold()
-        {
-            Return
-        }
-        
-        ; Makes a copy of this ImageAttributes object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Adjusts the colors in a palette according to the adjustment settings of a specified category.
-        GetAdjustedPalette()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this ImageAttributes object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Creates an ImageAttributes object. This is the default constructor.
-        ImageAttributes()
-        {
-            Return
-        }
-        
-        ; Creates an ImageAttributes object. This is the default constructor.
-        ImageAttributes()
-        {
-            Return
-        }
-        
-        ; Creates an ImageAttributes object. This is the default constructor.
-        ImageAttributes()
-        {
-            Return
-        }
-        
-        ; Clears all color- and grayscale-adjustment settings for a specified category.
-        Reset()
-        {
-            Return
-        }
-        
-        ; Sets the color remap table for the brush category.
-        SetBrushRemapTable()
-        {
-            Return
-        }
-        
-        ; Sets the color key (transparency range)                                 ; for a specified category.
-        SetColorKey()
-        {
-            Return
-        }
-        
-        ; Sets the color-adjustment matrix and the grayscale-adjustment matrix for a specified category.
-        SetColorMatrices()
-        {
-            Return
-        }
-        
-        ; Sets the color-adjustment matrix for a specified category.
-        SetColorMatrix()
-        {
-            Return
-        }
-        
-        ; Sets the gamma value for a specified category.
-        SetGamma()
-        {
-            Return
-        }
-        
-        ; Turns off color adjustment for a specified category. You can call ImageAttributes::ClearNoOp to reinstate the color-adjustment settings that were in place before the call to ImageAttributes::SetNoOp.
-        SetNoOp()
-        {
-            Return
-        }
-        
-        ; Sets the CMYK output channel for a specified category.
-        SetOutputChannel()
-        {
-            Return
-        }
-        
-        ; Sets the output channel color-profile file for a specified category.
-        SetOutputChannelColorProfile()
-        {
-            Return
-        }
-        
-        ; Sets the color-remap table for a specified category.
-        SetRemapTable()
-        {
-            Return
-        }
-        
-        ; Sets the threshold (transparency range)                                 ; for a specified category.
-        SetThreshold()
-        {
-            Return
-        }
-        
-        ; Sets the color-adjustment matrix of a specified category to identity matrix.
-        SetToIdentity()
-        {
-            Return
-        }
-        
-        ; Sets the wrap mode of this ImageAttributes object.
-        SetWrapMode()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Stores information about an image codec (encoder/decoder). GDI+ provides several built-in image codecs.                                                               
-    Class ImageCodecInfo
-    {
-        ; ## Methods ##
-    }
-        
-    ; Used to store and retrieve custom image metadata. Windows GDI+ supports custom metadata for JPEG, PNG, and GIF image files.                                                              
-    Class ImageItemData
-    {
-        ; ## Methods ##
-                                                                                                                                                                                   
-    InstalledFontCollection                                                                                         
-        ; ## Inherit ##   The InstalledFontCollection class implements FontCollection.                                                                                                                                                      
-        
-        ; ## Methods ##
-        ; Creates an InstalledFontCollection object.
-        InstalledFontCollection()
-        {
-            Return
-        }
-        
-        ; Creates an InstalledFontCollection object.
-        InstalledFontCollection()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Encompasses three bitmap adjustments: highlight, midtone, and shadow.                                                       
-    Class Levels
-    {
-        ; ## Inherit ##   The Levels class implements Effect.                                                                                                                                                      
-        
-        ; ## Methods ##
-        ; Gets the current values of the parameters of this Levels object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Creates a Levels object.
-        Levels()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this Levels object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Defines a brush that paints a color gradient in which the color changes evenly from the starting boundary line of the linear gradient brush to the ending boundary line of the linear gradient brush.                                                                    
-    Class LinearGradientBrush
-    {
-        ; ## Inherit ##   The LinearGradientBrush class implements Brush.
-        
-        ; ## Methods ##
-        ; Gets the blend factors and their corresponding blend positions from a LinearGradientBrush object.
-        GetBlend()
-        {
-            Return
-        }
-        
-        ; Gets the number of blend factors currently set for this LinearGradientBrush object.
-        GetBlendCount()
-        {
-            Return
-        }
-        
-        ; Determines whether gamma correction is enabled for this LinearGradientBrush object.
-        GetGammaCorrection()
-        {
-            Return
-        }
-        
-        ; Gets the number of colors currently set to be interpolated for this linear gradient brush.
-        GetInterpolationColorCount()
-        {
-            Return
-        }
-        
-        ; Gets the colors currently set to be interpolated for this linear gradient brush and their corresponding blend positions.
-        GetInterpolationColors()
-        {
-            Return
-        }
-        
-        ; Gets the starting color and ending color of this linear gradient brush.
-        GetLinearColors()
-        {
-            Return
-        }
-        
-        ; Gets the rectangle that defines the boundaries of the gradient.
-        GetRectangle()
-        {
-            Return
-        }
-        
-        ; Lists the GetRectangle methods of the LinearGradientBrush class. For a complete list of methods for the LinearGradientBrush class, see LinearGradientBrush Methods.
-        GetRectangle()
-        {
-            Return
-        }
-        
-        ; Gets the transformation matrix of this linear gradient brush.
-        GetTransform()
-        {
-            Return
-        }
-        
-        ; Gets the wrap mode for this brush. The wrap mode determines how an area is tiled when it is painted with a brush.
-        GetWrapMode()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the LinearGradientBrush class. For a complete class listing, see LinearGradientBrush Class.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the LinearGradientBrush class. For a complete class listing, see LinearGradientBrush Class.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a LinearGradientBrush object from a set of boundary points and boundary colors.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a LinearGradientBrush object based on a rectangle and mode of direction.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a LinearGradientBrush object from a rectangle and angle of direction.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a LinearGradientBrush object based on a rectangle and mode of direction.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a LinearGradientBrush object from a rectangle and angle of direction.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the LinearGradientBrush class. For a complete class listing, see LinearGradientBrush Class.
-        LinearGradientBrush()
-        {
-            Return
-        }
-        
-        ; Updates this brush's transformation matrix with the product of itself and another matrix.
-        MultiplyTransform()
-        {
-            Return
-        }
-        
-        ; Resets the transformation matrix of this linear gradient brush to the identity matrix. This means that no transformation takes place.
-        ResetTransform()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a rotation matrix.
-        RotateTransform()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a scaling matrix.
-        ScaleTransform()
-        {
-            Return
-        }
-        
-        ; Sets the blend factors and the blend positions of this linear gradient brush to create a custom blend.
-        SetBlend()
-        {
-            Return
-        }
-        
-        ; Sets the blend shape of this linear gradient brush to create a custom blend based on a bell-shaped curve.
-        SetBlendBellShape()
-        {
-            Return
-        }
-        
-        ; Sets the blend shape of this linear gradient brush to create a custom blend based on a triangular shape.
-        SetBlendTriangularShape()
-        {
-            Return
-        }
-        
-        ; Specifies whether gamma correction is enabled for this linear gradient brush.
-        SetGammaCorrection()
-        {
-            Return
-        }
-        
-        ; Sets the colors to be interpolated for this linear gradient brush and their corresponding blend positions.
-        SetInterpolationColors()
-        {
-            Return
-        }
-        
-        ; Sets the starting color and ending color of this linear gradient brush.
-        SetLinearColors()
-        {
-            Return
-        }
-        
-        ; Sets the transformation matrix of this linear gradient brush.
-        SetTransform()
-        {
-            Return
-        }
-        
-        ; Sets the wrap mode of this linear gradient brush.
-        SetWrapMode()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a translation matrix.
-        TranslateTransform()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Represents a 3 ×3 matrix that, in turn, represents an affine transformation.
-    Class Matrix
-    {
-        ; ## Inherit ##   The Matrix class implements GdiplusBase.
-        
-        ; ## Methods ##
-        ; Creates a new Matrix object that is a copy of this Matrix object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Determines whether the elements of this matrix are equal to the elements of another matrix.
-        Equals()
-        {
-            Return
-        }
-        
-        ; Gets the elements of this matrix. The elements are placed in an array in the order m11, m12, m21, m22, m31, m32, where mij denotes the element in row i, column j.
-        GetElements()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this Matrix object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Replaces the elements of this matrix with the elements of its inverse, if this matrix is invertible.
-        Invert()
-        {
-            Return
-        }
-        
-        ; Determines whether this matrix is the identity matrix.
-        IsIdentity()
-        {
-            Return
-        }
-        
-        ; Determines whether this matrix is invertible.
-        IsInvertible()
-        {
-            Return
-        }
-        
-        ; Creates and initializes a Matrix object that represents the identity matrix.
-        Matrix()
-        {
-            Return
-        }
-        
-        ; Creates and initializes a Matrix object that represents the identity matrix.
-        Matrix()
-        {
-            Return
-        }
-        
-        ; Creates a Matrix object based on a rectangle and a point.
-        Matrix()
-        {
-            Return
-        }
-        
-        ; Creates a Matrix object based on a rectangle and a point.
-        Matrix()
-        {
-            Return
-        }
-        
-        ; Creates and initializes a Matrix object that represents the identity matrix.
-        Matrix()
-        {
-            Return
-        }
-        
-        ; Creates and initializes a Matrix object based on six numbers that define an affine transformation.
-        Matrix()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the product of itself and another matrix.
-        Multiply()
-        {
-            Return
-        }
-        
-        ; Gets the horizontal translation value of this matrix, which is the element in row 3, column 1.
-        OffsetX()
-        {
-            Return
-        }
-        
-        ; Gets the vertical translation value of this matrix, which is the element in row 3, column 2.
-        OffsetY()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the elements of the identity matrix.
-        Reset()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the product of itself and a rotation matrix.
-        Rotate()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the product of itself and a matrix that represents rotation about a specified point.
-        RotateAt()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the product of itself and a scaling matrix.
-        Scale()
-        {
-            Return
-        }
-        
-        ; Sets the elements of this matrix.
-        SetElements()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the product of itself and a shearing matrix.
-        Shear()
-        {
-            Return
-        }
-        
-        ; Multiplies each point in an array by this matrix. Each point is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
-        TransformPoints()
-        {
-            Return
-        }
-        
-        ; Lists the TransformPoints methods of the Matrix class. For a complete list of methods for the Matrix class, see Matrix Methods.
-        TransformPoints()
-        {
-            Return
-        }
-        
-        ; Multiplies each vector in an array by this matrix.
-        TransformVectors()
-        {
-            Return
-        }
-        
-        ; Lists the TransformVectors methods of the Matrix class. For a complete list of methods for the Matrix class, see Matrix Methods.
-        TransformVectors()
-        {
-            Return
-        }
-        
-        ; Updates this matrix with the product of itself and a translation matrix.
-        Translate()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Defines a graphic metafile.
-    Class Metafile
-    {
-        ; ## Inherit ##   The Metafile class implements Image.
-        
-        ; ## Methods ##
-        ; Converts this Metafile object to the EMF+ format.
-        ConvertToEmfPlus()
-        {
-            Return
-        }
-        
-        ; Converts this Metafile object to the EMF+ format.
-        ConvertToEmfPlus()
-        {
-            Return
-        }
-        
-        ; Converts this Metafile object to the EMF+ format.
-        ConvertToEmfPlus()
-        {
-            Return
-        }
-        
-        ; Converts an enhanced-format metafile to a Windows Metafile Format (WMF)                                 ; metafile and stores the converted records in a specified buffer.
-        EmfToWmfBits()
-        {
-            Return
-        }
-        
-        ; Gets the rasterization limit currently set for this metafile.
-        GetDownLevelRasterizationLimit()
-        {
-            Return
-        }
-        
-        ; Gets a Windows handle to an Enhanced Metafile (EMF)                                 ; file.
-        GetHENHMETAFILE()
-        {
-            Return
-        }
-        
-        ; Gets the header.
-        GetMetafileHeader()
-        {
-            Return
-        }
-        
-        ; Gets the header.
-        GetMetafileHeader()
-        {
-            Return
-        }
-        
-        ; Gets the metafile header of this metafile.
-        GetMetafileHeader()
-        {
-            Return
-        }
-        
-        ; Gets the header.
-        GetMetafileHeader()
-        {
-            Return
-        }
-        
-        ; Gets the header.
-        GetMetafileHeader()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Metafile class. For a complete class listing, see Metafile Class.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for playback.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Metafile class. For a complete class listing, see Metafile Class.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Windows GDI+ Metafile object for playback based on a Windows Graphics Device Interface (GDI)                                 ; Enhanced Metafile (EMF)                                 ; file.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Windows GDI+Metafile object for recording. The format will be placeable metafile.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object from an IStream interface for playback.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording to an IStream interface.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording to an IStream interface.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Creates a Metafile object for recording to an IStream interface.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Metafile class. For a complete class listing, see Metafile Class.
-        Metafile()
-        {
-            Return
-        }
-        
-        ; The PlayRecord method plays a metafile record.
-        PlayRecord()
-        {
-            Return
-        }
-        
-        ; Sets the resolution for certain brush bitmaps that are stored in this metafile.
-        SetDownLevelRasterizationLimit()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Stores properties of an associated metafile.
-    Class MetafileHeader
-    {
-        ; ## Methods ##
-        ; Gets the bounding rectangle for the associated metafile.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets the horizontal dots per inch of the associated metafile.
-        GetDpiX()
-        {
-            Return
-        }
-        
-        ; Gets the vertical dots per inch of the associated metafile.
-        GetDpiY()
-        {
-            Return
-        }
-        
-        ; Gets an ENHMETAHEADER3 structure that contains properties of the associated metafile.
-        GetEmfHeader()
-        {
-            Return
-        }
-        
-        ; Gets a flag that indicates whether the associated metafile was recorded against a video display device context.
-        GetEmfPlusFlags()
-        {
-            Return
-        }
-        
-        ; Gets the size, in bytes, of the metafile.
-        GetMetafileSize()
-        {
-            Return
-        }
-        
-        ; Gets the type of the associated metafile.
-        GetType()
-        {
-            Return
-        }
-        
-        ; Gets the version of the metafile.
-        GetVersion()
-        {
-            Return
-        }
-        
-        ; Gets a METAHEADER structure that contains properties of the associated metafile.
-        GetWmfHeader()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile was recorded against a video display device context.
-        IsDisplay()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is in the EMF format.
-        IsEmf()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is in either the EMF or EMF+ format.
-        IsEmfOrEmfPlus()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is in the EMF+ format.
-        IsEmfPlus()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is in the EMF+ Dual format.
-        IsEmfPlusDual()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is in the EMF+ Only format.
-        IsEmfPlusOnly()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is in the WMF format.
-        IsWmf()
-        {
-            Return
-        }
-        
-        ; Determines whether the associated metafile is a placeable metafile.
-        IsWmfPlaceable()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Get or set the data points (and their types)                                 ; of a path. Helper class for the GraphicsPath and GraphicsPathIterator classes.
-    Class PathData
-    {
-        ; ## Methods ##
-        ~PathData()                                                         ; Destructor for the PathData class.
-        ; Creates a PathData object. The Count data member is initialized to 0. Points and Types data members are initialized to NULL.
-        PathData()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Stores the attributes of a color gradient that you can use to fill the interior of a path with a gradually changing color.
-    Class PathGradientBrush
-    {
-        ; ## Inherit ##   The PathGradientBrush class implements Brush.
-        
-        ; ## Methods ##
-        ; Gets the blend factors and the corresponding blend positions currently set for this path gradient brush.
-        GetBlend()
-        {
-            Return
-        }
-        
-        ; Gets the number of blend factors currently set for this path gradient brush.
-        GetBlendCount()
-        {
-            Return
-        }
-        
-        ; Gets the color of the center point of this path gradient brush.
-        GetCenterColor()
-        {
-            Return
-        }
-        
-        ; Gets the center point of this path gradient brush.
-        GetCenterPoint()
-        {
-            Return
-        }
-        
-        ; Gets the center point of this path gradient brush.
-        GetCenterPoint()
-        {
-            Return
-        }
-        
-        ; Gets the focus scales of this path gradient brush.
-        GetFocusScales()
-        {
-            Return
-        }
-        
-        ; Determines whether gamma correction is enabled for this path gradient brush.
-        GetGammaCorrection()
-        {
-            Return
-        }
-        
-        ; Is not implemented in Windows GDI+ version 1.0.
-        GetGraphicsPath()
-        {
-            Return
-        }
-        
-        ; Gets the number of preset colors currently specified for this path gradient brush.
-        GetInterpolationColorCount()
-        {
-            Return
-        }
-        
-        ; Gets the preset colors and blend positions currently specified for this path gradient brush.
-        GetInterpolationColors()
-        {
-            Return
-        }
-        
-        ; Gets the number of points in the array of points that defines this brush's boundary path.
-        GetPointCount()
-        {
-            Return
-        }
-        
-        ; Gets the smallest rectangle that encloses the boundary path of this path gradient brush.
-        GetRectangle()
-        {
-            Return
-        }
-        
-        ; Gets the smallest rectangle that encloses the boundary path of this path gradient brush.
-        GetRectangle()
-        {
-            Return
-        }
-        
-        ; Gets the number of colors that have been specified for the boundary path of this path gradient brush.
-        GetSurroundColorCount()
-        {
-            Return
-        }
-        
-        ; Gets the surround colors currently specified for this path gradient brush.
-        GetSurroundColors()
-        {
-            Return
-        }
-        
-        ; Gets transformation matrix of this path gradient brush.
-        GetTransform()
-        {
-            Return
-        }
-        
-        ; Gets the wrap mode currently set for this path gradient brush.
-        GetWrapMode()
-        {
-            Return
-        }
-        
-        ; Updates the brush's transformation matrix with the product of itself and another matrix.
-        MultiplyTransform()
-        {
-            Return
-        }
-        
-        ; Creates a PathGradientBrush object based on a GraphicsPath object.
-        PathGradientBrush()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the PathGradientBrush class. For a complete class listing, see PathGradientBrushXX Class.
-        PathGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
-        PathGradientBrush()
-        {
-            Return
-        }
-        
-        ; Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
-        PathGradientBrush()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the PathGradientBrush class. For a complete class listing, see PathGradientBrushXX Class.
-        PathGradientBrush()
-        {
-            Return
-        }
-        
-        ; Resets the transformation matrix of this path gradient brush to the identity matrix. This means that no transformation will take place.
-        ResetTransform()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a rotation matrix.
-        RotateTransform()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a scaling matrix.
-        ScaleTransform()
-        {
-            Return
-        }
-        
-        ; Sets the blend factors and the blend positions of this path gradient brush.
-        SetBlend()
-        {
-            Return
-        }
-        
-        ; Sets the blend shape of this path gradient brush.
-        SetBlendBellShape()
-        {
-            Return
-        }
-        
-        ; Sets the blend shape of this path gradient brush.
-        SetBlendTriangularShape()
-        {
-            Return
-        }
-        
-        ; Sets the center color of this path gradient brush. The center color is the color that appears at the brush's center point.
-        SetCenterColor()
-        {
-            Return
-        }
-        
-        ; Sets the center point of this path gradient brush. By default, the center point is at the centroid of the brush's boundary path, but you can set the center point to any location inside or outside the path.
-        SetCenterPoint()
-        {
-            Return
-        }
-        
-        ; Sets the center point of this path gradient brush.
-        SetCenterPoint()
-        {
-            Return
-        }
-        
-        ; Sets the focus scales of this path gradient brush.
-        SetFocusScales()
-        {
-            Return
-        }
-        
-        ; Specifies whether gamma correction is enabled for this path gradient brush.
-        SetGammaCorrection()
-        {
-            Return
-        }
-        
-        ; Is not implemented in Windows GDI+ version 1.0.
-        SetGraphicsPath()
-        {
-            Return
-        }
-        
-        ; Sets the preset colors and the blend positions of this path gradient brush.
-        SetInterpolationColors()
-        {
-            Return
-        }
-        
-        ; Sets the surround colors of this path gradient brush. The surround colors are colors specified for discrete points on the brush's boundary path.
-        SetSurroundColors()
-        {
-            Return
-        }
-        
-        ; Sets the transformation matrix of this path gradient brush.
-        SetTransform()
-        {
-            Return
-        }
-        
-        ; Sets the wrap mode of this path gradient brush.
-        SetWrapMode()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a translation matrix.
-        TranslateTransform()
-        {
-            Return
-        }
-        
-    }
-        
-    ; A Windows GDI+ object used to draw lines and curves
-    Class Pen
-    {
-        ; ## Inherit ##   The Pen class implements GdiplusBase.
-        
-        ; ## Methods ##
-        ; Copies a Pen object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Gets the alignment currently set for this Pen object.
-        GetAlignment()
-        {
-            Return
-        }
-        
-        ; Gets the Brush object that is currently set for this Pen object.
-        GetBrush()
-        {
-            Return
-        }
-        
-        ; Gets the color currently set for this Pen object.
-        GetColor()
-        {
-            Return
-        }
-        
-        ; Gets the compound array currently set for this Pen object.
-        GetCompoundArray()
-        {
-            Return
-        }
-        
-        ; Gets the number of elements in a compound array.
-        GetCompoundArrayCount()
-        {
-            Return
-        }
-        
-        ; Gets the custom end cap currently set for this Pen object.
-        GetCustomEndCap()
-        {
-            Return
-        }
-        
-        ; Gets the custom start cap currently set for this Pen object.
-        GetCustomStartCap()
-        {
-            Return
-        }
-        
-        ; Gets the dash cap style currently set for this Pen object.
-        GetDashCap()
-        {
-            Return
-        }
-        
-        ; Gets the distance from the start of the line to the start of the first space in a dashed line.
-        GetDashOffset()
-        {
-            Return
-        }
-        
-        ; Gets an array of custom dashes and spaces currently set for this Pen object.
-        GetDashPattern()
-        {
-            Return
-        }
-        
-        ; Gets the number of elements in a dash pattern array.
-        GetDashPatternCount()
-        {
-            Return
-        }
-        
-        ; Gets the dash style currently set for this Pen object.
-        GetDashStyle()
-        {
-            Return
-        }
-        
-        ; Gets the end cap currently set for this Pen object.
-        GetEndCap()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this Pen object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets the line join style currently set for this Pen object.
-        GetLineJoin()
-        {
-            Return
-        }
-        
-        ; Gets the miter length currently set for this Pen object.
-        GetMiterLimit()
-        {
-            Return
-        }
-        
-        ; Gets the type currently set for this Pen object.
-        GetPenType()
-        {
-            Return
-        }
-        
-        ; Gets the start cap currently set for this Pen object.
-        GetStartCap()
-        {
-            Return
-        }
-        
-        ; Gets the world transformation matrix currently set for this Pen object.
-        GetTransform()
-        {
-            Return
-        }
-        
-        ; Gets the width currently set for this Pen object.
-        GetWidth()
-        {
-            Return
-        }
-        
-        ; Updates the world transformation matrix of this Pen object with the product of itself and another matrix.
-        MultiplyTransform()
-        {
-            Return
-        }
-        
-        ; Creates a Pen object that uses the attributes of a brush and a real number to set the width of this Pen object.
-        Pen()
-        {
-            Return
-        }
-        
-        ; Creates a Pen object that uses a specified color and width.
-        Pen()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Pen class. For a complete class listing, see Pen Class.
-        Pen()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the Pen class. For a complete class listing, see Pen Class.
-        Pen()
-        {
-            Return
-        }
-        
-        ; Sets the world transformation matrix of this Pen object to the identity matrix.
-        ResetTransform()
-        {
-            Return
-        }
-        
-        ; Updates the world transformation matrix of this Pen object with the product of itself and a rotation matrix.
-        RotateTransform()
-        {
-            Return
-        }
-        
-        ; Sets the Pen object's world transformation matrix equal to the product of itself and a scaling matrix.
-        ScaleTransform()
-        {
-            Return
-        }
-        
-        ; Sets the alignment for this Pen object relative to the line.
-        SetAlignment()
-        {
-            Return
-        }
-        
-        ; Sets the Brush object that a pen uses to fill a line.
-        SetBrush()
-        {
-            Return
-        }
-        
-        ; Sets the color for this Pen object.
-        SetColor()
-        {
-            Return
-        }
-        
-        ; Sets the compound array for this Pen object.
-        SetCompoundArray()
-        {
-            Return
-        }
-        
-        ; Sets the custom end cap for this Pen object.
-        SetCustomEndCap()
-        {
-            Return
-        }
-        
-        ; Sets the custom start cap for this Pen object.
-        SetCustomStartCap()
-        {
-            Return
-        }
-        
-        ; Sets the dash cap style for this Pen object.
-        SetDashCap()
-        {
-            Return
-        }
-        
-        ; Sets the distance from the start of the line to the start of the first dash in a dashed line.
-        SetDashOffset()
-        {
-            Return
-        }
-        
-        ; Sets an array of custom dashes and spaces for this Pen object.
-        SetDashPattern()
-        {
-            Return
-        }
-        
-        ; Sets the dash style for this Pen object.
-        SetDashStyle()
-        {
-            Return
-        }
-        
-        ; Sets the end cap for this Pen object.
-        SetEndCap()
-        {
-            Return
-        }
-        
-        ; Sets the cap styles for the start, end, and dashes in a line drawn with this pen.
-        SetLineCap()
-        {
-            Return
-        }
-        
-        ; Sets the line join for this Pen object.
-        SetLineJoin()
-        {
-            Return
-        }
-        
-        ; Sets the miter limit of this Pen object.
-        SetMiterLimit()
-        {
-            Return
-        }
-        
-        ; Sets the start cap for this Pen object.
-        SetStartCap()
-        {
-            Return
-        }
-        
-        ; Sets the world transformation of this Pen object.
-        SetTransform()
-        {
-            Return
-        }
-        
-        ; Sets the width for this Pen object.
-        SetWidth()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Encapsulates a point in a 2-D coordinate system.
-    Class Point
-    {
-        ; ## Constructors ##
-        ; Creates a Point object. Initializes X and Y data to zero. This is the default constructor.
-        Point()
-        {
-            Return
-        }
-        
-        ; Creates a Point object. Initialize the X and Y data members using passed values.
-        Point(INT,INT)
-        {
-            Return
-        }
-        
-        ; Creates a new Point object by copying the data members from another Point object.
-        Point(Point&)
-        {
-            Return
-        }
-        
-        ; Creates a Point object using a Size object to initialize the X and Y data members.
-        Point(Size&)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; Determines whether two Point objects are equal. Two points are considered equal if they have the same X and Y data members.
-        Equals()
-        {
-            Return
-        }
-        
-        operator-(Point&)()                                                 ; Subtracts the X and Y data members of two Point objects.
-        operator+(Point&)()                                                 ; Adds the X and Y data members of two Point objects.
-                                            
-    PointF                                  
-        ; ## Constructors ##
-        ; Creates a PointF object and initializes the X and Y data members to zero. This is the default constructor.
-        PointF()
-        {
-            Return
-        }
-        
-        ; Creates a new PointF object and copies the data from another PointF object.
-        PointF(PointF&)
-        {
-            Return
-        }
-        
-        ; Creates a PointF object using two real numbers to specify the X and Y data members.
-        PointF(REAL,REAL)
-        {
-            Return
-        }
-        
-        ; Creates a PointF object using a SizeF object to specify the X and Y data members.
-        PointF(SizeF&)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        Equals                              ; Determines whether two PointF objects are equal. Two points are considered equal if they have the same X and Y data members.
-        operator-(PointF&)                                                  ; Subtracts the X and Y data members of two PointF objects.
-        operator+(PointF&)                                                  ; Adds the X and Y data members of two PointF objects.
-    }
-        
-    ; Keeps a collection of fonts specifically for an application.
-    Class PrivateFontCollection
-    {
-        ; ## Inherit ##   The PrivateFontCollection class implements FontCollection.
-        
-        ; ## Methods ##
-        ; Adds a font file to this private font collection.
-        AddFontFile()
-        {
-            Return
-        }
-        
-        ; Adds a font that is contained in system memory to a Windows GDI+ font collection.
-        AddMemoryFont()
-        {
-            Return
-        }
-        
-        ; Creates an empty PrivateFontCollection object.
-        PrivateFontCollection()
-        {
-            Return
-        }
-        
-        ; Creates an empty PrivateFontCollection object.
-        PrivateFontCollection()
-        {
-            Return
-        }
-        
-    }
-        
-    ; A PropertyItem object holds one piece of image metadata and is a helper class for the Image and Bitmap classes.
-    Class PropertyItem
-    {
-    }
-        
-    ; Stores the upper-left corner's x and y, width, and height of a rectangle.
-    Class Rect
-    {
-        ; ## Constructors ##
-        ; Creates a Rect object whose x-coordinate, y-coordinate, width, and height are all zero. This is the default constructor.
-        Rect()
-        {
-            Return
-        }
-        
-        ; Creates a Rect object by using four integers to initialize the X, Y, Width, and Height data members.
-        Rect(INT,INT,INT,INT)
-        {
-            Return
-        }
-        
-        ; Creates a Rect object by using a Point object to initialize the X and Y data members and a Size object to initialize the Width and Height data members.
-        Rect(Point&,Size&)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; Creates a new Rect object and initializes it with the contents of this Rect object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Determines whether the point ( x, y)                                 ; is inside this rectangle.
-        Contains(INT,INT)
-        {
-            Return
-        }
-        
-        ; Determines whether a point is inside this rectangle.
-        Contains(Point&)
-        {
-            Return
-        }
-        
-        ; Determines whether another rectangle is inside this rectangle.
-        Contains(Rect&)
-        {
-            Return
-        }
-        
-        ; Determines whether two rectangles are the same.
-        Equals()
-        {
-            Return
-        }
-        
-        ; Gets the y-coordinate of the bottom edge of the rectangle.
-        GetBottom()
-        {
-            Return
-        }
-        
-        ; Makes a copy of this rectangle.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets the x-coordinate of the left edge of the rectangle.
-        GetLeft()
-        {
-            Return
-        }
-        
-        ; Gets the coordinates of the upper-left corner of the rectangle.
-        GetLocation()
-        {
-            Return
-        }
-        
-        ; Gets the x-coordinate of the right edge of the rectangle.
-        GetRight()
-        {
-            Return
-        }
-        
-        ; Gets the width and height of the rectangle.
-        GetSize()
-        {
-            Return
-        }
-        
-        ; Gets the y-coordinate of the top edge of the rectangle.
-        GetTop()
-        {
-            Return
-        }
-        
-        ; Expands the rectangle by dx on the left and right edges, and by dy on the top and bottom edges.
-        Inflate(INT,INT)
-        {
-            Return
-        }
-        
-        ; Expands the rectangle by the value of point.X on the left and right edges, and by the value of point.Y on the top and bottom edges.
-        Inflate(Point&)
-        {
-            Return
-        }
-        
-        ; Replaces this rectangle with the intersection of itself and another rectangle.
-        Intersect(Rect&)
-        {
-            Return
-        }
-        
-        ; Determines the intersection of two rectangles and stores the result in a Rect object.
-        Intersect(Rect&,Rect&,Rect&)
-        {
-            Return
-        }
-        
-        ; Determines whether this rectangle intersects another rectangle.
-        IntersectsWith()
-        {
-            Return
-        }
-        
-        ; Determines whether this rectangle is empty.
-        IsEmptyArea()
-        {
-            Return
-        }
-        
-        ; Moves the rectangle by dx horizontally and by dy vertically.
-        Offset(INT,INT)
-        {
-            Return
-        }
-        
-        ; Moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.
-        Offset(Point&)
-        {
-            Return
-        }
-        
-        ; Determines the union of two rectangles and stores the result in a Rect object.
-        Union()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Stores the upper-left corner's x and y, width, and height of a rectangle. The RectF class uses floating point numbers.
-    Class RectF
-    {
-        ; ## Constructors ##
-        ; Creates a RectF object and initializes the X and Y data members to zero. This is the default constructor.
-        RectF()
-        {
-            Return
-        }
-        
-        ; Creates a RectF object by using a PointF object to initialize the X and Y data members and uses a SizeF object to initialize the Width and Height data members of this rectangle.
-        RectF(PointF&,SizeF&)
-        {
-            Return
-        }
-        
-        ; Creates a RectF object by using four integers to initialize the X, Y, Width, and Height data members.
-        RectF(REAL,REAL,REAL,REAL)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; Creates a new RectF object and initializes it with the contents of this RectF object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Determines whether a point is inside this rectangle.
-        Contains(PointF&)
-        {
-            Return
-        }
-        
-        ; Determines whether the point (x, y)                                 ; is inside this rectangle.
-        Contains(REAL,REAL)
-        {
-            Return
-        }
-        
-        ; Determines whether another rectangle is inside this rectangle.
-        Contains(RectF&)
-        {
-            Return
-        }
-        
-        ; Determines whether two rectangles are the same.
-        Equals()
-        {
-            Return
-        }
-        
-        ; Gets the y-coordinate of the bottom edge of the rectangle.
-        GetBottom()
-        {
-            Return
-        }
-        
-        ; Makes a copy of this rectangle.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets the x-coordinate of the left edge of the rectangle.
-        GetLeft()
-        {
-            Return
-        }
-        
-        ; Gets the coordinates of the upper-left corner of this rectangle.
-        GetLocation()
-        {
-            Return
-        }
-        
-        ; Gets the x-coordinate of the right edge of the rectangle.
-        GetRight()
-        {
-            Return
-        }
-        
-        ; Gets the width and height of this rectangle.
-        GetSize()
-        {
-            Return
-        }
-        
-        ; Gets the y-coordinate of the top edge of the rectangle.
-        GetTop()
-        {
-            Return
-        }
-        
-        ; Expands the rectangle by the value of point.X on the left and right edges, and by the value of point.Y on the top and bottom edges.
-        Inflate(PointF&)
-        {
-            Return
-        }
-        
-        ; Expands the rectangle by dx on the left and right edges, and by dy on the top and bottom edges.
-        Inflate(REAL,REAL)
-        {
-            Return
-        }
-        
-        ; Replaces this rectangle with the intersection of itself and another rectangle.
-        Intersect(RectF&)
-        {
-            Return
-        }
-        
-        ; Determines the intersection of two rectangles and stores the result in a RectF object.
-        Intersect(RectF&,RectF&,RectF&)
-        {
-            Return
-        }
-        
-        ; Determines whether this rectangle intersects another rectangle.
-        IntersectsWith()
-        {
-            Return
-        }
-        
-        ; Determines whether this rectangle is empty.
-        IsEmptyArea()
-        {
-            Return
-        }
-        
-        ; Moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.
-        Offset(PointF&)
-        {
-            Return
-        }
-        
-        ; Moves the rectangle by dx horizontally and by dx vertically.
-        Offset(REAL,REAL)
-        {
-            Return
-        }
-        
-        ; Determines the union of two rectangles and stores the result in a RectF object.
-        Union()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Enables you to correct the red eyes that sometimes occur in flash photographs.
-    Class RedEyeCorrection
-    {
-        ; ## Inherit ##   The RedEyeCorrection class implements Effect.
-        
-        ; ## Methods ##
-        ; Gets the current values of the parameters of this RedEyeCorrection object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Creates a RedEyeCorrection object.
-        RedEyeCorrection()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this RedEyeCorrection object.
-        SetParameters()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Describes an area of the display surface. The area can be any shape.
-    Class Region
-    {
-        ; ## Inherit ##   The Region class implements GdiplusBase.
-        
-        ; ## Methods ##
-        ; Makes a copy of this Regionobject and returns the address of the new Regionobject.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of the specified path's interior that does not intersect this region.
-        Complement()
-        {
-            Return
-        }
-        
-        ; Updates a region that does not intersect this region.
-        Complement()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of the specified rectangle's interior that does not intersect this region.
-        Complement()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of another region that does not intersect this region.
-        Complement()
-        {
-            Return
-        }
-        
-        ; Determines whether this region is equal to a specified region.
-        Equals()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of itself that does not intersect the specified path's interior.
-        Exclude()
-        {
-            Return
-        }
-        
-        ; Updates a region that does not intersect the specified rectangle's interior.
-        Exclude()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of itself that does not intersect the specified rectangle's interior.
-        Exclude()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of itself that does not intersect another region.
-        Exclude()
-        {
-            Return
-        }
-        
-        ; Creates a Windows GDI+Region object from a Windows Graphics Device Interface (GDI)                                  ; region.
-        FromHRGN()
-        {
-            Return
-        }
-        
-        ; Gets a rectangle that encloses this region.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets a rectangle that encloses this region.
-        GetBounds()
-        {
-            Return
-        }
-        
-        ; Gets data that describes this region.
-        GetData()
-        {
-            Return
-        }
-        
-        ; Gets the number of bytes of data that describes this region.
-        GetDataSize()
-        {
-            Return
-        }
-        
-        ; Creates a Windows Graphics Device Interface (GDI)                                 ; region from this region.
-        GetHRGN()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this Regionobject's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets an array of rectangles that approximate this region. The region is transformed by a specified matrix before the rectangles are calculated.
-        GetRegionScans()
-        {
-            Return
-        }
-        
-        ; Gets an array of rectangles that approximate this region.
-        GetRegionScans()
-        {
-            Return
-        }
-        
-        ; Gets the number of rectangles that approximate this region. The region is transformed by a specified matrix before the rectangles are calculated.
-        GetRegionScansCount()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of itself that intersects the specified path's interior.
-        Intersect()
-        {
-            Return
-        }
-        
-        ; Updates a region intersects the specified rectangle's interior.
-        Intersect()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of itself that intersects the specified rectangle's interior.
-        Intersect()
-        {
-            Return
-        }
-        
-        ; Updates this region to the portion of itself that intersects another region.
-        Intersect()
-        {
-            Return
-        }
-        
-        ; Determines whether this region is empty.
-        IsEmpty()
-        {
-            Return
-        }
-        
-        ; Determines whether this region is infinite.
-        IsInfinite()
-        {
-            Return
-        }
-        
-        ; Determines whether a point is inside this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a point is inside this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a rectangle intersects this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a rectangle intersects this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a point is inside this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a rectangle intersects this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a point is inside this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Determines whether a rectangle intersects this region.
-        IsVisible()
-        {
-            Return
-        }
-        
-        ; Updates this region to an empty region. In other words, the region occupies no space on the display device.
-        MakeEmpty()
-        {
-            Return
-        }
-        
-        ; Updates this region to an infinite region.
-        MakeInfinite()
-        {
-            Return
-        }
-        
-        ; Creates a region that is infinite. This is the default constructor.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is defined by data obtained from another region.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is defined by a path (a GraphicsPath object)                                 ; and has a fill mode that is contained in the GraphicsPath object.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is defined by a rectangle.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is defined by a rectangle.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is infinite. This is the default constructor.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is infinite. This is the default constructor.
-        Region()
-        {
-            Return
-        }
-        
-        ; Creates a region that is identical to the region that is specified by a handle to a Windows Graphics Device Interface (GDI)                                 ; region.
-        Region()
-        {
-            Return
-        }
-        
-        ; Transforms this region by multiplying each of its data points by a specified matrix.
-        Transform()
-        {
-            Return
-        }
-        
-        ; Offsets this region by specified amounts in the horizontal and vertical directions.
-        Translate()
-        {
-            Return
-        }
-        
-        ; Offsets this region by specified amounts in the horizontal and vertical directions.
-        Translate()
-        {
-            Return
-        }
-        
-        ; Updates this region to all portions (intersecting and nonintersecting)                                 ; of itself and all portions of the specified path's interior.
-        Union()
-        {
-            Return
-        }
-        
-        ; Updates this region.
-        Union()
-        {
-            Return
-        }
-        
-        ; Updates this region to all portions (intersecting and nonintersecting)                                 ; of itself and all portions of the specified rectangle's interior.
-        Union()
-        {
-            Return
-        }
-        
-        ; Updates this region to all portions (intersecting and nonintersecting)                                 ; of itself and all portions of another region.
-        Union()
-        {
-            Return
-        }
-        
-        ; Updates this region to the nonintersecting portions of itself and the specified path's interior.
-        Xor()
-        {
-            Return
-        }
-        
-        ; Updates a region to the nonintersecting portions with a rectangle's interior.
-        Xor()
-        {
-            Return
-        }
-        
-        ; Updates this region to the nonintersecting portions of itself and the specified rectangle's interior.
-        Xor()
-        {
-            Return
-        }
-        
-        ; Updates this region to the nonintersecting portions of itself and another region.
-        Xor()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Enables you to adjust the sharpness of a bitmap.
-    Class Sharpen
-    {
-        ; ## Inherit ##   The Sharpen class implements Effect.
-        
-        ; ## Methods ##
-        ; Gets the current values of the parameters of this Sharpen object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this Sharpen object.
-        SetParameters()
-        {
-            Return
-        }
-        
-        ; Creates a Sharpen object.
-        Sharpen()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Encapsulates a Width and Height dimension in a 2-D coordinate system.
-    Class Size
-    {
-        ; ## Constructors ##
-        ; Creates a new Size object and initializes the members to zero. This is the default constructor.
-        Size()
-        {
-            Return
-        }
-        
-        ; Creates a Size object and initializes its Width and Height data members.
-        Size(INT,INT)
-        {
-            Return
-        }
-        
-        ; Creates a Size object and initializes its members by copying the members of another Size object.
-        Size(Size&)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; Determines whether a Size object is empty.
-        Empty()
-        {
-            Return
-        }
-        
-        ; Determines whether two Size objects are equal.
-        Equals()
-        {
-            Return
-        }
-        
-        operator-(Size&)                                                    ; Subtracts the Width and Height data members of two Size objects.
-        operator+(Size&)                                                    ; Adds the Width and Height data members of two Size objects.
-    }
-        
-    ; Encapsulates a Width and Height dimension in a 2-D coordinate system. The SizeF class uses floating point numbers.
-    Class SizeF
-    {
-        ; ## Constructors ##
-        ; Creates a SizeF object and initializes the members to zero. This is the default constructor.
-        SizeF()
-        {
-            Return
-        }
-        
-        ; Creates a SizeF object and initializes its Width and Height data members.
-        SizeF(REAL,REAL)
-        {
-            Return
-        }
-        
-        ; Creates a SizeF object and initializes its members by copying the members of another SizeF object.
-        SizeF(SizeF&)
-        {
-            Return
-        }
-        
-        
-        ; ## Methods ##
-        ; The Empty method determines whether a SizeF object is empty.
-        Empty()
-        {
-            Return
-        }
-        
-        ; The Equals method determines whether two SizeF objects are equal.
-        Equals()
-        {
-            Return
-        }
-        
-        operator-(SizeF&)                                                   ; The operator- method subtracts the Width and Height data members of two SizeF objects.
-        operator+(SizeF&)                                                   ; The operator+ method adds the Width and Height data members of two SizeF objects.
-    }
-        
-    ; A Brush object is used to fill in shapes similar to the way a paint brush can paint the inside of a shape.
-    Class SolidBrush
-    {
-        ; ## Inherit ##   The SolidBrush class implements Brush.
-        
-        ; ## Methods ##
-        ; Gets the color of this solid brush.
-        GetColor()
-        {
-            Return
-        }
-        
-        ; Sets the color of this solid brush.
-        SetColor()
-        {
-            Return
-        }
-        
-        ; Creates a SolidBrush object based on a color.
-        SolidBrush()
-        {
-            Return
-        }
-        
-        ; Copy constructor for SolidBrush.
-        SolidBrush()
-        {
-            Return
-        }
-        
-        ; Creates a SolidBrush object based on a color.
-        SolidBrush()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Encapsulates text layout information and display manipulations.
-    Class StringFormat
-    {
-        ; ## Inherit ##   The StringFormat class implements GdiplusBase.
-        
-        ; ## Methods ##
-        ; Creates a new StringFormat object and initializes it with the contents of this StringFormat object.
-        Clone()
-        {
-            Return
-        }
-        
-        ; Creates a generic, default StringFormat object.
-        GenericDefault()
-        {
-            Return
-        }
-        
-        ; Creates a generic, typographic StringFormat object.
-        GenericTypographic()
-        {
-            Return
-        }
-        
-        ; Gets an element of the StringAlignment enumeration that indicates the character alignment of this StringFormat object in relation to the origin of the layout rectangle.
-        GetAlignment()
-        {
-            Return
-        }
-        
-        ; Gets the language that corresponds with the digits that are to be substituted for Western European digits.
-        GetDigitSubstitutionLanguage()
-        {
-            Return
-        }
-        
-        ; Gets an element of the StringDigitSubstitute enumeration that indicates the digit substitution method that is used by this StringFormat object.
-        GetDigitSubstitutionMethod()
-        {
-            Return
-        }
-        
-        ; Gets the string format flags for this StringFormat object.
-        GetFormatFlags()
-        {
-            Return
-        }
-        
-        ; Gets an element of the HotkeyPrefix enumeration that indicates the type of processing that is performed on a string when a hot key prefix, an ampersand (&), is encountered.
-        GetHotkeyPrefix()
-        {
-            Return
-        }
-        
-        ; Returns a value that indicates the nature of this StringFormat object's most recent method failure.
-        GetLastStatus()
-        {
-            Return
-        }
-        
-        ; Gets an element of the StringAlignment enumeration that indicates the line alignment of this StringFormat object in relation to the origin of the layout rectangle.
-        GetLineAlignment()
-        {
-            Return
-        }
-        
-        ; Gets the number of measurable character ranges that are currently set. The character ranges that are set can be measured in a string by using the MeasureCharacterRanges method.
-        GetMeasurableCharacterRangeCount()
-        {
-            Return
-        }
-        
-        ; Gets the number of tab-stop offsets in this StringFormat object.
-        GetTabStopCount()
-        {
-            Return
-        }
-        
-        ; Gets the offsets of the tab stops in this StringFormat object.
-        GetTabStops()
-        {
-            Return
-        }
-        
-        ; Gets an element of the StringTrimming enumeration that indicates the trimming style of this StringFormat object.
-        GetTrimming()
-        {
-            Return
-        }
-        
-        ; Sets the character alignment of this StringFormat object in relation to the origin of the layout rectangle. A layout rectangle is used to position the displayed string.
-        SetAlignment()
-        {
-            Return
-        }
-        
-        ; Sets the digit substitution method and the language that corresponds to the digit substitutes.
-        SetDigitSubstitution()
-        {
-            Return
-        }
-        
-        ; Sets the format flags for this StringFormat object. The format flags determine most of the characteristics of a StringFormat object.
-        SetFormatFlags()
-        {
-            Return
-        }
-        
-        ; Sets the type of processing that is performed on a string when the hot key prefix, an ampersand (&), is encountered.
-        SetHotkeyPrefix()
-        {
-            Return
-        }
-        
-        ; Sets the line alignment of this StringFormat object in relation to the origin of the layout rectangle.
-        SetLineAlignment()
-        {
-            Return
-        }
-        
-        ; Sets a series of character ranges for this StringFormat object that, when in a string, can be measured by the MeasureCharacterRanges method.
-        SetMeasurableCharacterRanges()
-        {
-            Return
-        }
-        
-        ; Sets the offsets for tab stops in this StringFormat object.
-        SetTabStops()
-        {
-            Return
-        }
-        
-        ; Sets the trimming style for this StringFormat object. The trimming style determines how to trim a string so that it fits into the layout rectangle.
-        SetTrimming()
-        {
-            Return
-        }
-        
-        ; Creates a StringFormat object from another StringFormat object.
-        StringFormat()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the StringFormat class. For a complete class listing, see StringFormat Class.
-        StringFormat()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the StringFormat class. For a complete class listing, see StringFormat Class.
-        StringFormat()
-        {
-            Return
-        }
-        
-        ; Creates a StringFormat object based on string format flags and a language.
-        StringFormat()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Defines a Brush object that contains an Image object that is used for the fill.
-    Class TextureBrush
-    {
-        ; ## Inherit ##   The TextureBrush class implements Brush.
-        
-        ; ## Methods ##
-        ; Gets a pointer to the Image object that is defined by this texture brush.
-        GetImage()
-        {
-            Return
-        }
-        
-        ; Gets the transformation matrix of this texture brush.
-        GetTransform()
-        {
-            Return
-        }
-        
-        ; Gets the wrap mode currently set for this texture brush.
-        GetWrapMode()
-        {
-            Return
-        }
-        
-        ; Updates this brush's transformation matrix with the product of itself and another matrix.
-        MultiplyTransform()
-        {
-            Return
-        }
-        
-        ; Resets the transformation matrix of this texture brush to the identity matrix. This means that no transformation takes place.
-        ResetTransform()
-        {
-            Return
-        }
-        
-        ; Updates this texture brush's current transformation matrix with the product of itself and a rotation matrix.
-        RotateTransform()
-        {
-            Return
-        }
-        
-        ; Updates this texture brush's current transformation matrix with the product of itself and a scaling matrix.
-        ScaleTransform()
-        {
-            Return
-        }
-        
-        ; Sets the transformation matrix of this texture brush.
-        SetTransform()
-        {
-            Return
-        }
-        
-        ; Sets the wrap mode of this texture brush.
-        SetWrapMode()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the TextureBrush class. For a complete class listing, see TextureBrush Class.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image and a wrap mode. The size of the brush defaults to the size of the image, so the entire image is used by the brush.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image, a wrap mode, and a defining rectangle.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image, a wrap mode, and a defining rectangle.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Lists the constructors of the TextureBrush class. For a complete class listing, see TextureBrush Class.
-        TextureBrush()
-        {
-            Return
-        }
-        
-        ; Updates this brush's current transformation matrix with the product of itself and a translation matrix.
-        TranslateTransform()
-        {
-            Return
-        }
-        
-    }
-        
-    ; Enables you to apply a tint to a bitmap.
-    Class Tint
-    {
-        ; ## Inherit ##   The Tint class implements Effect.
-        
-        ; ## Methods ##
-        ; Gets the current values of the parameters of this Tint object.
-        GetParameters()
-        {
-            Return
-        }
-        
-        ; Sets the parameters of this Tint object.
-        SetParameters()
-        {
-            Return
-        }
-        
-        ; Creates a Tint object.
-        Tint()
-        {
-            Return
-        }
-        
-    }
-}
-*/
 
 
 
+; ##  gdiplusheaders.h  ##
+; This data was pulled from the gdiplusheaders.h file and contains most of the wrapper calls used by
+; GDIP's class based setup.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-GDI+ Class and Method List
-                                                                                                                                                                               
-AdjustableArrowCap                      ; Builds a line cap that looks like an arrow. This is a subclass of CustomLineCap.
-    ::Inherit::                         
-    ::Methods::                         
-    AdjustableArrowCap()                ; Creates an adjustable arrow line cap with specified height and width. Can be filled or unfilled. Middle inset defaults to zero.
-    GetHeight()                         ; Gets height of arrow cap. The height is the distance from the base of the arrow to its vertex.
-    GetMiddleInset()                    ; Gets value of inset. The middle inset is the number of units that the midpoint of the base shifts towards the vertex.
-    GetWidth()                          ; Gets width of arrow cap. The width is the distance between the endpoints of the base of the arrow.
-    IsFilled()                          ; Determines whether the arrow cap is filled.
-    SetFillState()                      ; Sets fill state of the arrow cap. If the arrow cap is not filled, only the outline is drawn.
-    SetHeight()                         ; Sets height of the arrow cap. This is the distance from the base of the arrow to its vertex.
-    SetMiddleInset()                    ; Sets number of units that the midpoint of the base shifts towards the vertex.
-    SetWidth()                          ; Sets width of the arrow cap. The width is the distance between the endpoints of the base of the arrow.
-                                                                                                                                                                                       
-Bitmap                                  ; Inherits from the Image class. The Image class provides saving and loading methods for vector images (metafiles) ; and raster images (bitmaps).
-    ::Inherit::                         
-    ::Methods::                         
-    ApplyEffectThe()                    ; Bitmap::ApplyEffect method creates a new Bitmap object by applying a specified effect to an existing Bitmap object.
-    ApplyEffectThe()                    ; Bitmap::ApplyEffect method alters this Bitmap object by applying a specified effect.
-    Bitmap()                            ; Creates a Bitmap object based on a BITMAPINFO structure and an array of pixel data.
-    Bitmap()                            ; Creates a Bitmap object based on an image file.
-    Bitmap()                            ; Creates a Bitmap object based on a handle to a Windows Windows Graphics Device Interface (GDI) ; bitmap and a handle to a GDI palette.
-    Bitmap()                            ; Creates a Bitmap object based on an icon.
-    Bitmap()                            ; Creates a Bitmap object based on an application or DLL instance handle and the name of a bitmap resource.
-    Bitmap()                            ; Creates a Bitmap object based on a DirectDraw surface. The Bitmap::Bitmap object maintains a reference to the DirectDraw surface until the Bitmap::Bitmap object is deleted or goes out of scope.
-    Bitmap()                            ; Creates a Bitmap object based on a Graphics object, a width, and a height.
-    Bitmap()                            ; Creates a Bitmap object based on an array of bytes along with size and format information.
-    Bitmap()                            ; Creates a Bitmap object of a specified size and pixel format. The pixel data must be provided after the Bitmap::Bitmap object is constructed.
-    Bitmap()                            ; Creates a Bitmap object based on an IStream COM interface.
-    CloneThe()                          ; Creates a new Bitmap object by copying a portion of this bitmap.
-    CloneThe()                          ; Creates a new Bitmap object by copying a portion of this bitmap.
-    CloneThe()                          ; Creates a new Bitmapobject by copying a portion of this bitmap.
-    CloneThe()                          ; Creates a new Bitmapobject by copying a portion of this bitmap.
-    ConvertFormatThe()                  ; Converts a bitmap to a specified pixel format. The original pixel data in the bitmap is replaced by the new pixel data.
-    FromBITMAPINFOThe()                 ; Creates a Bitmap object based on a BITMAPINFO structure and an array of pixel data.
-    FromDirectDrawSurface()             ; Creates a Bitmap object based on a DirectDraw surface. The Bitmap object maintains a reference to the DirectDraw surface until the Bitmap object is deleted.
-    FromFileThe()                       ; Creates a Bitmap object based on an image file.
-    FromHBITMAPThe()                    ; Creates a Bitmap object based on a handle to a Windows Graphics Device Interface (GDI) ; bitmap and a handle to a GDI palette.
-    FromHICONThe()                      ; Creates a Bitmap object based on a handle to an icon.
-    FromResourceThe()                   ; Creates a Bitmap object based on an application or DLL instance handle and the name of a bitmap resource.
-    FromStreamThe()                     ; Creates a Bitmap object based on a stream.
-    GetHBITMAPThe()                     ; Creates a Windows Graphics Device Interface (GDI) ; bitmap from this Bitmap object.
-    GetHICONThe()                       ; Creates an icon from this Bitmap object.
-    GetHistogramThe()                   ; Returns one or more histograms for specified color channels of this Bitmap object.
-    GetHistogramSizeThe()               ; The number of elements (in an array of UINTs) ; that you must allocate before you call the Bitmap::GetHistogram method of a Bitmap object.
-    GetPixelThe()                       ; Gets the color of a specified pixel in this bitmap.
-    InitializePaletteThe()              ; Initializes a standard, optimal, or custom color palette.
-    LockBitsThe()                       ; Locks a rectangular portion of this bitmap and provides a temporary buffer that you can use to read or write pixel data in a specified format.
-    SetPixelThe()                       ; Sets the color of a specified pixel in this bitmap.
-    SetResolutionThe()                  ; Sets the resolution of this Bitmap object.
-    UnlockBitsThe()                     ; Unlocks a portion of this bitmap that was previously locked by a call to Bitmap::LockBits.
-                                                                                                                                                                                       
-BitmapData                              ; Used by the Bitmap::LockBits and Bitmap::UnlockBits methods of the Bitmap class. A BitmapData object stores attributes of a bitmap.
-    ::Inherit::                         
-    ::Methods::                         
-                                                                                                                                                                                       
-Blur                                    ; Enables you to apply a Gaussian blur effect to a bitmap and specify the nature of the blur.
-    ::Inherit::                         
-    ::Methods::                         
-    BlurCreates()                       ; Blur object.
-    GetParameters()                     ; Gets current values of Blur object parameters.
-    SetParameters()                     ; Sets value for Blur object.
-                                                                                                                                                                                   
-BrightnessContrast                      ; Enables you to change the brightness and contrast of a bitmap. 
-    ::Inherit::                         
-    ::Methods::                         
-    BrightnessContrast()                ; Creates a new BrightnessContrast object.
-    GetParameters()                     ; Gets current values of the parameters of this BrightnessContrast object.
-    SetParameters()                     ; Sets parameters of this BrightnessContrast object.    
-                                                                                                                                                                                   
-Brush                                   ; An abstract base class that defines a Brush object. A Brush object is used to paint the interior of graphics shapes, such as rectangles, ellipses, pies, polygons, and paths.
-    ::Inherit::                         
-    ::Methods::                         
-    Clone()                             ; Creates a copy of a Brush object.
-    GetLastStatus()                     ; Returns a value indicating this Brush object's most recent method failure.
-    GetType()                           ; Gets the type of this brush.
-                                                                                                                                                                                       
-CachedBitmap                            ; Stores a bitmap in a format that is optimized for display on a particular device.
-    ::Inherit::                         
-    ::Methods::                         
-    CachedBitmap()                      ; Create a CachedBitmap object based on a Bitmap object and Graphics object.
-    CachedBitmap()                      ; Copy constructor for CachedBitmap.
-    GetLastStatus()                     ; Returns a value indicating if CachedBitmap object was constructed successfully.
-                                                                                                                                                                                       
-CharacterRange                          ; Specifies a range of character positions within a string
-    ::Inherit::                         
-    ::Constructors::                    
-    CharacterRange()                    ; Creates a CharacterRange object with data members set to zero.
-    CharacterRange(INT,INT)             ; Creates a CharacterRange object and initializes data members to the values specified.    
-    ::Methods::                         
-    operator=()                         ; The operator= method sets a CharacterRange object equal to the specified CharacterRange object.
-                                                                                                                                                                                       
-Color                                   ; An object that stores a 32-bit value representing a color. The value contains four 8-bit components: alpha, red, green, and blue (respectively)
-    ::Inherit::                         
-    ::Constructors::                    
-    Color()                             ; Creates Color object and initializes it to opaque black. This is the default constructor.
-    Color(ARGB)                         ; Creates Color object using an ARGB value.
-    Color(BYTE,BYTE,BYTE)               ; Creates Color object using specified values for the red, green, and blue components. This constructor sets the alpha component to 255 (opaque).
-    Color(BYTE,BYTE,BYTE,BYTE)          ; Creates Color object using specified values for the alpha, red, green, and blue components.     
-    ::Methods::                         
-    GetA()                              ; Gets alpha component of Color object.
-    GetAlpha()                          ; Gets alpha component of Color object.
-    GetB()                              ; Gets blue component of Color object.
-    GetBlue()                           ; Gets blue component of Color object.
-    GetG()                              ; Gets green component of Color object.
-    GetGreen()                          ; Gets green component of Color object.
-    GetR()                              ; Gets red component of Color object.
-    GetRed()                            ; Gets red component of Color object.
-    GetValue()                          ; Gets ARGB value of this Color object.
-    MakeARGB()                          ; Creates a 32-bit value using the specified alpha, red, green, and blue components.
-    SetFromCOLORREF()                   ; Uses a GDICOLORREF value to set the ARGB value of this Color object.
-    SetValue()                          ; Sets the color of this Color object.
-    ToCOLORREF()                        ; Converts this Color object's ARGB value to a GDICOLORREF value.
-                                                                                                                                                                                   
-ColorBalance                            ; The ColorBalance class enables you to change the color balance (relative amounts of red, green, and blue) ; of a bitmap.
-    ::Inherit::                         
-    ::Methods::                         
-    ColorBalance()                      ; Create new ColorBalance object.
-    GetParameters()                     ; Gets the current values of the parameters of this ColorBalance object.
-    SetParameters()                     ; Sets the parameters of this ColorBalance object.
-                                                                                                                                                                                       
-ColorCurve                              ; Eight different image adjustments: Exposure, density, contrast, highlight, shadow, midtone, white saturation, black saturation
-    ::Inherit::                         
-    ::Methods::                         
-    ColorCurve()                        ; Creates a ColorCurve object.
-    GetParameters()                     ; Gets the current values of the parameters of this ColorCurve object.
-    SetParameters()                     ; Sets the parameters of this ColorCurve object.
-                                                                                                                                                                                       
-ColorLUT                                ; Use lookup tables to make custom color adjustments to bitmaps. A ColorLUTParams structure has four members, each being a lookup table for : alpha, red, green, or blue.
-    ::Inherit::                         
-    ::Methods::                         
-    ColorLUT()                          ; Creates a new ColorLUT object.
-    GetParameters()                     ; Gets the current values of the parameters of this ColorLUT object.
-    SetParameters()                     ; Sets the parameters of this ColorLUT object.
-                                                                                                                                                                                       
-ColorMatrixEffect                       ; Enables you to apply an affine transformation to a bitmap.
-    ::Inherit::                         
-    ::Methods::                         
-    ColorMatrixEffect()                 ; Creates a ColorMatrixEffect object.
-    GetParameters()                     ; Gets the elements of the current 5x5 color matrix of this ColorMatrixEffect object.
-    SetParameters()                     ; Sets the 5x5 color matrix of this ColorMatrixEffect object.
-                                                                                                                                                                                   
-CustomLineCap                           ; Encapsulates a custom line cap. A line cap defines the style of graphic used to draw the ends of a line. It can be various shapes, such as a square, circle, or diamond. A custom line cap is defined by the path that draws it.
-    ::Inherit::                         
-    ::Methods::                         
-    Clone()                             ; Copies the contents of the existing object into a new CustomLineCap object.
-    CustomLineCap()                     ; Copy constructor for CustomLineCap.
-    CustomLineCap()                     ; Creates a CustomLineCap object.
-    CustomLineCap()                     ; Creates a CustomLineCap object.
-    GetBaseCap()                        ; Gets the style of the base cap. The base cap is a LineCap object used as a cap at the end of a line along with this CustomLineCap object.
-    GetBaseInset()                      ; Gets the distance between the base cap to the start of the line.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this CustomLineCap object's most recent method failure.
-    GetStrokeCaps()                     ; Gets the end cap styles for both the start line cap and the end line cap. Line caps are LineCap objects that end the individual lines within a path.
-    GetStrokeJoin()                     ; Returns the style of LineJoin used to join multiple lines in the same GraphicsPath object.
-    GetWidthScale()                     ; Gets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen object used to draw a line. The default value of 1.0 does not scale the line cap.
-    SetBaseCap()                        ; Sets the LineCap that appears as part of this CustomLineCap at the end of a line.
-    SetBaseInset()                      ; Sets the base inset value of this custom line cap. This is the distance between the end of a line and the base cap.
-    SetStrokeCap()                      ; Sets the LineCap object used to start and end lines within the GraphicsPath object that defines this CustomLineCap object.
-    SetStrokeCaps()                     ; Sets the LineCap objects used to start and end lines within the GraphicsPath object that defines this CustomLineCap object.
-    SetStrokeJoin()                     ; Sets the style of line join for the stroke. The line join specifies how two lines that intersect within the GraphicsPath object that makes up the custom line cap are joined.
-    SetWidthScale()                     ; Sets the value of the scale width. This is the amount to scale the custom line cap relative to the width of the Pen used to draw lines. The default value of 1.0 does not scale the line cap.
-                                                                                                                                                                                   
-Effect                                  ; Serves as a base class for eleven classes that you can use to apply effects and adjustments to bitmaps. 
-    ::Inherit::                         
-    ::Constructors::                    
-    Effect()                            ; Creates an Effect object
-    ::Methods::                         
-    GetAuxData()                        ; Gets a pointer to a set of lookup tables created by a previous call to the Bitmap::ApplyEffect method.
-    GetAuxDataSize()                    ; Gets the size, in bytes, of the auxiliary data created by a previous call to the Bitmap::ApplyEffect method.
-    GetParameterSize()                  ; Gets the total size, in bytes, of the parameters currently set for this Effect. The Effect::GetParameterSize method is usually called on an object that is an instance of a descendant of the Effect class.
-    UseAuxData()                        ; Sets or clears a flag that specifies whether the Bitmap::ApplyEffect method should return a pointer to the auxiliary data that it creates.
-                                                                                                                                                                                       
-EncoderParameter                        ; Holds a parameter that can be passed to an image encoder.
-    ::Inherit::                         
-    ::Methods::                         
-                                                                                                                                                                                       
-EncoderParameters                       ; An array of EncoderParameter objects along with a data member that specifies the number of EncoderParameter objects in the array.
-    ::Inherit::                         
-    ::Methods::                         
-                                                                                                                                                                                       
-Font                                    ; Encapsulates the characteristics, such as family, height, size, and style (or combination of styles), of a specific font. A Font object is used when drawing strings.
-    ::Inherit::                         
-    ::Methods::                         
-    Clone()                             ; Creates a new Font object based on this Font object.
-    Font()                              ; Lists the constructors of the Font class. For a complete class listing, see Font Class.
-    Font()                              ; Creates a Font object based on a FontFamily object, a size, a font style, and a unit of measurement.
-    Font()                              ; Creates a Font object based on a font family, a size, a font style, a unit of measurement, and a FontCollection object.
-    Font()                              ; This topic lists the constructors of the Font class. For a complete class listing, see Font Class.
-    Font()                              ; Creates a Font object based on the Windows Graphics Device Interface (GDI) ; font object that is currently selected into a specified device context. This constructor is provided for compatibility with GDI.
-    Font()                              ; Creates a Font object indirectly from a Windows Graphics Device Interface (GDI) ; logical font by using a handle to a GDILOGFONT structure.
-    Font()                              ; Creates a Font object directly from a Windows Graphics Device Interface (GDI) ; logical font.
-    Font()                              ; Creates a Font object directly from a Windows Graphics Device Interface (GDI) ; logical font.
-    GetFamily()                         ; Gets the font family on which this font is based.
-    GetHeight()                         ; Gets the line spacing of this font in the current unit of a specified Graphics object.
-    GetHeight()                         ; Gets the line spacing, in pixels, of this font.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this Font object's most recent method failure.
-    GetLogFontA()                       ; Uses a LOGFONTA structure to get the attributes of this Font object.
-    GetLogFontW()                       ; Uses a LOGFONTW structure to get the attributes of this Font object.
-    GetSize()                           ; Returns the font size (commonly called the em size) ; of this Font object. The size is in the units of this Font object.
-    GetStyle()                          ; Gets the style of this font's typeface.
-    GetUnit()                           ; Returns the unit of measure of this Font object.
-    IsAvailable()                       ; Determines whether this Font object was created successfully.
-                                                                                                                                                                                       
-FontCollection                          
-    ::Inherit::                         
-    ::Methods::                         
-    FontCollection()                    ; Creates an empty FontCollection object.
-    FontCollection()                    ; Creates an empty FontCollection object.
-    GetFamilies()                       ; Gets the font families contained in this font collection.
-    GetFamilyCount()                    ; Gets the number of font families contained in this font collection.
-    GetLastStatus()                     ; Returns a value that indicates the result of this FontCollection object's previous method call.
-                                                                                                                                                                                       
-FontFamily                              ; Encapsulates a set of fonts that make up a font family. A font family is a group of fonts that have the same typeface but different styles.
-    ::Inherit::                         
-    ::Methods::                         
-    Clone()                             ; Creates a new FontFamily object based on this FontFamily object.
-    FontFamily()                        ; Creates an empty FontFamily object.
-    FontFamily()                        ; Lists the constructors of the FontFamily class. For a complete class listing, see FontFamilyClass.
-    FontFamily()                        ; Creates a FontFamily object based on a specified font family.
-    FontFamily()                        ; Lists the constructors of the FontFamily class. For a complete class listing, see FontFamilyClass.
-    GenericMonospace()                  ; Gets a FontFamily object that specifies a generic monospace typeface.
-    GenericSansSerif()                  ; Gets a FontFamily object that specifies a generic sans serif typeface.
-    GenericSerif()                      ; Gets a FontFamily object that represents a generic serif typeface.
-    GetCellAscent()                     ; Gets the cell ascent, in design units, of this font family for the specified style or style combination.
-    GetCellDescent()                    ; Gets the cell descent, in design units, of this font family for the specified style or style combination.
-    GetEmHeight()                       ; Gets the size (commonly called em size or em height), in design units, of this font family.
-    GetFamilyName()                     ; Gets the name of this font family.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this FontFamily object's most recent method failure.
-    GetLineSpacing()                    ; Gets the line spacing, in design units, of this font family for the specified style or style combination. The line spacing is the vertical distance between the base lines of two consecutive lines of text.
-    IsAvailable()                       ; Determines whether this FontFamily object was created successfully.
-    IsStyleAvailable()                  ; Determines whether the specified style is available for this font family.
-                                                                                                                                                                                           
-GdiplusBase                                                                                                             
-    ::Inherit::                         
-    ::Methods::                         
-    operator delete()                   ; The operator delete method deallocates memory for one GDI+ object.
-    operator delete[]()                 ; The operator delete[] method allocates memory for an array of GDI+ objects.
-    operator new()                      ; The operator new method allocates memory for one GDI+ object.
-    operator new[]()                    ; The operator new[] method allocates memory for an array of GDI+ objects.
-                                                                                                        
-Graphics
-    ::Inherit::                         
-    ::Methods::                         
-    AddMetafileComment()                ; Adds a text comment to an existing metafile.
-    BeginContainer()                    ; Begins a new graphics container.
-    BeginContainer()                    ; Begins a new graphics container.
-    BeginContainer()                    ; Begins a new graphics container.              
-    Clear()                             ; Clears a Graphicsobject to a specified color.
-    DrawArc()                           ; Draws an arc. The arc is part of an ellipse.
-    DrawArc()                           ; Draws an arc. The arc is part of an ellipse.
-    DrawArc()                           ; Draws an arc. The arc is part of an ellipse.
-    DrawArc()                           ; Draws an arc.
-    DrawBezier()                        ; Draws a Bezier spline.
-    DrawBezier()                        ; Draws a Bezier spline.
-    DrawBezier()                        ; Draws a Bezier spline.
-    DrawBezier()                        ; Draws a Bezier spline.
-    DrawBeziers()                       ; Draws a sequence of connected B?zier splines.
-    DrawBeziers()                       ; Draws a sequence of connected Bezier splines.
-    DrawCachedBitmap()                  ; Draws the image stored in a CachedBitmap object.
-    DrawClosedCurve()                   ; Draws a closed cardinal spline.
-    DrawClosedCurve()                   ; Draws a closed cardinal spline.
-    DrawClosedCurve()                   ; Draws a closed cardinal spline.
-    DrawClosedCurve()                   ; Draws a closed cardinal spline.
-    DrawCurve()                         ; Draws a cardinal spline.
-    DrawCurve()                         ; Draws a cardinal spline.
-    DrawCurve()                         ; Draws a cardinal spline.
-    DrawCurve()                         ; Draws a cardinal spline.
-    DrawCurve()                         ; Draws a cardinal spline.
-    DrawCurve()                         ; Draws a cardinal spline.
-    DrawDriverString()                  ; Draws characters at the specified positions. The method gives the client complete control over the appearance of text. The method assumes that the client has already set up the format and layout to be applied.
-    DrawEllipse()                       ; Draws an ellipse.
-    DrawEllipse()                       ; Draws an ellipse.
-    DrawEllipse()                       ; Draws an ellipse.
-    DrawEllipse()                       ; Draws an ellipse.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws a specified portion of an image at a specified location.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image at a specified location.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image at a specified location.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws an image.
-    DrawImage()                         ; Draws a portion of an image after applying a specified effect.
-    DrawLine()                          ; Draws a line that connects two points.
-    DrawLine()                          ; Draws a line that connects two points.
-    DrawLine()                          ; Draws a line that connects two points.
-    DrawLine()                          ; Draws a line that connects two points.
-    DrawLines()                         ; Draws a sequence of connected lines.
-    DrawLines()                         ; Draws a sequence of connected lines.
-    DrawPath()                          ; Draws a sequence of lines and curves defined by a GraphicsPath object.
-    DrawPie()                           ; Draws a pie.
-    DrawPie()                           ; Draws a pie.
-    DrawPie()                           ; Draws a pie.
-    DrawPie()                           ; Draws a pie.
-    DrawPolygon()                       ; Draws a polygon.
-    DrawPolygon()                       ; Draws a polygon.
-    DrawRectangle()                     ; Draws a rectangle.
-    DrawRectangle()                     ; Draws a rectangle.
-    DrawRectangle()                     ; Draws a rectangle.
-    DrawRectangle()                     ; Draws a rectangle.
-    DrawRectangles()                    ; Draws a sequence of rectangles.
-    DrawRectangles()                    ; Draws a sequence of rectangles.
-    DrawString()                        ; Draws a string based on a font and an origin for the string.
-    DrawString()                        ; Draws a string based on a font, a string origin, and a format.
-    DrawString()                        ; Draws a string based on a font, a layout rectangle, and a format.
-    EndContainer()                      ; Closes a graphics container that was previously opened by the Graphics::BeginContainer method.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    EnumerateMetafile()                 ; Calls an application-defined callback function for each record in a specified metafile. You can use this method to display a metafile by calling PlayRecord in the callback function.
-    ExcludeClip()                       ; Updates the clipping region to the portion of itself that does not intersect the specified rectangle.
-    ExcludeClip()                       ; Updates the clipping region to the portion of itself that does not intersect the specified rectangle.
-    ExcludeClip()                       ; Updates the clipping region with the portion of itself that does not overlap the specified region.
-    FillClosedCurve()                   ; Creates a closed cardinal spline from an array of points and uses a brush to fill the interior of the spline.
-    FillClosedCurve()                   ; Creates a closed cardinal spline from an array of points and uses a brush to fill, according to a specified mode, the interior of the spline.
-    FillClosedCurve()                   ; Creates a closed cardinal spline from an array of points and uses a brush to fill the interior of the spline.
-    FillClosedCurve()                   ; Creates a closed cardinal spline from an array of points and uses a brush to fill, according to a specified mode, the interior of the spline.
-    FillEllipse()                       ; Uses a brush to fill the interior of an ellipse that is specified by a rectangle.
-    FillEllipse()                       ; Uses a brush to fill the interior of an ellipse that is specified by a rectangle.
-    FillEllipse()                       ; Uses a brush to fill the interior of an ellipse that is specified by coordinates and dimensions.
-    FillEllipse()                       ; Uses a brush to fill the interior of an ellipse that is specified by coordinates and dimensions.
-    FillPath()                          ; Uses a brush to fill the interior of a path. If a figure in the path is not closed, this method treats the nonclosed figure as if it were closed by a straight line that connects the figure's starting and ending points.
-    FillPie()                           ; Uses a brush to fill the interior of a pie.
-    FillPie()                           ; Uses a brush to fill the interior of a pie.
-    FillPie()                           ; Uses a brush to fill the interior of a pie.
-    FillPie()                           ; Uses a brush to fill the interior of a pie.
-    FillPolygon()                       ; Uses a brush to fill the interior of a polygon.
-    FillPolygon()                       ; Uses a brush to fill the interior of a polygon.
-    FillPolygon()                       ; Uses a brush to fill the interior of a polygon.
-    FillPolygon()                       ; Uses a brush to fill the interior of a polygon.
-    FillRectangle()                     ; Uses a brush to fill the interior of a rectangle.
-    FillRectangle()                     ; Uses a brush to fill the interior of a rectangle.
-    FillRectangle()                     ; Uses a brush to fill the interior of a rectangle.
-    FillRectangle()                     ; Uses a brush to fill the interior of a rectangle.
-    FillRectangles()                    ; Uses a brush to fill the interior of a sequence of rectangles.
-    FillRectangles()                    ; Uses a brush to fill the interior of a sequence of rectangles.
-    FillRegion()                        ; Uses a brush to fill a specified region.
-    Flush()                             ; Flushes all pending graphics operations.
-    FromHDC()                           ; Creates a Graphics object that is associated with a specified device context.
-    FromHDC()                           ; Creates a Graphics object that is associated with a specified device context and a specified device.
-    FromHWND()                          ; Creates a Graphicsobject that is associated with a specified window.
-    FromImage()                         ; Creates a Graphicsobject that is associated with a specified Image object.
-    GetClip()                           ; Gets the clipping region of this Graphics object.
-    GetClipBounds()                     ; Gets a rectangle that encloses the clipping region of this Graphics object.
-    GetClipBounds()                     ; Gets a rectangle that encloses the clipping region of this Graphics object.
-    GetCompositingMode()                ; Gets the compositing mode currently set for this Graphics object.
-    GetCompositingQuality()             ; Gets the compositing quality currently set for this Graphics object.
-    GetDpiX()                           ; Gets the horizontal resolution, in dots per inch, of the display device associated with this Graphics object.
-    GetDpiY()                           ; Gets the vertical resolution, in dots per inch, of the display device associated with this Graphics object.
-    GetHalftonePalette()                ; Gets a Windows halftone palette.
-    GetHDC()                            ; Gets a handle to the device context associated with this Graphics object.
-    GetInterpolationMode()              ; Gets the interpolation mode currently set for this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this Graphics object's most recent method failure.
-    GetNearestColor()                   ; Gets the nearest color to the color that is passed in. This method works on 8-bits per pixel or lower display devices for which there is an 8-bit color palette.
-    GetPageScale()                      ; Gets the scaling factor currently set for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
-    GetPageUnit()                       ; Gets the unit of measure currently set for this Graphics object.
-    GetPixelOffsetMode()                ; Gets the pixel offset mode currently set for this Graphics object.
-    GetRenderingOrigin()                ; Gets the rendering origin currently set for this Graphics object.
-    GetSmoothingMode()                  ; Determines whether smoothing (antialiasing) ; is applied to the Graphics object.
-    GetTextContrast()                   ; Gets the contrast value currently set for this Graphics object. The contrast value is used for antialiasing text.
-    GetTextRenderingHint()              ; Returns the text rendering mode currently set for this Graphics object.
-    GetTransform()                      ; Gets the world transformation matrix of this Graphics object.
-    GetVisibleClipBounds()              ; Gets a rectangle that encloses the visible clipping region of this Graphics object.
-    GetVisibleClipBounds()              ; Gets a rectangle that encloses the visible clipping region of this Graphics object.
-    Graphics()                          ; Lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
-    Graphics()                          ; Lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
-    Graphics()                          ; Creates a Graphics object that is associated with a specified device context.
-    Graphics()                          ; Creates a Graphics object that is associated with a specified device context and a specified device.
-    Graphics()                          ; Creates a Graphics object that is associated with a specified window.
-    Graphics()                          ; Creates a Graphics object that is associated with an Image object.
-    IntersectClip()                     ; Updates the clipping region of this Graphics object to the portion of the specified rectangle that intersects with the current clipping region of this Graphics object.
-    IntersectClip()                     ; Updates the clipping region of this Graphics object.
-    IntersectClip()                     ; Updates the clipping region of this Graphics object to the portion of the specified region that intersects with the current clipping region of this Graphics object.
-    IsClipEmpty()                       ; Determines whether the clipping region of this Graphics object is empty.
-    IsVisible()                         ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified point is inside the visible clipping region of this Graphics object.
-    IsVisible()                         ; Determines whether the specified rectangle intersects the visible clipping region of this Graphics object.
-    IsVisibleClipEmpty()                ; Determines whether the visible clipping region of this Graphics object is empty. The visible clipping region is the intersection of the clipping region of this Graphics object and the clipping region of the window.
-    MeasureCharacterRanges()            ; Gets a set of regions each of which bounds a range of character positions within a string.
-    MeasureDriverString()               ; Measures the bounding box for the specified characters and their corresponding positions.
-    MeasureString()                     ; Measures the extent of the string in the specified font, format, and layout rectangle.
-    MeasureString()                     ; Measures the extent of the string in the specified font and layout rectangle.
-    MeasureString()                     ; Measures the extent of the string in the specified font, format, and layout rectangle.
-    MeasureString()                     ; Measures the extent of the string in the specified font and layout rectangle.
-    MeasureString()                     ; Measures the extent of the string in the specified font, format, and layout rectangle.
-    MultiplyTransform()                 ; Updates this Graphics object's world transformation matrix with the product of itself and another matrix.
-    ReleaseHDC()                        ; Releases a device context handle obtained by a previous call to the Graphics::GetHDC method of this Graphics object.
-    ResetClip()                         ; Sets the clipping region of this Graphics object to an infinite region.
-    ResetTransform()                    ; Sets the world transformation matrix of this Graphics object to the identity matrix.
-    Restore()                           ; Sets the state of this Graphics object to the state stored by a previous call to the Graphics::Save method of this Graphics object.
-    RotateTransform()                   ; Updates the world transformation matrix of this Graphics object with the product of itself and a rotation matrix.
-    Save()                              ; Saves the current state (transformations, clipping region, and quality settings) ; of this Graphics object. You can restore the state later by calling the Graphics::Restore method.
-    ScaleTransform()                    ; Updates this Graphics object's world transformation matrix with the product of itself and a scaling matrix.
-    SetAbort()                          ; Not used in Windows GDI+ versions 1.0 and 1.1.
-    SetClip()                           ; Updates the clipping region of this Graphics object.
-    SetClip()                           ; Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a graphics path.
-    SetClip()                           ; Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.
-    SetClip()                           ; Updates the clipping region of this Graphics object to a region that is the combination of itself and a rectangle.
-    SetClip()                           ; Updates the clipping region of this Graphics object to a region that is the combination of itself and the region specified by a Region object.
-    SetClip()                           ; Updates the clipping region of this Graphics object to a region that is the combination of itself and a Windows Graphics Device Interface (GDI) ; region.
-    SetCompositingMode()                ; Sets the compositing mode of this Graphics object.
-    SetCompositingQuality()             ; Sets the compositing quality of this Graphics object.
-    SetInterpolationMode()              ; Sets the interpolation mode of this Graphics object. The interpolation mode determines the algorithm that is used when images are scaled or rotated.
-    SetPageScale()                      ; Sets the scaling factor for the page transformation of this Graphics object. The page transformation converts page coordinates to device coordinates.
-    SetPageUnit()                       ; Sets the unit of measure for this Graphics object. The page unit belongs to the page transformation, which converts page coordinates to device coordinates.
-    SetPixelOffsetMode()                ; Sets the pixel offset mode of this Graphics object.
-    SetRenderingOrigin()                ; Sets the rendering origin of this Graphics object. The rendering origin is used to set the dither origin for 8-bits-per-pixel and 16-bits-per-pixel dithering and is also used to set the origin for hatch brushes.
-    SetSmoothingMode()                  ; Sets the rendering quality of the Graphics object.
-    SetTextContrast()                   ; Sets the contrast value of this Graphics object. The contrast value is used for antialiasing text.
-    SetTextRenderingHint()              ; Sets the text rendering mode of this Graphics object.
-    SetTransform()                      ; Sets the world transformation of this Graphics object.
-    TransformPoints()                   ; Converts an array of points from one coordinate space to another. The conversion is based on the current world and page transformations of this Graphics object.
-    TransformPoints()                   ; Converts an array of points from one coordinate space to another. The conversion is based on the current world and page transformations of this Graphics object.
-    TranslateClip()                     ; Translates the clipping region of this Graphics object.
-    TranslateClip()                     ; Translates the clipping region of this Graphics object.
-    TranslateTransform()                ; Updates this Graphics object's world transformation matrix with the product of itself and a translation matrix.
-                                                                                                                                                                                       
-GraphicsPath                            ; Stores a sequence of lines, curves, and shapes. You can also place markers in the sequence, so that you can draw selected portions of the path.
-    ::Inherit::                         
-    ::Methods::                         
-    AddArc()                            ; Adds an elliptical arc to the current figure of this path.
-    AddArc()                            ; Adds an elliptical arc to the current figure of this path.
-    AddArc()                            ; Adds an elliptical arc to the current figure of this path.
-    AddArc()                            ; Adds an elliptical arc to the current figure of this path.
-    AddBezier()                         ; Adds a Bezier spline to the current figure of this path.
-    AddBezier()                         ; Adds a Bezier spline to the current figure of this path.
-    AddBezier()                         ; Adds a Bezier spline to the current figure of this path.
-    AddBezier()                         ; Adds a Bezier spline to the current figure of this path.
-    AddBeziers()                        ; Adds a sequence of connected Bezier splines to the current figure of this path.
-    AddBeziers()                        ; Adds a sequence of connected Bezier splines to the current figure of this path.
-    AddClosedCurve()                    ; Adds a closed cardinal spline to this path.
-    AddClosedCurve()                    ; Adds a closed cardinal spline to this path.
-    AddClosedCurve()                    ; Adds a closed cardinal spline to this path.
-    AddClosedCurve()                    ; Adds a closed cardinal spline to this path.
-    AddCurve()                          ; Adds a cardinal spline to the current figure of this path.
-    AddCurve()                          ; Adds a cardinal spline to the current figure of this path.
-    AddCurve()                          ; Adds a cardinal spline to the current figure of this path.
-    AddCurve()                          ; Adds a cardinal spline to the current figure of this path.
-    AddCurve()                          ; Adds a cardinal spline to the current figure of this path.
-    AddCurve()                          ; Adds a cardinal spline to the current figure of this path.
-    AddEllipse()                        ; Adds an ellipse to this path.
-    AddEllipse()                        ; Adds an ellipse to this path.
-    AddEllipse()                        ; Adds an ellipse to this path.
-    AddEllipse()                        ; Adds an ellipse to this path.
-    AddLine()                           ; Adds a line to the current figure of this path.
-    AddLine()                           ; Adds a line to the current figure of this path.
-    AddLine()                           ; Adds a line to the current figure of this path.
-    AddLine()                           ; Adds a line to the current figure of this path.
-    AddLines()                          ; Adds a sequence of connected lines to the current figure of this path.
-    AddLines()                          ; Adds a sequence of connected lines to the current figure of this path.
-    AddPath()                           ; Adds a path to this path.
-    AddPie()                            ; Adds a pie to this path.
-    AddPie()                            ; Adds a pie to this path.
-    AddPie()                            ; Adds a pie to this path.
-    AddPie()                            ; Adds a pie to this path.
-    AddPolygon()                        ; Adds a polygon to this path.
-    AddPolygon()                        ; Adds a polygon to this path.
-    AddRectangle()                      ; Adds a rectangle to this path.
-    AddRectangle()                      ; Adds a rectangle to this path.
-    AddRectangles()                     ; Adds a sequence of rectangles to this path
-    AddRectangles()                     ; Adds a sequence of rectangles to this path.
-    AddString()                         ; Adds the outlines of a string to this path.
-    AddString()                         ; Adds the outline of a string to this path.
-    AddString()                         ; Adds the outline of a string to this path.
-    AddString()                         ; Adds the outline of a string to this path.
-    ClearMarkers()                      ; Clears the markers from this path.
-    Clone()                             ; Creates a new GraphicsPath object, and initializes it with the contents of this GraphicsPath object.
-    CloseAllFigures()                   ; Closes all open figures in this path.
-    CloseFigure()                       ; Closes the current figure of this path.
-    Flatten()                           ; Applies a transformation to this path and converts each curve in the path to a sequence of connected lines.
-    GetBounds()                         ; Gets a bounding rectangle for this path.
-    GetBounds()                         ; Gets a bounding rectangle for this path.
-    GetFillMode()                       ; Gets the fill mode of this path.
-    GetLastPoint()                      ; Gets the ending point of the last figure in this path.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this GraphicsPath object's most recent method failure.
-    GetPathData()                       ; Gets an array of points and an array of point types from this path. Together, these two arrays define the lines, curves, figures, and markers of this path.
-    GetPathPoints()                     ; Gets this path's array of points. The array contains the endpoints and control points of the lines and Bezier splines that are used to draw the path.
-    GetPathPoints()                     ; Gets this path's array of points.
-    GetPathTypes()                      ; Gets this path's array of point types.
-    GetPointCount()                     ; Gets the number of points in this path's array of data points. This is the same as the number of types in the path's array of point types.
-    GraphicsPath()                      ; Lists the constructors of the GraphicsPath class. For a complete class listing, see GraphicsPath Class.
-    GraphicsPath()                      ; Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
-    GraphicsPath()                      ; Creates a GraphicsPath object based on an array of points, an array of types, and a fill mode.
-    GraphicsPath()                      ; Creates a GraphicsPath object and initializes the fill mode. This is the default constructor.
-    GraphicsPath()                      ; Lists the constructors of the GraphicsPath class. For a complete class listing, see GraphicsPath Class.
-    IsOutlineVisible()                  ; Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphicsobject and a specified pen.
-    IsOutlineVisible()                  ; Determines whether a specified point touches the outline of a path.
-    IsOutlineVisible()                  ; Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
-    IsOutlineVisible()                  ; Determines whether a specified point touches the outline of this path when the path is drawn by a specified Graphics object and a specified pen.
-    IsVisible()                         ; Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
-    IsVisible()                         ; Determines whether a specified point lies in an area.
-    IsVisible()                         ; Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphicsobject.
-    IsVisible()                         ; Determines whether a specified point lies in the area that is filled when this path is filled by a specified Graphics object.
-    Outline()                           ; Transforms and flattens this path, and then converts this path's data points so that they represent only the outline of the path.
-    Reset()                             ; Empties the path and sets the fill mode to FillModeAlternate.
-    Reverse()                           ; Reverses the order of the points that define this path's lines and curves.
-    SetFillMode()                       ; Sets the fill mode of this path.
-    SetMarker()                         ; Designates the last point in this path as a marker point.
-    StartFigure()                       ; Starts a new figure without closing the current figure. Subsequent points added to this path are added to the new figure.
-    Transform()                         ; Multiplies each of this path's data points by a specified matrix.
-    Warp()                              ; Applies a warp transformation to this path. The GraphicsPath::Warp method also flattens (converts to a sequence of straight lines) ; the path.
-    Widen()                             ; Replaces this path with curves that enclose the area that is filled when this path is drawn by a specified pen. The GraphicsPath::Widen method also flattens the path.
-                                                                                                                                                                                       
-GraphicsPathIterator                    ; Provides methods for isolating selected subsets of the path stored in a GraphicsPath object.
-    ::Inherit::                         
-    ::Methods::                         
-    CopyData()                          ; Copies a subset of the path's data points to a PointF array and copies a subset of the path's point types to a BYTE array.
-    Enumerate()                         ; Copies the path's data points to a PointF array and copies the path's point types to a BYTE array.
-    GetCount()                          ; Returns the number of data points in the path.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this GraphicsPathIterator object's most recent method failure.
-    GetSubpathCount()                   ; Returns the number of subpaths (also called figures) ; in the path.
-    GraphicsPathIterator()              ; Creates a new GraphicsPathIterator object and associates it with a GraphicsPath object.
-    GraphicsPathIterator()              ; Copy constructor for GraphicsPathIterator.
-    HasCurve()                          ; Determines whether the path has any curves.
-    NextMarker()                        ; Gets the next marker-delimited section of this iterator's associated path.
-    NextMarker()                        ; Gets the starting index and the ending index of a section.
-    NextPathType()                      ; Gets the starting index and the ending index of the next group of data points that all have the same type.
-    NextSubpath()                       ; Gets the next figure (subpath) ; from this iterator's associated path.
-    NextSubpath()                       ; Gets the starting index and the ending index of the next subpath.
-    Rewind()                            ; Rewinds this iterator to the beginning of its associated path.
-                                                                                                                                                                                       
-HatchBrush                              ; Defines a rectangular brush with a hatch style, a foreground color, and a background color. There are six hatch styles.
-    ::Inherit::                         ; The HatchBrush class implements Brush.
-    ::Methods::                         
-    GetBackgroundColor()                ; Gets the background color of this hatch brush.
-    GetForegroundColor()                ; Gets the foreground color of this hatch brush.
-    GetHatchStyle()                     ; Gets the hatch style of this hatch brush.
-    HatchBrush()                        ; Copy constructor for HatchBrush.
-    HatchBrush()                        ; Creates a HatchBrush object based on a hatch style, foreground color, and background color.
-                                                                                                                                                                                       
-HueSaturationLightness                  ; Enables you to change the hue, saturation, and lightness of a bitmap.
-    ::Constructors::                    
-    ::Inherit::                         ; The HueSaturationLightness class implements Effect.
-    ::Methods::                         
-    GetParameters()                     ; Gets the current values of the parameters of this HueSaturationLightness object.
-    HueSaturationLightness()            ; Creates a HueSaturationLightness object.
-    SetParameters()                     ; Sets the parameters of this HueSaturationLightness object.
-                                                                                                                                                                                       
-Image                                   ; Provides methods for loading and saving raster images (bitmaps) ; and vector images (metafiles).
-    ::Inherit::                         ; The Image class implements GdiplusBase.
-    ::Methods::                         
-    Clone()                             ; Creates a new Image object and initializes it with the contents of this Image object.
-    FindFirstItem()                     ; Retrieves the description and the data size of the first metadata item in this Image object.
-    FindNextItem()                      ; Used along with the Image::FindFirstItem method to enumerate the metadata items stored in this Image object.
-    FromFile()                          ; Creates an Image object based on a file.
-    FromStream()                        ; Creates a new Image object based on a stream.
-    GetAllPropertyItems()               ; Gets all the property items (metadata) ; stored in this Image object.
-    GetBounds()                         ; Gets the bounding rectangle for this image.
-    GetEncoderParameterList()           ; Gets a list of the parameters supported by a specified image encoder.
-    GetEncoderParameterListSize()       ; Gets the size, in bytes, of the parameter list for a specified image encoder.
-    GetFlags()                          ; Gets a set of flags that indicate certain attributes of this Image object.
-    GetFrameCount()                     ; Gets the number of frames in a specified dimension of this Image object.
-    GetFrameDimensionsCount()           ; Gets the number of frame dimensions in this Image object.
-    GetFrameDimensionsList()            ; Gets the identifiers for the frame dimensions of this Image object.
-    GetHeight()                         ; Gets the image height, in pixels, of this image.
-    GetHorizontalResolution()           ; Gets the horizontal resolution, in dots per inch, of this image.
-    GetItemData()                       ; Gets one piece of metadata from this Image object.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this Image object's most recent method failure.
-    GetPalette()                        ; Gets the ColorPalette of this Image object.
-    GetPaletteSize()                    ; Gets the size, in bytes, of the color palette of this Image object.
-    GetPhysicalDimension()              ; Gets the width and height of this image.
-    GetPixelFormat()                    ; Gets the pixel format of this Image object.
-    GetPropertyCount()                  ; Gets the number of properties (pieces of metadata) ; stored in this Image object.
-    GetPropertyIdList()                 ; Gets a list of the property identifiers used in the metadata of this Image object.
-    GetPropertyItem()                   ; Gets a specified property item (piece of metadata) ; from this Image object.
-    GetPropertyItemSize()               ; Gets the size, in bytes, of a specified property item of this Image object.
-    GetPropertySize()                   ; Gets the total size, in bytes, of all the property items stored in this Image object. The Image::GetPropertySize method also gets the number of property items stored in this Image object.
-    GetRawFormat()                      ; Gets a globally unique identifier ( GUID) ; that identifies the format of this Image object. GUIDs that identify various file formats are defined in Gdiplusimaging.h.
-    GetThumbnailImage()                 ; Gets a thumbnail image from this Image object.
-    GetType()                           ; Gets the type (bitmap or metafile) ; of this Image object.
-    GetVerticalResolution()             ; Gets the vertical resolution, in dots per inch, of this image.
-    GetWidth()                          ; Gets the width, in pixels, of this image.
-    Image()                             ; Lists the constructors of the Image class. For a complete class listing, see Image Class.
-    Image()                             ; Creates an Image object based on a file.
-    Image()                             ; Lists the constructors of the Image class. For a complete class listing, see Image Class.
-    Image()                             ; Creates an Image object based on a stream.
-    Image()                             ; Lists the constructors of the Image class. For a complete class listing, see Image Class.
-    RemovePropertyItem()                ; Removes a property item (piece of metadata) ; from this Image object.
-    RotateFlip()                        ; Rotates and flips this image.
-    Save()                              ; Saves this image to a file.
-    Save()                              ; Saves this image to a stream.
-    SaveAdd()                           ; Adds a frame to a file or stream specified in a previous call to the Save method.
-    SaveAdd()                           ; Adds a frame to a file or stream specified in a previous call to the Save method.
-    SelectActiveFrame()                 ; Selects the frame in this Image object specified by a dimension and an index.
-    SetAbort()                          ; Sets the object whose Abort method is called periodically during time-consuming rendering operation.
-    SetPalette()                        ; Sets the color palette of this Image object.
-    SetPropertyItem()                   ; Sets a property item (piece of metadata) ; for this Image object. If the item already exists, then its contents are updated; otherwise, a new item is added.
-                                                                                                                                                                                   
-ImageAttributes                         ; Contains information about how bitmap and metafile colors are manipulated during rendering.                                                                    
-    ::Inherit::                         ; The ImageAttributes class implements GdiplusBase.
-    ::Methods::                         
-    ClearBrushRemapTable()              ; Clears the brush color-remap table of this ImageAttributes object.
-    ClearColorKey()                     ; Clears the color key (transparency range) ; for a specified category.
-    ClearColorMatrices()                ; Clears the color-adjustment matrix and the grayscale-adjustment matrix for a specified category.
-    ClearColorMatrix()                  ; Clears the color-adjustment matrix for a specified category.
-    ClearGamma()                        ; Disables gamma correction for a specified category.
-    ClearNoOp()                         ; Clears the NoOp setting for a specified category.
-    ClearOutputChannel()                ; Clears the cyan-magenta-yellow-black (CMYK) ; output channel setting for a specified category.
-    ClearOutputChannelColorProfile()    ; Clears the output channel color profile setting for a specified category.
-    ClearRemapTable()                   ; Clears the color-remap table for a specified category.
-    ClearThreshold()                    ; Clears the threshold value for a specified category.
-    Clone()                             ; Makes a copy of this ImageAttributes object.
-    GetAdjustedPalette()                ; Adjusts the colors in a palette according to the adjustment settings of a specified category.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this ImageAttributes object's most recent method failure.
-    ImageAttributes()                   ; Creates an ImageAttributes object. This is the default constructor.
-    ImageAttributes()                   ; Creates an ImageAttributes object. This is the default constructor.
-    ImageAttributes()                   ; Creates an ImageAttributes object. This is the default constructor.
-    Reset()                             ; Clears all color- and grayscale-adjustment settings for a specified category.
-    SetBrushRemapTable()                ; Sets the color remap table for the brush category.
-    SetColorKey()                       ; Sets the color key (transparency range) ; for a specified category.
-    SetColorMatrices()                  ; Sets the color-adjustment matrix and the grayscale-adjustment matrix for a specified category.
-    SetColorMatrix()                    ; Sets the color-adjustment matrix for a specified category.
-    SetGamma()                          ; Sets the gamma value for a specified category.
-    SetNoOp()                           ; Turns off color adjustment for a specified category. You can call ImageAttributes::ClearNoOp to reinstate the color-adjustment settings that were in place before the call to ImageAttributes::SetNoOp.
-    SetOutputChannel()                  ; Sets the CMYK output channel for a specified category.
-    SetOutputChannelColorProfile()      ; Sets the output channel color-profile file for a specified category.
-    SetRemapTable()                     ; Sets the color-remap table for a specified category.
-    SetThreshold()                      ; Sets the threshold (transparency range) ; for a specified category.
-    SetToIdentity()                     ; Sets the color-adjustment matrix of a specified category to identity matrix.
-    SetWrapMode()                       ; Sets the wrap mode of this ImageAttributes object.
-                                                                                                                                                                               
-ImageCodecInfo                          ; Stores information about an image codec (encoder/decoder). GDI+ provides several built-in image codecs.                                                               
-    ::Methods::                         
-                                                                                                                                                                               
-ImageItemData                           ; Used to store and retrieve custom image metadata. Windows GDI+ supports custom metadata for JPEG, PNG, and GIF image files.                                                              
-    ::Methods::                         
-                                                                                                                                                                               
-InstalledFontCollection                                                                                         
-    ::Inherit::                         ; The InstalledFontCollection class implements FontCollection.                                                                                                                                                      
-    ::Methods::                         
-    InstalledFontCollection()           ; Creates an InstalledFontCollection object.
-    InstalledFontCollection()           ; Creates an InstalledFontCollection object.
-                                                                                                                                                                               
-Levels                                  ; Encompasses three bitmap adjustments: highlight, midtone, and shadow.                                                       
-    ::Inherit::                         ; The Levels class implements Effect.                                                                                                                                                      
-    ::Methods::                         
-    GetParameters()                     ; Gets the current values of the parameters of this Levels object.
-    Levels()                            ; Creates a Levels object.
-    SetParameters()                     ; Sets the parameters of this Levels object.
-
-LinearGradientBrush                     ; Defines a brush that paints a color gradient in which the color changes evenly from the starting boundary line of the linear gradient brush to the ending boundary line of the linear gradient brush.                                                                    
-    ::Inherit::                         ; The LinearGradientBrush class implements Brush.
-    ::Methods::                         
-    GetBlend()                          ; Gets the blend factors and their corresponding blend positions from a LinearGradientBrush object.
-    GetBlendCount()                     ; Gets the number of blend factors currently set for this LinearGradientBrush object.
-    GetGammaCorrection()                ; Determines whether gamma correction is enabled for this LinearGradientBrush object.
-    GetInterpolationColorCount()        ; Gets the number of colors currently set to be interpolated for this linear gradient brush.
-    GetInterpolationColors()            ; Gets the colors currently set to be interpolated for this linear gradient brush and their corresponding blend positions.
-    GetLinearColors()                   ; Gets the starting color and ending color of this linear gradient brush.
-    GetRectangle()                      ; Gets the rectangle that defines the boundaries of the gradient.
-    GetRectangle()                      ; Lists the GetRectangle methods of the LinearGradientBrush class. For a complete list of methods for the LinearGradientBrush class, see LinearGradientBrush Methods.
-    GetTransform()                      ; Gets the transformation matrix of this linear gradient brush.
-    GetWrapMode()                       ; Gets the wrap mode for this brush. The wrap mode determines how an area is tiled when it is painted with a brush.
-    LinearGradientBrush()               ; Lists the constructors of the LinearGradientBrush class. For a complete class listing, see LinearGradientBrush Class.
-    LinearGradientBrush()               ; Lists the constructors of the LinearGradientBrush class. For a complete class listing, see LinearGradientBrush Class.
-    LinearGradientBrush()               ; Creates a LinearGradientBrush object from a set of boundary points and boundary colors.
-    LinearGradientBrush()               ; Creates a LinearGradientBrush object based on a rectangle and mode of direction.
-    LinearGradientBrush()               ; Creates a LinearGradientBrush object from a rectangle and angle of direction.
-    LinearGradientBrush()               ; Creates a LinearGradientBrush object based on a rectangle and mode of direction.
-    LinearGradientBrush()               ; Creates a LinearGradientBrush object from a rectangle and angle of direction.
-    LinearGradientBrush()               ; Lists the constructors of the LinearGradientBrush class. For a complete class listing, see LinearGradientBrush Class.
-    MultiplyTransform()                 ; Updates this brush's transformation matrix with the product of itself and another matrix.
-    ResetTransform()                    ; Resets the transformation matrix of this linear gradient brush to the identity matrix. This means that no transformation takes place.
-    RotateTransform()                   ; Updates this brush's current transformation matrix with the product of itself and a rotation matrix.
-    ScaleTransform()                    ; Updates this brush's current transformation matrix with the product of itself and a scaling matrix.
-    SetBlend()                          ; Sets the blend factors and the blend positions of this linear gradient brush to create a custom blend.
-    SetBlendBellShape()                 ; Sets the blend shape of this linear gradient brush to create a custom blend based on a bell-shaped curve.
-    SetBlendTriangularShape()           ; Sets the blend shape of this linear gradient brush to create a custom blend based on a triangular shape.
-    SetGammaCorrection()                ; Specifies whether gamma correction is enabled for this linear gradient brush.
-    SetInterpolationColors()            ; Sets the colors to be interpolated for this linear gradient brush and their corresponding blend positions.
-    SetLinearColors()                   ; Sets the starting color and ending color of this linear gradient brush.
-    SetTransform()                      ; Sets the transformation matrix of this linear gradient brush.
-    SetWrapMode()                       ; Sets the wrap mode of this linear gradient brush.
-    TranslateTransform()                ; Updates this brush's current transformation matrix with the product of itself and a translation matrix.
-
-Matrix                                  ; Represents a 3 ×3 matrix that, in turn, represents an affine transformation.
-    ::Inherit::                         ; The Matrix class implements GdiplusBase.
-    ::Methods::                         
-    Clone()                             ; Creates a new Matrix object that is a copy of this Matrix object.
-    Equals()                            ; Determines whether the elements of this matrix are equal to the elements of another matrix.
-    GetElements()                       ; Gets the elements of this matrix. The elements are placed in an array in the order m11, m12, m21, m22, m31, m32, where mij denotes the element in row i, column j.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this Matrix object's most recent method failure.
-    Invert()                            ; Replaces the elements of this matrix with the elements of its inverse, if this matrix is invertible.
-    IsIdentity()                        ; Determines whether this matrix is the identity matrix.
-    IsInvertible()                      ; Determines whether this matrix is invertible.
-    Matrix()                            ; Creates and initializes a Matrix object that represents the identity matrix.
-    Matrix()                            ; Creates and initializes a Matrix object that represents the identity matrix.
-    Matrix()                            ; Creates a Matrix object based on a rectangle and a point.
-    Matrix()                            ; Creates a Matrix object based on a rectangle and a point.
-    Matrix()                            ; Creates and initializes a Matrix object that represents the identity matrix.
-    Matrix()                            ; Creates and initializes a Matrix object based on six numbers that define an affine transformation.
-    Multiply()                          ; Updates this matrix with the product of itself and another matrix.
-    OffsetX()                           ; Gets the horizontal translation value of this matrix, which is the element in row 3, column 1.
-    OffsetY()                           ; Gets the vertical translation value of this matrix, which is the element in row 3, column 2.
-    Reset()                             ; Updates this matrix with the elements of the identity matrix.
-    Rotate()                            ; Updates this matrix with the product of itself and a rotation matrix.
-    RotateAt()                          ; Updates this matrix with the product of itself and a matrix that represents rotation about a specified point.
-    Scale()                             ; Updates this matrix with the product of itself and a scaling matrix.
-    SetElements()                       ; Sets the elements of this matrix.
-    Shear()                             ; Updates this matrix with the product of itself and a shearing matrix.
-    TransformPoints()                   ; Multiplies each point in an array by this matrix. Each point is treated as a row matrix. The multiplication is performed with the row matrix on the left and this matrix on the right.
-    TransformPoints()                   ; Lists the TransformPoints methods of the Matrix class. For a complete list of methods for the Matrix class, see Matrix Methods.
-    TransformVectors()                  ; Multiplies each vector in an array by this matrix.
-    TransformVectors()                  ; Lists the TransformVectors methods of the Matrix class. For a complete list of methods for the Matrix class, see Matrix Methods.
-    Translate()                         ; Updates this matrix with the product of itself and a translation matrix.
-                                                                                                                                                                               
-Metafile                                ; Defines a graphic metafile.
-    ::Inherit::                         ; The Metafile class implements Image.
-    ::Methods::                         
-    ConvertToEmfPlus()                  ; Converts this Metafile object to the EMF+ format.
-    ConvertToEmfPlus()                  ; Converts this Metafile object to the EMF+ format.
-    ConvertToEmfPlus()                  ; Converts this Metafile object to the EMF+ format.
-    EmfToWmfBits()                      ; Converts an enhanced-format metafile to a Windows Metafile Format (WMF) ; metafile and stores the converted records in a specified buffer.
-    GetDownLevelRasterizationLimit()    ; Gets the rasterization limit currently set for this metafile.
-    GetHENHMETAFILE()                   ; Gets a Windows handle to an Enhanced Metafile (EMF) ; file.
-    GetMetafileHeader()                 ; Gets the header.
-    GetMetafileHeader()                 ; Gets the header.
-    GetMetafileHeader()                 ; Gets the metafile header of this metafile.
-    GetMetafileHeader()                 ; Gets the header.
-    GetMetafileHeader()                 ; Gets the header.
-    Metafile()                          ; Lists the constructors of the Metafile class. For a complete class listing, see Metafile Class.
-    Metafile()                          ; Creates a Metafile object for playback.
-    Metafile()                          ; Lists the constructors of the Metafile class. For a complete class listing, see Metafile Class.
-    Metafile()                          ; Creates a Metafile object for recording.
-    Metafile()                          ; Creates a Metafile object for recording.
-    Metafile()                          ; Creates a Metafile object for recording.
-    Metafile()                          ; Creates a Metafile object for recording.
-    Metafile()                          ; Creates a Metafile object for recording.
-    Metafile()                          ; Creates a Metafile object for recording.
-    Metafile()                          ; Creates a Windows GDI+ Metafile object for playback based on a Windows Graphics Device Interface (GDI) ; Enhanced Metafile (EMF) ; file.
-    Metafile()                          ; Creates a Windows GDI+Metafile object for recording. The format will be placeable metafile.
-    Metafile()                          ; Creates a Metafile object from an IStream interface for playback.
-    Metafile()                          ; Creates a Metafile object for recording to an IStream interface.
-    Metafile()                          ; Creates a Metafile object for recording to an IStream interface.
-    Metafile()                          ; Creates a Metafile object for recording to an IStream interface.
-    Metafile()                          ; Lists the constructors of the Metafile class. For a complete class listing, see Metafile Class.
-    PlayRecord()                        ; The PlayRecord method plays a metafile record.
-    SetDownLevelRasterizationLimit()    ; Sets the resolution for certain brush bitmaps that are stored in this metafile.
-                                                                                                                                                                               
-MetafileHeader                          ; Stores properties of an associated metafile.
-    ::Methods::                         
-    GetBounds()                         ; Gets the bounding rectangle for the associated metafile.
-    GetDpiX()                           ; Gets the horizontal dots per inch of the associated metafile.
-    GetDpiY()                           ; Gets the vertical dots per inch of the associated metafile.
-    GetEmfHeader()                      ; Gets an ENHMETAHEADER3 structure that contains properties of the associated metafile.
-    GetEmfPlusFlags()                   ; Gets a flag that indicates whether the associated metafile was recorded against a video display device context.
-    GetMetafileSize()                   ; Gets the size, in bytes, of the metafile.
-    GetType()                           ; Gets the type of the associated metafile.
-    GetVersion()                        ; Gets the version of the metafile.
-    GetWmfHeader()                      ; Gets a METAHEADER structure that contains properties of the associated metafile.
-    IsDisplay()                         ; Determines whether the associated metafile was recorded against a video display device context.
-    IsEmf()                             ; Determines whether the associated metafile is in the EMF format.
-    IsEmfOrEmfPlus()                    ; Determines whether the associated metafile is in either the EMF or EMF+ format.
-    IsEmfPlus()                         ; Determines whether the associated metafile is in the EMF+ format.
-    IsEmfPlusDual()                     ; Determines whether the associated metafile is in the EMF+ Dual format.
-    IsEmfPlusOnly()                     ; Determines whether the associated metafile is in the EMF+ Only format.
-    IsWmf()                             ; Determines whether the associated metafile is in the WMF format.
-    IsWmfPlaceable()                    ; Determines whether the associated metafile is a placeable metafile.
-
-PathData                                ; Get or set the data points (and their types) ; of a path. Helper class for the GraphicsPath and GraphicsPathIterator classes.
-    ::Methods::                         
-    ~PathData()                         ; Destructor for the PathData class.
-    PathData()                          ; Creates a PathData object. The Count data member is initialized to 0. Points and Types data members are initialized to NULL.
-                                                                                                                                                                               
-PathGradientBrush                       ; Stores the attributes of a color gradient that you can use to fill the interior of a path with a gradually changing color.
-    ::Inherit::                         ; The PathGradientBrush class implements Brush.
-    ::Methods::                         
-    GetBlend()                          ; Gets the blend factors and the corresponding blend positions currently set for this path gradient brush.
-    GetBlendCount()                     ; Gets the number of blend factors currently set for this path gradient brush.
-    GetCenterColor()                    ; Gets the color of the center point of this path gradient brush.
-    GetCenterPoint()                    ; Gets the center point of this path gradient brush.
-    GetCenterPoint()                    ; Gets the center point of this path gradient brush.
-    GetFocusScales()                    ; Gets the focus scales of this path gradient brush.
-    GetGammaCorrection()                ; Determines whether gamma correction is enabled for this path gradient brush.
-    GetGraphicsPath()                   ; Is not implemented in Windows GDI+ version 1.0.
-    GetInterpolationColorCount()        ; Gets the number of preset colors currently specified for this path gradient brush.
-    GetInterpolationColors()            ; Gets the preset colors and blend positions currently specified for this path gradient brush.
-    GetPointCount()                     ; Gets the number of points in the array of points that defines this brush's boundary path.
-    GetRectangle()                      ; Gets the smallest rectangle that encloses the boundary path of this path gradient brush.
-    GetRectangle()                      ; Gets the smallest rectangle that encloses the boundary path of this path gradient brush.
-    GetSurroundColorCount()             ; Gets the number of colors that have been specified for the boundary path of this path gradient brush.
-    GetSurroundColors()                 ; Gets the surround colors currently specified for this path gradient brush.
-    GetTransform()                      ; Gets transformation matrix of this path gradient brush.
-    GetWrapMode()                       ; Gets the wrap mode currently set for this path gradient brush.
-    MultiplyTransform()                 ; Updates the brush's transformation matrix with the product of itself and another matrix.
-    PathGradientBrush()                 ; Creates a PathGradientBrush object based on a GraphicsPath object.
-    PathGradientBrush()                 ; Lists the constructors of the PathGradientBrush class. For a complete class listing, see PathGradientBrushXX Class.
-    PathGradientBrush()                 ; Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
-    PathGradientBrush()                 ; Creates a PathGradientBrush object based on an array of points. Initializes the wrap mode of the path gradient brush.
-    PathGradientBrush()                 ; Lists the constructors of the PathGradientBrush class. For a complete class listing, see PathGradientBrushXX Class.
-    ResetTransform()                    ; Resets the transformation matrix of this path gradient brush to the identity matrix. This means that no transformation will take place.
-    RotateTransform()                   ; Updates this brush's current transformation matrix with the product of itself and a rotation matrix.
-    ScaleTransform()                    ; Updates this brush's current transformation matrix with the product of itself and a scaling matrix.
-    SetBlend()                          ; Sets the blend factors and the blend positions of this path gradient brush.
-    SetBlendBellShape()                 ; Sets the blend shape of this path gradient brush.
-    SetBlendTriangularShape()           ; Sets the blend shape of this path gradient brush.
-    SetCenterColor()                    ; Sets the center color of this path gradient brush. The center color is the color that appears at the brush's center point.
-    SetCenterPoint()                    ; Sets the center point of this path gradient brush. By default, the center point is at the centroid of the brush's boundary path, but you can set the center point to any location inside or outside the path.
-    SetCenterPoint()                    ; Sets the center point of this path gradient brush.
-    SetFocusScales()                    ; Sets the focus scales of this path gradient brush.
-    SetGammaCorrection()                ; Specifies whether gamma correction is enabled for this path gradient brush.
-    SetGraphicsPath()                   ; Is not implemented in Windows GDI+ version 1.0.
-    SetInterpolationColors()            ; Sets the preset colors and the blend positions of this path gradient brush.
-    SetSurroundColors()                 ; Sets the surround colors of this path gradient brush. The surround colors are colors specified for discrete points on the brush's boundary path.
-    SetTransform()                      ; Sets the transformation matrix of this path gradient brush.
-    SetWrapMode()                       ; Sets the wrap mode of this path gradient brush.
-    TranslateTransform()                ; Updates this brush's current transformation matrix with the product of itself and a translation matrix.
-                                        
-Pen                                     ; A Windows GDI+ object used to draw lines and curves
-    ::Inherit::                         ; The Pen class implements GdiplusBase.
-    ::Methods::                         
-    Clone()                             ; Copies a Pen object.
-    GetAlignment()                      ; Gets the alignment currently set for this Pen object.
-    GetBrush()                          ; Gets the Brush object that is currently set for this Pen object.
-    GetColor()                          ; Gets the color currently set for this Pen object.
-    GetCompoundArray()                  ; Gets the compound array currently set for this Pen object.
-    GetCompoundArrayCount()             ; Gets the number of elements in a compound array.
-    GetCustomEndCap()                   ; Gets the custom end cap currently set for this Pen object.
-    GetCustomStartCap()                 ; Gets the custom start cap currently set for this Pen object.
-    GetDashCap()                        ; Gets the dash cap style currently set for this Pen object.
-    GetDashOffset()                     ; Gets the distance from the start of the line to the start of the first space in a dashed line.
-    GetDashPattern()                    ; Gets an array of custom dashes and spaces currently set for this Pen object.
-    GetDashPatternCount()               ; Gets the number of elements in a dash pattern array.
-    GetDashStyle()                      ; Gets the dash style currently set for this Pen object.
-    GetEndCap()                         ; Gets the end cap currently set for this Pen object.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this Pen object's most recent method failure.
-    GetLineJoin()                       ; Gets the line join style currently set for this Pen object.
-    GetMiterLimit()                     ; Gets the miter length currently set for this Pen object.
-    GetPenType()                        ; Gets the type currently set for this Pen object.
-    GetStartCap()                       ; Gets the start cap currently set for this Pen object.
-    GetTransform()                      ; Gets the world transformation matrix currently set for this Pen object.
-    GetWidth()                          ; Gets the width currently set for this Pen object.
-    MultiplyTransform()                 ; Updates the world transformation matrix of this Pen object with the product of itself and another matrix.
-    Pen()                               ; Creates a Pen object that uses the attributes of a brush and a real number to set the width of this Pen object.
-    Pen()                               ; Creates a Pen object that uses a specified color and width.
-    Pen()                               ; Lists the constructors of the Pen class. For a complete class listing, see Pen Class.
-    Pen()                               ; Lists the constructors of the Pen class. For a complete class listing, see Pen Class.
-    ResetTransform()                    ; Sets the world transformation matrix of this Pen object to the identity matrix.
-    RotateTransform()                   ; Updates the world transformation matrix of this Pen object with the product of itself and a rotation matrix.
-    ScaleTransform()                    ; Sets the Pen object's world transformation matrix equal to the product of itself and a scaling matrix.
-    SetAlignment()                      ; Sets the alignment for this Pen object relative to the line.
-    SetBrush()                          ; Sets the Brush object that a pen uses to fill a line.
-    SetColor()                          ; Sets the color for this Pen object.
-    SetCompoundArray()                  ; Sets the compound array for this Pen object.
-    SetCustomEndCap()                   ; Sets the custom end cap for this Pen object.
-    SetCustomStartCap()                 ; Sets the custom start cap for this Pen object.
-    SetDashCap()                        ; Sets the dash cap style for this Pen object.
-    SetDashOffset()                     ; Sets the distance from the start of the line to the start of the first dash in a dashed line.
-    SetDashPattern()                    ; Sets an array of custom dashes and spaces for this Pen object.
-    SetDashStyle()                      ; Sets the dash style for this Pen object.
-    SetEndCap()                         ; Sets the end cap for this Pen object.
-    SetLineCap()                        ; Sets the cap styles for the start, end, and dashes in a line drawn with this pen.
-    SetLineJoin()                       ; Sets the line join for this Pen object.
-    SetMiterLimit()                     ; Sets the miter limit of this Pen object.
-    SetStartCap()                       ; Sets the start cap for this Pen object.
-    SetTransform()                      ; Sets the world transformation of this Pen object.
-    SetWidth()                          ; Sets the width for this Pen object.
-                                        
-Point                                   ; Encapsulates a point in a 2-D coordinate system.
-    ::Constructors::                    
-    Point()                             ; Creates a Point object. Initializes X and Y data to zero. This is the default constructor.
-    Point(INT,INT)                      ; Creates a Point object. Initialize the X and Y data members using passed values.
-    Point(Point&)                       ; Creates a new Point object by copying the data members from another Point object.
-    Point(Size&)                        ; Creates a Point object using a Size object to initialize the X and Y data members.
-    ::Methods::                         
-    Equals                              ; The Point::Equals method determines whether two Point objects are equal. Two points are considered equal if they have the same X and Y data members.
-    operator-(Point&)                   ; The Point::operator- method subtracts the X and Y data members of two Point objects.
-    operator+(Point&)                   ; The Point::operator+ method adds the X and Y data members of two Point objects.
-                                        
-PointF                                  
-    ::Constructors::                    
-    PointF()                            ; Creates a PointF object and initializes the X and Y data members to zero. This is the default constructor.
-    PointF(PointF&)                     ; Creates a new PointF object and copies the data from another PointF object.
-    PointF(REAL,REAL)                   ; Creates a PointF object using two real numbers to specify the X and Y data members.
-    PointF(SizeF&)                      ; Creates a PointF object using a SizeF object to specify the X and Y data members.
-    ::Methods::                         
-    Equals                              ; Determines whether two PointF objects are equal. Two points are considered equal if they have the same X and Y data members.
-    operator-(PointF&)                  ; Subtracts the X and Y data members of two PointF objects.
-    operator+(PointF&)                  ; Adds the X and Y data members of two PointF objects.
-                                        
-PrivateFontCollection                   ; Keeps a collection of fonts specifically for an application.
-    ::Inherit::                         ; The PrivateFontCollection class implements FontCollection.
-    ::Methods::                         
-    AddFontFile()                       ; Adds a font file to this private font collection.
-    AddMemoryFont()                     ; Adds a font that is contained in system memory to a Windows GDI+ font collection.
-    PrivateFontCollection()             ; Creates an empty PrivateFontCollection object.
-    PrivateFontCollection()             ; Creates an empty PrivateFontCollection object.
-
-PropertyItem                            ; A PropertyItem object holds one piece of image metadata and is a helper class for the Image and Bitmap classes.
-                                        
-Rect                                    ; Stores the upper-left corner's x and y, width, and height of a rectangle.
-    ::Constructors::                    
-    Rect()                              ; Creates a Rect object whose x-coordinate, y-coordinate, width, and height are all zero. This is the default constructor.
-    Rect(INT,INT,INT,INT)               ; Creates a Rect object by using four integers to initialize the X, Y, Width, and Height data members.
-    Rect(Point&,Size&)                  ; Creates a Rect object by using a Point object to initialize the X and Y data members and a Size object to initialize the Width and Height data members.
-    ::Methods::                             
-    Clone()                             ; Creates a new Rect object and initializes it with the contents of this Rect object.
-    Contains(INT,INT)                   ; Determines whether the point ( x, y) ; is inside this rectangle.
-    Contains(Point&)                    ; Determines whether a point is inside this rectangle.
-    Contains(Rect&)                     ; Determines whether another rectangle is inside this rectangle.
-    Equals()                            ; Determines whether two rectangles are the same.
-    GetBottom()                         ; Gets the y-coordinate of the bottom edge of the rectangle.
-    GetBounds()                         ; Makes a copy of this rectangle.
-    GetLeft()                           ; Gets the x-coordinate of the left edge of the rectangle.
-    GetLocation()                       ; Gets the coordinates of the upper-left corner of the rectangle.
-    GetRight()                          ; Gets the x-coordinate of the right edge of the rectangle.
-    GetSize()                           ; Gets the width and height of the rectangle.
-    GetTop()                            ; Gets the y-coordinate of the top edge of the rectangle.
-    Inflate(INT,INT)                    ; Expands the rectangle by dx on the left and right edges, and by dy on the top and bottom edges.
-    Inflate(Point&)                     ; Expands the rectangle by the value of point.X on the left and right edges, and by the value of point.Y on the top and bottom edges.
-    Intersect(Rect&)                    ; Replaces this rectangle with the intersection of itself and another rectangle.
-    Intersect(Rect&,Rect&,Rect&)        ; Determines the intersection of two rectangles and stores the result in a Rect object.
-    IntersectsWith()                    ; Determines whether this rectangle intersects another rectangle.
-    IsEmptyArea()                       ; Determines whether this rectangle is empty.
-    Offset(INT,INT)                     ; Moves the rectangle by dx horizontally and by dy vertically.
-    Offset(Point&)                      ; Moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.
-    Union()                             ; Determines the union of two rectangles and stores the result in a Rect object.
-                                        
-RectF                                   ; Stores the upper-left corner's x and y, width, and height of a rectangle. The RectF class uses floating point numbers.
-    ::Constructors::                    
-    RectF()                             ; Creates a RectF object and initializes the X and Y data members to zero. This is the default constructor.
-    RectF(PointF&,SizeF&)               ; Creates a RectF object by using a PointF object to initialize the X and Y data members and uses a SizeF object to initialize the Width and Height data members of this rectangle.
-    RectF(REAL,REAL,REAL,REAL)          ; Creates a RectF object by using four integers to initialize the X, Y, Width, and Height data members.
-    ::Methods::                         
-    Clone()                             ; Creates a new RectF object and initializes it with the contents of this RectF object.
-    Contains(PointF&)                   ; Determines whether a point is inside this rectangle.
-    Contains(REAL,REAL)                 ; Determines whether the point (x, y) ; is inside this rectangle.
-    Contains(RectF&)                    ; Determines whether another rectangle is inside this rectangle.
-    Equals()                            ; Determines whether two rectangles are the same.
-    GetBottom()                         ; Gets the y-coordinate of the bottom edge of the rectangle.
-    GetBounds()                         ; Makes a copy of this rectangle.
-    GetLeft()                           ; Gets the x-coordinate of the left edge of the rectangle.
-    GetLocation()                       ; Gets the coordinates of the upper-left corner of this rectangle.
-    GetRight()                          ; Gets the x-coordinate of the right edge of the rectangle.
-    GetSize()                           ; Gets the width and height of this rectangle.
-    GetTop()                            ; Gets the y-coordinate of the top edge of the rectangle.
-    Inflate(PointF&)                    ; Expands the rectangle by the value of point.X on the left and right edges, and by the value of point.Y on the top and bottom edges.
-    Inflate(REAL,REAL)                  ; Expands the rectangle by dx on the left and right edges, and by dy on the top and bottom edges.
-    Intersect(RectF&)                   ; Replaces this rectangle with the intersection of itself and another rectangle.
-    Intersect(RectF&,RectF&,RectF&)     ; Determines the intersection of two rectangles and stores the result in a RectF object.
-    IntersectsWith()                    ; Determines whether this rectangle intersects another rectangle.
-    IsEmptyArea()                       ; Determines whether this rectangle is empty.
-    Offset(PointF&)                     ; Moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.
-    Offset(REAL,REAL)                   ; Moves the rectangle by dx horizontally and by dx vertically.
-    Union()                             ; Determines the union of two rectangles and stores the result in a RectF object.
-                                        
-RedEyeCorrection                        ; Enables you to correct the red eyes that sometimes occur in flash photographs.
-    ::Inherit::                         ; The RedEyeCorrection class implements Effect.
-    ::Constructors::                    
-    ::Methods::                         
-    GetParameters()                     ; Gets the current values of the parameters of this RedEyeCorrection object.
-    RedEyeCorrection()                  ; Creates a RedEyeCorrection object.
-    SetParameters()                     ; Sets the parameters of this RedEyeCorrection object.
-                                                                                                                                                                               
-Region                                  ; Describes an area of the display surface. The area can be any shape.
-    ::Inherit::                         ; The Region class implements GdiplusBase.
-    ::Methods::                         
-    Clone()                             ; Makes a copy of this Regionobject and returns the address of the new Regionobject.
-    Complement()                        ; Updates this region to the portion of the specified path's interior that does not intersect this region.
-    Complement()                        ; Updates a region that does not intersect this region.
-    Complement()                        ; Updates this region to the portion of the specified rectangle's interior that does not intersect this region.
-    Complement()                        ; Updates this region to the portion of another region that does not intersect this region.
-    Equals()                            ; Determines whether this region is equal to a specified region.
-    Exclude()                           ; Updates this region to the portion of itself that does not intersect the specified path's interior.
-    Exclude()                           ; Updates a region that does not intersect the specified rectangle's interior.
-    Exclude()                           ; Updates this region to the portion of itself that does not intersect the specified rectangle's interior.
-    Exclude()                           ; Updates this region to the portion of itself that does not intersect another region.
-    FromHRGN()                          ; Creates a Windows GDI+Region object from a Windows Graphics Device Interface (GDI)  ; region.
-    GetBounds()                         ; Gets a rectangle that encloses this region.
-    GetBounds()                         ; Gets a rectangle that encloses this region.
-    GetData()                           ; Gets data that describes this region.
-    GetDataSize()                       ; Gets the number of bytes of data that describes this region.
-    GetHRGN()                           ; Creates a Windows Graphics Device Interface (GDI) ; region from this region.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this Regionobject's most recent method failure.
-    GetRegionScans()                    ; Gets an array of rectangles that approximate this region. The region is transformed by a specified matrix before the rectangles are calculated.
-    GetRegionScans()                    ; Gets an array of rectangles that approximate this region.
-    GetRegionScansCount()               ; Gets the number of rectangles that approximate this region. The region is transformed by a specified matrix before the rectangles are calculated.
-    Intersect()                         ; Updates this region to the portion of itself that intersects the specified path's interior.
-    Intersect()                         ; Updates a region intersects the specified rectangle's interior.
-    Intersect()                         ; Updates this region to the portion of itself that intersects the specified rectangle's interior.
-    Intersect()                         ; Updates this region to the portion of itself that intersects another region.
-    IsEmpty()                           ; Determines whether this region is empty.
-    IsInfinite()                        ; Determines whether this region is infinite.
-    IsVisible()                         ; Determines whether a point is inside this region.
-    IsVisible()                         ; Determines whether a point is inside this region.
-    IsVisible()                         ; Determines whether a rectangle intersects this region.
-    IsVisible()                         ; Determines whether a rectangle intersects this region.
-    IsVisible()                         ; Determines whether a point is inside this region.
-    IsVisible()                         ; Determines whether a rectangle intersects this region.
-    IsVisible()                         ; Determines whether a point is inside this region.
-    IsVisible()                         ; Determines whether a rectangle intersects this region.
-    MakeEmpty()                         ; Updates this region to an empty region. In other words, the region occupies no space on the display device.
-    MakeInfinite()                      ; Updates this region to an infinite region.
-    Region()                            ; Creates a region that is infinite. This is the default constructor.
-    Region()                            ; Creates a region that is defined by data obtained from another region.
-    Region()                            ; Creates a region that is defined by a path (a GraphicsPath object) ; and has a fill mode that is contained in the GraphicsPath object.
-    Region()                            ; Creates a region that is defined by a rectangle.
-    Region()                            ; Creates a region that is defined by a rectangle.
-    Region()                            ; Creates a region that is infinite. This is the default constructor.
-    Region()                            ; Creates a region that is infinite. This is the default constructor.
-    Region()                            ; Creates a region that is identical to the region that is specified by a handle to a Windows Graphics Device Interface (GDI) ; region.
-    Transform()                         ; Transforms this region by multiplying each of its data points by a specified matrix.
-    Translate()                         ; Offsets this region by specified amounts in the horizontal and vertical directions.
-    Translate()                         ; Offsets this region by specified amounts in the horizontal and vertical directions.
-    Union()                             ; Updates this region to all portions (intersecting and nonintersecting) ; of itself and all portions of the specified path's interior.
-    Union()                             ; Updates this region.
-    Union()                             ; Updates this region to all portions (intersecting and nonintersecting) ; of itself and all portions of the specified rectangle's interior.
-    Union()                             ; Updates this region to all portions (intersecting and nonintersecting) ; of itself and all portions of another region.
-    Xor()                               ; Updates this region to the nonintersecting portions of itself and the specified path's interior.
-    Xor()                               ; Updates a region to the nonintersecting portions with a rectangle's interior.
-    Xor()                               ; Updates this region to the nonintersecting portions of itself and the specified rectangle's interior.
-    Xor()                               ; Updates this region to the nonintersecting portions of itself and another region.
-                                                                                                                                                                               
-Sharpen                                 ; Enables you to adjust the sharpness of a bitmap.
-    ::Inherit::                         ; The Sharpen class implements Effect.
-    ::Methods::                         
-    GetParameters()                     ; Gets the current values of the parameters of this Sharpen object.
-    SetParameters()                     ; Sets the parameters of this Sharpen object.
-    Sharpen()                           ; Creates a Sharpen object.
-                                                                                                                                                                               
-Size                                    ; Encapsulates a Width and Height dimension in a 2-D coordinate system.
-    ::Constructors::                    
-    Size()                              ; Creates a new Size object and initializes the members to zero. This is the default constructor.
-    Size(INT,INT)                       ; Creates a Size object and initializes its Width and Height data members.
-    Size(Size&)                         ; Creates a Size object and initializes its members by copying the members of another Size object.
-    ::Methods::                         
-    Empty                               ; Determines whether a Size object is empty.
-    Equals                              ; Determines whether two Size objects are equal.
-    operator-(Size&)                    ; Subtracts the Width and Height data members of two Size objects.
-    operator+(Size&)                    ; Adds the Width and Height data members of two Size objects.
-                                                                                                                                                                               
-SizeF                                   ; Encapsulates a Width and Height dimension in a 2-D coordinate system. The SizeF class uses floating point numbers.
-    ::Constructors::                    
-    SizeF()                             ; Creates a SizeF object and initializes the members to zero. This is the default constructor.
-    SizeF(REAL,REAL)                    ; Creates a SizeF object and initializes its Width and Height data members.
-    SizeF(SizeF&)                       ; Creates a SizeF object and initializes its members by copying the members of another SizeF object.
-    ::Methods::                         
-    Empty                               ; The Empty method determines whether a SizeF object is empty.
-    Equals                              ; The Equals method determines whether two SizeF objects are equal.
-    operator-(SizeF&)                   ; The operator- method subtracts the Width and Height data members of two SizeF objects.
-    operator+(SizeF&)                   ; The operator+ method adds the Width and Height data members of two SizeF objects.
-                                                                                                                                                                               
-SolidBrush                              ; A Brush object is used to fill in shapes similar to the way a paint brush can paint the inside of a shape.
-    ::Inherit::                         ; The SolidBrush class implements Brush.
-    ::Methods::                         
-    GetColor()                          ; Gets the color of this solid brush.
-    SetColor()                          ; Sets the color of this solid brush.
-    SolidBrush()                        ; Creates a SolidBrush object based on a color.
-    SolidBrush()                        ; Copy constructor for SolidBrush.
-    SolidBrush()                        ; Creates a SolidBrush object based on a color.
-                                                                                                                                                                               
-StringFormat                            ; Encapsulates text layout information and display manipulations.
-    ::Inherit::                         ; The StringFormat class implements GdiplusBase.
-    ::Methods::                         
-    Clone()                             ; Creates a new StringFormat object and initializes it with the contents of this StringFormat object.
-    GenericDefault()                    ; Creates a generic, default StringFormat object.
-    GenericTypographic()                ; Creates a generic, typographic StringFormat object.
-    GetAlignment()                      ; Gets an element of the StringAlignment enumeration that indicates the character alignment of this StringFormat object in relation to the origin of the layout rectangle.
-    GetDigitSubstitutionLanguage()      ; Gets the language that corresponds with the digits that are to be substituted for Western European digits.
-    GetDigitSubstitutionMethod()        ; Gets an element of the StringDigitSubstitute enumeration that indicates the digit substitution method that is used by this StringFormat object.
-    GetFormatFlags()                    ; Gets the string format flags for this StringFormat object.
-    GetHotkeyPrefix()                   ; Gets an element of the HotkeyPrefix enumeration that indicates the type of processing that is performed on a string when a hot key prefix, an ampersand (&), is encountered.
-    GetLastStatus()                     ; Returns a value that indicates the nature of this StringFormat object's most recent method failure.
-    GetLineAlignment()                  ; Gets an element of the StringAlignment enumeration that indicates the line alignment of this StringFormat object in relation to the origin of the layout rectangle.
-    GetMeasurableCharacterRangeCount()  ; Gets the number of measurable character ranges that are currently set. The character ranges that are set can be measured in a string by using the MeasureCharacterRanges method.
-    GetTabStopCount()                   ; Gets the number of tab-stop offsets in this StringFormat object.
-    GetTabStops()                       ; Gets the offsets of the tab stops in this StringFormat object.
-    GetTrimming()                       ; Gets an element of the StringTrimming enumeration that indicates the trimming style of this StringFormat object.
-    SetAlignment()                      ; Sets the character alignment of this StringFormat object in relation to the origin of the layout rectangle. A layout rectangle is used to position the displayed string.
-    SetDigitSubstitution()              ; Sets the digit substitution method and the language that corresponds to the digit substitutes.
-    SetFormatFlags()                    ; Sets the format flags for this StringFormat object. The format flags determine most of the characteristics of a StringFormat object.
-    SetHotkeyPrefix()                   ; Sets the type of processing that is performed on a string when the hot key prefix, an ampersand (&), is encountered.
-    SetLineAlignment()                  ; Sets the line alignment of this StringFormat object in relation to the origin of the layout rectangle.
-    SetMeasurableCharacterRanges()      ; Sets a series of character ranges for this StringFormat object that, when in a string, can be measured by the MeasureCharacterRanges method.
-    SetTabStops()                       ; Sets the offsets for tab stops in this StringFormat object.
-    SetTrimming()                       ; Sets the trimming style for this StringFormat object. The trimming style determines how to trim a string so that it fits into the layout rectangle.
-    StringFormat()                      ; Creates a StringFormat object from another StringFormat object.
-    StringFormat()                      ; Lists the constructors of the StringFormat class. For a complete class listing, see StringFormat Class.
-    StringFormat()                      ; Lists the constructors of the StringFormat class. For a complete class listing, see StringFormat Class.
-    StringFormat()                      ; Creates a StringFormat object based on string format flags and a language.
-                                                                                                                                                                               
-TextureBrush                            ; Defines a Brush object that contains an Image object that is used for the fill.
-    ::Inherit::                         ; The TextureBrush class implements Brush.
-    ::Methods::                         
-    GetImage()                          ; Gets a pointer to the Image object that is defined by this texture brush.
-    GetTransform()                      ; Gets the transformation matrix of this texture brush.
-    GetWrapMode()                       ; Gets the wrap mode currently set for this texture brush.
-    MultiplyTransform()                 ; Updates this brush's transformation matrix with the product of itself and another matrix.
-    ResetTransform()                    ; Resets the transformation matrix of this texture brush to the identity matrix. This means that no transformation takes place.
-    RotateTransform()                   ; Updates this texture brush's current transformation matrix with the product of itself and a rotation matrix.
-    ScaleTransform()                    ; Updates this texture brush's current transformation matrix with the product of itself and a scaling matrix.
-    SetTransform()                      ; Sets the transformation matrix of this texture brush.
-    SetWrapMode()                       ; Sets the wrap mode of this texture brush.
-    TextureBrush()                      ; Lists the constructors of the TextureBrush class. For a complete class listing, see TextureBrush Class.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image, a defining rectangle, and a set of image properties.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image and a wrap mode. The size of the brush defaults to the size of the image, so the entire image is used by the brush.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image, a wrap mode, and a defining rectangle.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image, a wrap mode, and a defining rectangle.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
-    TextureBrush()                      ; Creates a TextureBrush object based on an image, a wrap mode, and a defining set of coordinates.
-    TextureBrush()                      ; Lists the constructors of the TextureBrush class. For a complete class listing, see TextureBrush Class.
-    TranslateTransform()                ; Updates this brush's current transformation matrix with the product of itself and a translation matrix.
-                                                                                                                                                                               
-Tint                                    ; Enables you to apply a tint to a bitmap.
-    ::Inherit::                         ; The Tint class implements Effect.
-    ::Methods::                         
-    GetParameters()                     ; Gets the current values of the parameters of this Tint object.
-    SetParameters()                     ; Sets the parameters of this Tint object.
-    Tint()                              ; Creates a Tint object.
-*/
+ class Image : public GdiplusBase
+ {
+   public:
+     friend class Graphics;
+     friend class TextureBrush;
+ 
+     Image(IStream *stream, BOOL useEmbeddedColorManagement = FALSE) : nativeImage(NULL)
+     {
+         if (useEmbeddedColorManagement)
+             lastStatus = DllExports::GdipLoadImageFromStreamICM(stream, &nativeImage);
+         else
+             lastStatus = DllExports::GdipLoadImageFromStream(stream, &nativeImage);
+     }
+ 
+     Image(const WCHAR *filename, BOOL useEmbeddedColorManagement = FALSE) : nativeImage(NULL)
+     {
+         if (useEmbeddedColorManagement)
+             lastStatus = DllExports::GdipLoadImageFromFileICM(filename, &nativeImage);
+         else
+             lastStatus = DllExports::GdipLoadImageFromFile(filename, &nativeImage);
+     }
+ 
+     Image *
+     Clone()
+     {
+         GpImage *cloneimage = NULL;
+         SetStatus(DllExports::GdipCloneImage(nativeImage, &cloneimage));
+         return new Image(cloneimage, lastStatus);
+     }
+ 
+     virtual ~Image()
+     {
+         DllExports::GdipDisposeImage(nativeImage);
+     }
+ 
+     static Image *
+     FromFile(const WCHAR *filename, BOOL useEmbeddedColorManagement = FALSE)
+     {
+         return new Image(filename, useEmbeddedColorManagement);
+     }
+ 
+     static Image *
+     FromStream(IStream *stream, BOOL useEmbeddedColorManagement = FALSE)
+     {
+         return new Image(stream, useEmbeddedColorManagement);
+     }
+ 
+     Status
+     GetAllPropertyItems(UINT totalBufferSize, UINT numProperties, PropertyItem *allItems)
+     {
+         if (allItems == NULL)
+             return SetStatus(InvalidParameter);
+         return SetStatus(DllExports::GdipGetAllPropertyItems(nativeImage, totalBufferSize, numProperties, allItems));
+     }
+ 
+     Status
+     GetBounds(RectF *srcRect, Unit *srcUnit)
+     {
+         return SetStatus(DllExports::GdipGetImageBounds(nativeImage, srcRect, srcUnit));
+     }
+ 
+     Status
+     GetEncoderParameterList(const CLSID *clsidEncoder, UINT size, EncoderParameters *buffer)
+     {
+ #if 1
+         return SetStatus(NotImplemented);
+ #else
+         return SetStatus(DllExports::GdipGetEncoderParameterList(nativeImage, clsidEncoder, size, buffer));
+ #endif
+     }
+ 
+     UINT
+     GetEncoderParameterListSize(const CLSID *clsidEncoder)
+     {
+         UINT size = 0;
+         SetStatus(DllExports::GdipGetEncoderParameterListSize(nativeImage, clsidEncoder, &size));
+         return size;
+     }
+ 
+     UINT
+     GetFlags()
+     {
+         UINT flags = 0;
+         SetStatus(DllExports::GdipGetImageFlags(nativeImage, &flags));
+         return flags;
+     }
+ 
+     UINT
+     GetFrameCount(const GUID *dimensionID)
+     {
+         UINT count = 0;
+         SetStatus(DllExports::GdipImageGetFrameCount(nativeImage, dimensionID, &count));
+         return count;
+     }
+ 
+     UINT
+     GetFrameDimensionsCount()
+     {
+         UINT count = 0;
+         SetStatus(DllExports::GdipImageGetFrameDimensionsCount(nativeImage, &count));
+         return count;
+     }
+ 
+     Status
+     GetFrameDimensionsList(GUID *dimensionIDs, UINT count)
+     {
+         return SetStatus(DllExports::GdipImageGetFrameDimensionsList(nativeImage, dimensionIDs, count));
+     }
+ 
+     UINT
+     GetHeight()
+     {
+         UINT height = 0;
+         SetStatus(DllExports::GdipGetImageHeight(nativeImage, &height));
+         return height;
+     }
+ 
+     REAL
+     GetHorizontalResolution()
+     {
+         REAL resolution = 0.0f;
+         SetStatus(DllExports::GdipGetImageHorizontalResolution(nativeImage, &resolution));
+         return resolution;
+     }
+ 
+     Status
+     GetLastStatus()
+     {
+         return lastStatus;
+     }
+ 
+     Status
+     GetPalette(ColorPalette *palette, INT size)
+     {
+         return SetStatus(DllExports::GdipGetImagePalette(nativeImage, palette, size));
+     }
+ 
+     INT
+     GetPaletteSize()
+     {
+         INT size = 0;
+         SetStatus(DllExports::GdipGetImagePaletteSize(nativeImage, &size));
+         return size;
+     }
+ 
+     Status
+     GetPhysicalDimension(SizeF *size)
+     {
+         if (size == NULL)
+             return SetStatus(InvalidParameter);
+ 
+         return SetStatus(DllExports::GdipGetImageDimension(nativeImage, &size->Width, &size->Height));
+     }
+ 
+     PixelFormat
+     GetPixelFormat()
+     {
+         PixelFormat format;
+         SetStatus(DllExports::GdipGetImagePixelFormat(nativeImage, &format));
+         return format;
+     }
+ 
+     UINT
+     GetPropertyCount()
+     {
+         UINT numOfProperty = 0;
+         SetStatus(DllExports::GdipGetPropertyCount(nativeImage, &numOfProperty));
+         return numOfProperty;
+     }
+ 
+     Status
+     GetPropertyIdList(UINT numOfProperty, PROPID *list)
+     {
+         return SetStatus(DllExports::GdipGetPropertyIdList(nativeImage, numOfProperty, list));
+     }
+ 
+     Status
+     GetPropertyItem(PROPID propId, UINT propSize, PropertyItem *buffer)
+     {
+         return SetStatus(DllExports::GdipGetPropertyItem(nativeImage, propId, propSize, buffer));
+     }
+ 
+     UINT
+     GetPropertyItemSize(PROPID propId)
+     {
+         UINT size = 0;
+         SetStatus(DllExports::GdipGetPropertyItemSize(nativeImage, propId, &size));
+         return size;
+     }
+ 
+     Status
+     GetPropertySize(UINT *totalBufferSize, UINT *numProperties)
+     {
+         return SetStatus(DllExports::GdipGetPropertySize(nativeImage, totalBufferSize, numProperties));
+     }
+ 
+     Status
+     GetRawFormat(GUID *format)
+     {
+         return SetStatus(DllExports::GdipGetImageRawFormat(nativeImage, format));
+     }
+ 
+     Image *
+     GetThumbnailImage(UINT thumbWidth, UINT thumbHeight, GetThumbnailImageAbort callback, VOID *callbackData)
+     {
+         GpImage *thumbImage = NULL;
+         SetStatus(DllExports::GdipGetImageThumbnail(
+             nativeImage, thumbWidth, thumbHeight, &thumbImage, callback, callbackData));
+         Image *newImage = new Image(thumbImage, lastStatus);
+         if (newImage == NULL)
+         {
+             DllExports::GdipDisposeImage(thumbImage);
+         }
+         return newImage;
+     }
+ 
+     ImageType
+     GetType()
+     {
+         ImageType type;
+         SetStatus(DllExports::GdipGetImageType(nativeImage, &type));
+         return type;
+     }
+ 
+     REAL
+     GetVerticalResolution()
+     {
+         REAL resolution = 0.0f;
+         SetStatus(DllExports::GdipGetImageVerticalResolution(nativeImage, &resolution));
+         return resolution;
+     }
+ 
+     UINT
+     GetWidth()
+     {
+         UINT width = 0;
+         SetStatus(DllExports::GdipGetImageWidth(nativeImage, &width));
+         return width;
+     }
+ 
+     Status
+     RemovePropertyItem(PROPID propId)
+     {
+         return SetStatus(DllExports::GdipRemovePropertyItem(nativeImage, propId));
+     }
+ 
+     Status
+     RotateFlip(RotateFlipType rotateFlipType)
+     {
+         return SetStatus(DllExports::GdipImageRotateFlip(nativeImage, rotateFlipType));
+     }
+ 
+     Status
+     Save(IStream *stream, const CLSID *clsidEncoder, const EncoderParameters *encoderParams)
+     {
+         return SetStatus(DllExports::GdipSaveImageToStream(nativeImage, stream, clsidEncoder, encoderParams));
+     }
+ 
+     Status
+     Save(const WCHAR *filename, const CLSID *clsidEncoder, const EncoderParameters *encoderParams)
+     {
+         return SetStatus(DllExports::GdipSaveImageToFile(nativeImage, filename, clsidEncoder, encoderParams));
+     }
+ 
+     Status
+     SaveAdd(const EncoderParameters *encoderParams)
+     {
+         return SetStatus(DllExports::GdipSaveAdd(nativeImage, encoderParams));
+     }
+ 
+     Status
+     SaveAdd(Image *newImage, const EncoderParameters *encoderParams)
+     {
+ #if 1
+         // FIXME: Not available yet
+         return SetStatus(NotImplemented);
+ #else
+         if (!newImage)
+             return SetStatus(InvalidParameter);
+ 
+         return SetStatus(DllExports::GdipSaveAddImage(nativeImage, getNat(newImage), encoderParams));
+ #endif
+     }
+ 
+     Status
+     SelectActiveFrame(const GUID *dimensionID, UINT frameIndex)
+     {
+         return SetStatus(DllExports::GdipImageSelectActiveFrame(nativeImage, dimensionID, frameIndex));
+     }
+ 
+     Status
+     SetPalette(const ColorPalette *palette)
+     {
+         return SetStatus(DllExports::GdipSetImagePalette(nativeImage, palette));
+     }
+ 
+     Status
+     SetPropertyItem(const PropertyItem *item)
+     {
+         return SetStatus(DllExports::GdipSetPropertyItem(nativeImage, item));
+     }
+ 
+ #if 0
+     ImageLayout
+     GetLayout() const
+     {
+         return SetStatus(NotImplemented);
+     }
+ 
+     Status
+     SetLayout(const ImageLayout layout)
+     {
+         return SetStatus(NotImplemented);
+     }
+ #endif
+ 
+   protected:
+     GpImage *nativeImage;
+     mutable Status lastStatus;
+ 
+     Image()
+     {
+     }
+ 
+     Image(GpImage *image, Status status) : nativeImage(image), lastStatus(status)
+     {
+     }
+ 
+     Status
+     SetStatus(Status status) const
+     {
+         if (status != Ok)
+             lastStatus = status;
+         return status;
+     }
+ 
+     void
+     SetNativeImage(GpImage *image)
+     {
+         nativeImage = image;
+     }
+ 
+   private:
+     // Image is not copyable
+     Image(const Image &);
+     Image &
+     operator=(const Image &);
+ 
+     // get native
+     friend inline GpImage *&
+     getNat(const Image *image)
+     {
+         return const_cast<Image *>(image)->nativeImage;
+     }
+ };
+ 
+ class Bitmap : public Image
+ {
+     friend class CachedBitmap;
+ 
+   public:
+     // Bitmap(IDirectDrawSurface7 *surface)  // <-- FIXME: compiler does not like this
+     // {
+     //   lastStatus = DllExports::GdipCreateBitmapFromDirectDrawSurface(surface, &bitmap);
+     // }
+ 
+     Bitmap(INT width, INT height, Graphics *target)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromGraphics(width, height, target ? getNat(target) : NULL, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(const BITMAPINFO *gdiBitmapInfo, VOID *gdiBitmapData)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromGdiDib(gdiBitmapInfo, gdiBitmapData, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(INT width, INT height, PixelFormat format)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromScan0(width, height, 0, format, NULL, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(HBITMAP hbm, HPALETTE hpal)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromHBITMAP(hbm, hpal, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(INT width, INT height, INT stride, PixelFormat format, BYTE *scan0)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromScan0(width, height, stride, format, scan0, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(const WCHAR *filename, BOOL useIcm)
+     {
+         GpBitmap *bitmap = NULL;
+ 
+         if (useIcm)
+             lastStatus = DllExports::GdipCreateBitmapFromFileICM(filename, &bitmap);
+         else
+             lastStatus = DllExports::GdipCreateBitmapFromFile(filename, &bitmap);
+ 
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(HINSTANCE hInstance, const WCHAR *bitmapName)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromResource(hInstance, bitmapName, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(HICON hicon)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCreateBitmapFromHICON(hicon, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap(IStream *stream, BOOL useIcm)
+     {
+         GpBitmap *bitmap = NULL;
+         if (useIcm)
+             lastStatus = DllExports::GdipCreateBitmapFromStreamICM(stream, &bitmap);
+         else
+             lastStatus = DllExports::GdipCreateBitmapFromStream(stream, &bitmap);
+         SetNativeImage(bitmap);
+     }
+ 
+     Bitmap *
+     Clone(const Rect &rect, PixelFormat format)
+     {
+         return Clone(rect.X, rect.Y, rect.Width, rect.Height, format);
+     }
+ 
+     Bitmap *
+     Clone(const RectF &rect, PixelFormat format)
+     {
+         return Clone(rect.X, rect.Y, rect.Width, rect.Height, format);
+     }
+ 
+     Bitmap *
+     Clone(REAL x, REAL y, REAL width, REAL height, PixelFormat format)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCloneBitmapArea(x, y, width, height, format, GetNativeBitmap(), &bitmap);
+ 
+         if (lastStatus != Ok)
+             return NULL;
+ 
+         Bitmap *newBitmap = new Bitmap(bitmap);
+         if (newBitmap == NULL)
+         {
+             DllExports::GdipDisposeImage(bitmap);
+         }
+ 
+         return newBitmap;
+     }
+ 
+     Bitmap *
+     Clone(INT x, INT y, INT width, INT height, PixelFormat format)
+     {
+         GpBitmap *bitmap = NULL;
+         lastStatus = DllExports::GdipCloneBitmapAreaI(x, y, width, height, format, GetNativeBitmap(), &bitmap);
+ 
+         if (lastStatus != Ok)
+             return NULL;
+ 
+         Bitmap *newBitmap = new Bitmap(bitmap);
+         if (newBitmap == NULL)
+         {
+             DllExports::GdipDisposeImage(bitmap);
+         }
+ 
+         return newBitmap;
+     }
+ 
+     static Bitmap *
+     FromBITMAPINFO(const BITMAPINFO *gdiBitmapInfo, VOID *gdiBitmapData)
+     {
+         return new Bitmap(gdiBitmapInfo, gdiBitmapData);
+     }
+ 
+     // static Bitmap *FromDirectDrawSurface7(IDirectDrawSurface7 *surface)  // <-- FIXME: compiler does not like this
+     // {
+     //   return new Bitmap(surface);
+     // }
+ 
+     static Bitmap *
+     FromFile(const WCHAR *filename, BOOL useEmbeddedColorManagement)
+     {
+         return new Bitmap(filename, useEmbeddedColorManagement);
+     }
+ 
+     static Bitmap *
+     FromHBITMAP(HBITMAP hbm, HPALETTE hpal)
+     {
+         return new Bitmap(hbm, hpal);
+     }
+ 
+     static Bitmap *
+     FromHICON(HICON hicon)
+     {
+         return new Bitmap(hicon);
+     }
+ 
+     static Bitmap *
+     FromResource(HINSTANCE hInstance, const WCHAR *bitmapName)
+     {
+         return new Bitmap(hInstance, bitmapName);
+     }
+ 
+     static Bitmap *
+     FromStream(IStream *stream, BOOL useEmbeddedColorManagement)
+     {
+         return new Bitmap(stream, useEmbeddedColorManagement);
+     }
+ 
+     Status
+     GetHBITMAP(const Color &colorBackground, HBITMAP *hbmReturn)
+     {
+         return SetStatus(
+             DllExports::GdipCreateHBITMAPFromBitmap(GetNativeBitmap(), hbmReturn, colorBackground.GetValue()));
+     }
+ 
+     Status
+     GetHICON(HICON *hicon)
+     {
+         return SetStatus(DllExports::GdipCreateHICONFromBitmap(GetNativeBitmap(), hicon));
+     }
+ 
+     Status
+     GetPixel(INT x, INT y, Color *color)
+     {
+         ARGB argb;
+         Status s = SetStatus(DllExports::GdipBitmapGetPixel(GetNativeBitmap(), x, y, &argb));
+         if (color)
+             color->SetValue(argb);
+         return s;
+     }
+ 
+     Status
+     LockBits(const Rect *rect, UINT flags, PixelFormat format, BitmapData *lockedBitmapData)
+     {
+         return SetStatus(DllExports::GdipBitmapLockBits(GetNativeBitmap(), rect, flags, format, lockedBitmapData));
+     }
+ 
+     Status
+     SetPixel(INT x, INT y, const Color &color)
+     {
+         return SetStatus(DllExports::GdipBitmapSetPixel(GetNativeBitmap(), x, y, color.GetValue()));
+     }
+ 
+     Status
+     SetResolution(REAL xdpi, REAL ydpi)
+     {
+         return SetStatus(DllExports::GdipBitmapSetResolution(GetNativeBitmap(), xdpi, ydpi));
+     }
+ 
+     Status
+     UnlockBits(BitmapData *lockedBitmapData)
+     {
+         return SetStatus(DllExports::GdipBitmapUnlockBits(GetNativeBitmap(), lockedBitmapData));
+     }
+ 
+   protected:
+     Bitmap()
+     {
+     }
+ 
+     Bitmap(GpBitmap *nativeBitmap)
+     {
+         lastStatus = Ok;
+         SetNativeImage(nativeBitmap);
+     }
+ 
+     GpBitmap *
+     GetNativeBitmap() const
+     {
+         return static_cast<GpBitmap *>(nativeImage);
+     }
+ };
+ 
+ class CachedBitmap : public GdiplusBase
+ {
+   public:
+     CachedBitmap(Bitmap *bitmap, Graphics *graphics)
+     {
+         nativeCachedBitmap = NULL;
+         lastStatus = DllExports::GdipCreateCachedBitmap(
+             bitmap->GetNativeBitmap(), graphics ? getNat(graphics) : NULL, &nativeCachedBitmap);
+     }
+ 
+     ~CachedBitmap()
+     {
+         DllExports::GdipDeleteCachedBitmap(nativeCachedBitmap);
+     }
+ 
+     Status
+     GetLastStatus()
+     {
+         return lastStatus;
+     }
+ 
+   protected:
+     mutable Status lastStatus;
+     GpCachedBitmap *nativeCachedBitmap;
+ 
+   private:
+     // CachedBitmap is not copyable
+     CachedBitmap(const CachedBitmap &);
+     CachedBitmap &
+     operator=(const CachedBitmap &);
+ 
+     // get native
+     friend inline GpCachedBitmap *&
+     getNat(const CachedBitmap *cb)
+     {
+         return const_cast<CachedBitmap *>(cb)->nativeCachedBitmap;
+     }
+ };
+ 
+ class FontCollection : public GdiplusBase
+ {
+     friend class FontFamily;
+ 
+   public:
+     FontCollection() : nativeFontCollection(NULL), lastStatus(Ok)
+     {
+     }
+ 
+     virtual ~FontCollection()
+     {
+     }
+ 
+     Status
+     GetFamilies(INT numSought, FontFamily *gpfamilies, INT *numFound) const
+     {
+         return SetStatus(NotImplemented);
+     }
+ 
+     INT
+     GetFamilyCount() const
+     {
+         INT numFound = 0;
+         lastStatus = DllExports::GdipGetFontCollectionFamilyCount(nativeFontCollection, &numFound);
+         return numFound;
+     }
+ 
+     Status
+     GetLastStatus() const
+     {
+         return lastStatus;
+     }
+ 
+   protected:
+     GpFontCollection *nativeFontCollection;
+     mutable Status lastStatus;
+ 
+     Status
+     SetStatus(Status status) const
+     {
+         if (status != Ok)
+             lastStatus = status;
+         return status;
+     }
+ 
+   private:
+     // FontCollection is not copyable
+     FontCollection(const FontCollection &);
+     FontCollection &
+     operator=(const FontCollection &);
+ 
+     // get native
+     friend inline GpFontCollection *&
+     getNat(const FontCollection *fc)
+     {
+         return const_cast<FontCollection *>(fc)->nativeFontCollection;
+     }
+ };
+ 
+ class FontFamily : public GdiplusBase
+ {
+     friend class Font;
+ 
+   public:
+     FontFamily()
+     {
+     }
+ 
+     FontFamily(const WCHAR *name, const FontCollection *fontCollection)
+     {
+         GpFontCollection *theCollection = fontCollection ? getNat(fontCollection) : NULL;
+         status = DllExports::GdipCreateFontFamilyFromName(name, theCollection, &fontFamily);
+     }
+ 
+     FontFamily *
+     Clone()
+     {
+         return NULL;
+     }
+ 
+     static const FontFamily *
+     GenericMonospace()
+     {
+         FontFamily *genericMonospace = new FontFamily();
+         genericMonospace->status =
+             DllExports::GdipGetGenericFontFamilyMonospace(genericMonospace ? &genericMonospace->fontFamily : NULL);
+         return genericMonospace;
+     }
+ 
+     static const FontFamily *
+     GenericSansSerif()
+     {
+         FontFamily *genericSansSerif = new FontFamily();
+         genericSansSerif->status =
+             DllExports::GdipGetGenericFontFamilySansSerif(genericSansSerif ? &genericSansSerif->fontFamily : NULL);
+         return genericSansSerif;
+     }
+ 
+     static const FontFamily *
+     GenericSerif()
+     {
+         FontFamily *genericSerif = new FontFamily();
+         genericSerif->status =
+             DllExports::GdipGetGenericFontFamilyMonospace(genericSerif ? &genericSerif->fontFamily : NULL);
+         return genericSerif;
+     }
+ 
+     UINT16
+     GetCellAscent(INT style) const
+     {
+         UINT16 CellAscent;
+         SetStatus(DllExports::GdipGetCellAscent(fontFamily, style, &CellAscent));
+         return CellAscent;
+     }
+ 
+     UINT16
+     GetCellDescent(INT style) const
+     {
+         UINT16 CellDescent;
+         SetStatus(DllExports::GdipGetCellDescent(fontFamily, style, &CellDescent));
+         return CellDescent;
+     }
+ 
+     UINT16
+     GetEmHeight(INT style)
+     {
+         UINT16 EmHeight;
+         SetStatus(DllExports::GdipGetEmHeight(fontFamily, style, &EmHeight));
+         return EmHeight;
+     }
+ 
+     Status
+     GetFamilyName(WCHAR name[LF_FACESIZE], WCHAR language) const
+     {
+         return SetStatus(DllExports::GdipGetFamilyName(fontFamily, name, language));
+     }
+ 
+     Status
+     GetLastStatus() const
+     {
+         return status;
+     }
+ 
+     UINT16
+     GetLineSpacing(INT style) const
+     {
+         UINT16 LineSpacing;
+         SetStatus(DllExports::GdipGetLineSpacing(fontFamily, style, &LineSpacing));
+         return LineSpacing;
+     }
+ 
+     BOOL
+     IsAvailable() const
+     {
+         return FALSE;
+     }
+ 
+     BOOL
+     IsStyleAvailable(INT style) const
+     {
+         BOOL StyleAvailable;
+         SetStatus(DllExports::GdipIsStyleAvailable(fontFamily, style, &StyleAvailable));
+         return StyleAvailable;
+     }
+ 
+   private:
+     mutable Status status;
+     GpFontFamily *fontFamily;
+ 
+     Status
+     SetStatus(Status status) const
+     {
+         if (status == Ok)
+             return status;
+         this->status = status;
+         return status;
+     }
+ 
+     // get native
+     friend inline GpFontFamily *&
+     getNat(const FontFamily *ff)
+     {
+         return const_cast<FontFamily *>(ff)->fontFamily;
+     }
+ };
+ 
+ class InstalledFontFamily : public FontFamily
+ {
+   public:
+     InstalledFontFamily()
+     {
+     }
+ };
+ 
+ class PrivateFontCollection : public FontCollection
+ {
+   public:
+     PrivateFontCollection()
+     {
+         nativeFontCollection = NULL;
+         lastStatus = DllExports::GdipNewPrivateFontCollection(&nativeFontCollection);
+     }
+ 
+     virtual ~PrivateFontCollection()
+     {
+         DllExports::GdipDeletePrivateFontCollection(&nativeFontCollection);
+     }
+ 
+     Status
+     AddFontFile(const WCHAR *filename)
+     {
+         return SetStatus(DllExports::GdipPrivateAddFontFile(nativeFontCollection, filename));
+     }
+ 
+     Status
+     AddMemoryFont(const VOID *memory, INT length)
+     {
+         return SetStatus(DllExports::GdipPrivateAddMemoryFont(nativeFontCollection, memory, length));
+     }
+ };
+ 
+ class Font : public GdiplusBase
+ {
+   public:
+     friend class FontFamily;
+     friend class FontCollection;
+     friend class Graphics;
+ 
+     Font(const FontFamily *family, REAL emSize, INT style, Unit unit)
+     {
+         status = DllExports::GdipCreateFont(family->fontFamily, emSize, style, unit, &font);
+     }
+ 
+     Font(HDC hdc, const HFONT hfont)
+     {
+     }
+ 
+     Font(HDC hdc, const LOGFONTA *logfont)
+     {
+         status = DllExports::GdipCreateFontFromLogfontA(hdc, logfont, &font);
+     }
+ 
+     Font(HDC hdc, const LOGFONTW *logfont)
+     {
+         status = DllExports::GdipCreateFontFromLogfontW(hdc, logfont, &font);
+     }
+ 
+     Font(const WCHAR *familyName, REAL emSize, INT style, Unit unit, const FontCollection *fontCollection)
+     {
+     }
+ 
+     Font(HDC hdc)
+     {
+         status = DllExports::GdipCreateFontFromDC(hdc, &font);
+     }
+ 
+     Font *
+     Clone() const
+     {
+         Font *cloneFont = new Font();
+         cloneFont->status = DllExports::GdipCloneFont(font, cloneFont ? &cloneFont->font : NULL);
+         return cloneFont;
+     }
+ 
+     Status
+     GetFamily(FontFamily *family) const
+     {
+         return SetStatus(DllExports::GdipGetFamily(font, family ? &family->fontFamily : NULL));
+     }
+ 
+     REAL
+     GetHeight(const Graphics *graphics) const
+     {
+         REAL height;
+         SetStatus(DllExports::GdipGetFontHeight(font, graphics ? getNat(graphics) : NULL, &height));
+         return height;
+     }
+ 
+     REAL
+     GetHeight(REAL dpi) const
+     {
+         REAL height;
+         SetStatus(DllExports::GdipGetFontHeightGivenDPI(font, dpi, &height));
+         return height;
+     }
+ 
+     Status
+     GetLastStatus() const
+     {
+         return status;
+     }
+ 
+     Status
+     GetLogFontA(const Graphics *g, LOGFONTA *logfontA) const
+     {
+         return SetStatus(DllExports::GdipGetLogFontA(font, g ? getNat(g) : NULL, logfontA));
+     }
+ 
+     Status
+     GetLogFontW(const Graphics *g, LOGFONTW *logfontW) const
+     {
+         return SetStatus(DllExports::GdipGetLogFontW(font, g ? getNat(g) : NULL, logfontW));
+     }
+ 
+     REAL
+     GetSize() const
+     {
+         REAL size;
+         SetStatus(DllExports::GdipGetFontSize(font, &size));
+         return size;
+     }
+ 
+     INT
+     GetStyle() const
+     {
+         INT style;
+         SetStatus(DllExports::GdipGetFontStyle(font, &style));
+         return style;
+     }
+ 
+     Unit
+     GetUnit() const
+     {
+         Unit unit;
+         SetStatus(DllExports::GdipGetFontUnit(font, &unit));
+         return unit;
+     }
+ 
+     BOOL
+     IsAvailable() const
+     {
+         return FALSE;
+     }
+ 
+   protected:
+     Font()
+     {
+     }
+ 
+   private:
+     mutable Status status;
+     GpFont *font;
+ 
+     Status
+     SetStatus(Status status) const
+     {
+         if (status == Ok)
+             return status;
+         this->status = status;
+         return status;
+     }
+ 
+     // get native
+     friend inline GpFont *&
+     getNat(const Font *font)
+     {
+         return const_cast<Font *>(font)->font;
+     }
+ };
+ 
+ class Region : public GdiplusBase
+ {
+   public:
+     friend class Graphics;
+     friend class GraphicsPath;
+     friend class Matrix;
+ 
+     Region(const Rect &rect)
+     {
+         lastStatus = DllExports::GdipCreateRegionRectI(&rect, &nativeRegion);
+     }
+ 
+     Region()
+     {
+         lastStatus = DllExports::GdipCreateRegion(&nativeRegion);
+     }
+ 
+     Region(const BYTE *regionData, INT size)
+     {
+         lastStatus = DllExports::GdipCreateRegionRgnData(regionData, size, &nativeRegion);
+     }
+ 
+     Region(const GraphicsPath *path)
+     {
+         lastStatus = DllExports::GdipCreateRegionPath(getNat(path), &nativeRegion);
+     }
+ 
+     Region(HRGN hRgn)
+     {
+         lastStatus = DllExports::GdipCreateRegionHrgn(hRgn, &nativeRegion);
+     }
+ 
+     Region(const RectF &rect)
+     {
+         lastStatus = DllExports::GdipCreateRegionRect(&rect, &nativeRegion);
+     }
+ 
+     Region *
+     Clone()
+     {
+         Region *cloneRegion = new Region();
+         cloneRegion->lastStatus =
+             DllExports::GdipCloneRegion(nativeRegion, cloneRegion ? &cloneRegion->nativeRegion : NULL);
+         return cloneRegion;
+     }
+ 
+     Status
+     Complement(const GraphicsPath *path)
+     {
+         GpPath *thePath = path ? getNat(path) : NULL;
+         return SetStatus(DllExports::GdipCombineRegionPath(nativeRegion, thePath, CombineModeComplement));
+     }
+ 
+     Status
+     Complement(const Region *region)
+     {
+         GpRegion *theRegion = region ? getNat(region) : NULL;
+         return SetStatus(DllExports::GdipCombineRegionRegion(nativeRegion, theRegion, CombineModeComplement));
+     }
+ 
+     Status
+     Complement(const Rect &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRectI(nativeRegion, &rect, CombineModeComplement));
+     }
+ 
+     Status
+     Complement(const RectF &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRect(nativeRegion, &rect, CombineModeComplement));
+     }
+ 
+     BOOL
+     Equals(const Region *region, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(
+             DllExports::GdipIsEqualRegion(nativeRegion, region ? getNat(region) : NULL, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     Status
+     Exclude(const GraphicsPath *path)
+     {
+         return SetStatus(
+             DllExports::GdipCombineRegionPath(nativeRegion, path ? getNat(path) : NULL, CombineModeExclude));
+     }
+ 
+     Status
+     Exclude(const RectF &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRect(nativeRegion, &rect, CombineModeExclude));
+     }
+ 
+     Status
+     Exclude(const Rect &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRectI(nativeRegion, &rect, CombineModeExclude));
+     }
+ 
+     Status
+     Exclude(const Region *region)
+     {
+         return SetStatus(
+             DllExports::GdipCombineRegionRegion(nativeRegion, region ? getNat(region) : NULL, CombineModeExclude));
+     }
+ 
+     static Region *
+     FromHRGN(HRGN hRgn)
+     {
+         return new Region(hRgn);
+     }
+ 
+     Status
+     GetBounds(Rect *rect, const Graphics *g) const
+     {
+         return SetStatus(DllExports::GdipGetRegionBoundsI(nativeRegion, g ? getNat(g) : NULL, rect));
+     }
+ 
+     Status
+     GetBounds(RectF *rect, const Graphics *g) const
+     {
+         return SetStatus(DllExports::GdipGetRegionBounds(nativeRegion, g ? getNat(g) : NULL, rect));
+     }
+ 
+     Status
+     GetData(BYTE *buffer, UINT bufferSize, UINT *sizeFilled) const
+     {
+         return SetStatus(DllExports::GdipGetRegionData(nativeRegion, buffer, bufferSize, sizeFilled));
+     }
+ 
+     UINT
+     GetDataSize() const
+     {
+         UINT bufferSize;
+         SetStatus(DllExports::GdipGetRegionDataSize(nativeRegion, &bufferSize));
+         return bufferSize;
+     }
+ 
+     HRGN
+     GetHRGN(const Graphics *g) const
+     {
+         HRGN hRgn;
+         SetStatus(DllExports::GdipGetRegionHRgn(nativeRegion, g ? getNat(g) : NULL, &hRgn));
+         return hRgn;
+     }
+ 
+     Status
+     GetLastStatus()
+     {
+         return lastStatus;
+     }
+ 
+     Status
+     GetRegionScans(const Matrix *matrix, Rect *rects, INT *count) const
+     {
+         return SetStatus(DllExports::GdipGetRegionScansI(nativeRegion, rects, count, matrix ? getNat(matrix) : NULL));
+     }
+ 
+     Status
+     GetRegionScans(const Matrix *matrix, RectF *rects, INT *count) const
+     {
+         return SetStatus(DllExports::GdipGetRegionScans(nativeRegion, rects, count, matrix ? getNat(matrix) : NULL));
+     }
+ 
+     UINT
+     GetRegionScansCount(const Matrix *matrix) const
+     {
+         UINT count;
+         SetStatus(DllExports::GdipGetRegionScansCount(nativeRegion, &count, matrix ? getNat(matrix) : NULL));
+         return count;
+     }
+ 
+     Status
+     Intersect(const Rect &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRectI(nativeRegion, &rect, CombineModeIntersect));
+     }
+ 
+     Status
+     Intersect(const GraphicsPath *path)
+     {
+         GpPath *thePath = path ? getNat(path) : NULL;
+         return SetStatus(DllExports::GdipCombineRegionPath(nativeRegion, thePath, CombineModeIntersect));
+     }
+ 
+     Status
+     Intersect(const RectF &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRect(nativeRegion, &rect, CombineModeIntersect));
+     }
+ 
+     Status
+     Intersect(const Region *region)
+     {
+         return SetStatus(
+             DllExports::GdipCombineRegionRegion(nativeRegion, region ? getNat(region) : NULL, CombineModeIntersect));
+     }
+ 
+     BOOL
+     IsEmpty(const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsEmptyRegion(nativeRegion, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsInfinite(const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsInfiniteRegion(nativeRegion, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(const PointF &point, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsVisibleRegionPoint(nativeRegion, point.X, point.Y, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(const RectF &rect, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsVisibleRegionRect(
+             nativeRegion, rect.X, rect.Y, rect.Width, rect.Height, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(const Rect &rect, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsVisibleRegionRectI(
+             nativeRegion, rect.X, rect.Y, rect.Width, rect.Height, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(INT x, INT y, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsVisibleRegionPointI(nativeRegion, x, y, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(REAL x, REAL y, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsVisibleRegionPoint(nativeRegion, x, y, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(INT x, INT y, INT width, INT height, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(
+             DllExports::GdipIsVisibleRegionRectI(nativeRegion, x, y, width, height, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(const Point &point, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(DllExports::GdipIsVisibleRegionPointI(nativeRegion, point.X, point.Y, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     BOOL
+     IsVisible(REAL x, REAL y, REAL width, REAL height, const Graphics *g) const
+     {
+         BOOL result;
+         SetStatus(
+             DllExports::GdipIsVisibleRegionRect(nativeRegion, x, y, width, height, g ? getNat(g) : NULL, &result));
+         return result;
+     }
+ 
+     Status
+     MakeEmpty()
+     {
+         return SetStatus(DllExports::GdipSetEmpty(nativeRegion));
+     }
+ 
+     Status
+     MakeInfinite()
+     {
+         return SetStatus(DllExports::GdipSetInfinite(nativeRegion));
+     }
+ 
+     Status
+     Transform(const Matrix *matrix)
+     {
+         return SetStatus(DllExports::GdipTransformRegion(nativeRegion, matrix ? getNat(matrix) : NULL));
+     }
+ 
+     Status
+     Translate(REAL dx, REAL dy)
+     {
+         return SetStatus(DllExports::GdipTranslateRegion(nativeRegion, dx, dy));
+     }
+ 
+     Status
+     Translate(INT dx, INT dy)
+     {
+         return SetStatus(DllExports::GdipTranslateRegionI(nativeRegion, dx, dy));
+     }
+ 
+     Status
+     Union(const Rect &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRectI(nativeRegion, &rect, CombineModeUnion));
+     }
+ 
+     Status
+     Union(const Region *region)
+     {
+         return SetStatus(
+             DllExports::GdipCombineRegionRegion(nativeRegion, region ? getNat(region) : NULL, CombineModeUnion));
+     }
+ 
+     Status
+     Union(const RectF &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRect(nativeRegion, &rect, CombineModeUnion));
+     }
+ 
+     Status
+     Union(const GraphicsPath *path)
+     {
+         return SetStatus(DllExports::GdipCombineRegionPath(nativeRegion, path ? getNat(path) : NULL, CombineModeUnion));
+     }
+ 
+     Status
+     Xor(const GraphicsPath *path)
+     {
+         return SetStatus(DllExports::GdipCombineRegionPath(nativeRegion, path ? getNat(path) : NULL, CombineModeXor));
+     }
+ 
+     Status
+     Xor(const RectF &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRect(nativeRegion, &rect, CombineModeXor));
+     }
+ 
+     Status
+     Xor(const Rect &rect)
+     {
+         return SetStatus(DllExports::GdipCombineRegionRectI(nativeRegion, &rect, CombineModeXor));
+     }
+ 
+     Status
+     Xor(const Region *region)
+     {
+         return SetStatus(
+             DllExports::GdipCombineRegionRegion(nativeRegion, region ? getNat(region) : NULL, CombineModeXor));
+     }
+ 
+   private:
+     GpRegion *nativeRegion;
+     mutable Status lastStatus;
+ 
+     Status
+     SetStatus(Status status) const
+     {
+         if (status != Ok)
+             lastStatus = status;
+         return status;
+     }
+ 
+     // get native
+     friend inline GpRegion *&
+     getNat(const Region *region)
+     {
+         return const_cast<Region *>(region)->nativeRegion;
+     }
+ };
+ 
+ class CustomLineCap : public GdiplusBase
+ {
+   public:
+     CustomLineCap(const GraphicsPath *fillPath, const GraphicsPath *strokePath, LineCap baseCap, REAL baseInset = 0);
+ 
+     ~CustomLineCap();
+ 
+     CustomLineCap *
+     Clone();
+ 
+     LineCap
+     GetBaseCap();
+ 
+     REAL
+     GetBaseInset();
+ 
+     Status
+     GetLastStatus();
+ 
+     Status
+     GetStrokeCaps(LineCap *startCap, LineCap *endCap);
+ 
+     LineJoin
+     GetStrokeJoin();
+ 
+     REAL
+     GetWidthScale();
+ 
+     Status
+     SetBaseCap(LineCap baseCap);
+ 
+     Status
+     SetBaseInset(REAL inset);
+ 
+     Status
+     SetStrokeCap(LineCap strokeCap);
+ 
+     Status
+     SetStrokeCaps(LineCap startCap, LineCap endCap);
+ 
+     Status
+     SetStrokeJoin(LineJoin lineJoin);
+ 
+     Status
+     SetWidthScale(IN REAL widthScale);
+ 
+   protected:
+     GpCustomLineCap *nativeCap;
+     mutable Status lastStatus;
+ 
+     CustomLineCap() : nativeCap(NULL), lastStatus(Ok)
+     {
+     }
+ 
+     CustomLineCap(GpCustomLineCap *cap, Status status) : nativeCap(cap), lastStatus(status)
+     {
+     }
+ 
+     void
+     SetNativeCap(GpCustomLineCap *cap)
+     {
+         nativeCap = cap;
+     }
+ 
+     Status
+     SetStatus(Status status) const
+     {
+         if (status == Ok)
+             lastStatus = status;
+         return status;
+     }
+ 
+   private:
+     // CustomLineCap is not copyable
+     CustomLineCap(const CustomLineCap &);
+     CustomLineCap &
+     operator=(const CustomLineCap &);
+ 
+     // get native
+     friend inline GpCustomLineCap *&
+     getNat(const CustomLineCap *cap)
+     {
+         return const_cast<CustomLineCap *>(cap)->nativeCap;
+     }
+ };
+ 
+ inline Image *
+ TextureBrush::GetImage() const
+ {
+     GpImage *image = NULL;
+     GpTexture *texture = GetNativeTexture();
+     SetStatus(DllExports::GdipGetTextureImage(texture, &image));
+     if (lastStatus != Ok)
+         return NULL;
+ 
+     Image *newImage = new Image(image, lastStatus);
+     if (!newImage)
+         DllExports::GdipDisposeImage(image);
+     return newImage;
+ }
+ 
+ #endif /* _GDIPLUSHEADERS_H */
