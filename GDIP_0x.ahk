@@ -21,10 +21,22 @@ test()
         Startup and shutdown are working
         Added image class
         Image.FromFile() works
-    20210703
+    20210730
         Image.GetType() works
-        IMO = Image Object
-        IMOP = IMO Pointer
+        Added NativeImage to base.image to store the current image
+            NativeImage is used by many methods to interact with the "Native Image"
+            IMOP = IMO Pointer
+    20210731
+        Created rect class
+            Added overloaded constructor
+        Created point class
+            Added overloaded constructor
+        Created size class
+            Added overloaded constructor
+        Created gui class
+        Added new_layered_window() to gui class to create fast guis
+            Returns an HWND to that gui
+        Created test class for testing all the things!
     
 */
 
@@ -33,7 +45,6 @@ Class GDIP
 {
     Static  gdip_token  := ""
             , version   := 1.0
-            , imo_ptr   := ""
     
     ;####################################################################################################################
     ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
@@ -82,9 +93,11 @@ Class GDIP
                         :                    "UInt"     ; Default to UInt
         this.PtrA       := this.Ptr . "*"               ; Set pointer address type
         OnExit(this._method("__Delete"))                ; Ensure shutdown runs at script exit
+        VarSetCapacity(imo, A_PtrSize)                  ; Create a variable to store the native image pointer
+        this.image.imo  := imo                          ; This pointer resides in base.image
         estat           := this.Startup()               ; Run GDIP startup and get token
         ;this.generate_colorName()                      ; Generate color object
-        ;ad generator here
+        ;add other generators here
         Return estat
     }
     
@@ -137,25 +150,7 @@ Class GDIP
         DllCall("gdiplus\GdiplusShutdown", "UInt", this.gdip_token)
         Return
     }
-    
-    ;___________________________________________________________________________________________________________________|
-    ; Call              new_window(OnTop:=1,TitleBar:=0,TaskBar:=0)                                                     |
-    ; Description       Cleans up resources used by Windows GDI+ and clears GDIP token.                                 |
-    ;                                                                                                                   |
-    ; OnTop             Set window to always on top                                                                     |
-    ;                                                                                                                   |
-    ; Return            Handle to gui                                                                                            |
-    ;___________________________________________________________________________________________________________________|
-    new_window(OnTop=1, TitleBar=0, TaskBar=0)
-    {
-        Gui, New, % "+E0x80000 "                        ; Create a new layered window
-            . (TitleBar ? " -Caption"     : "")         ; Remove title bar and thick window border/edge
-            . (OnTop    ? " +AlwaysOnTop" : "")         ; Force GUI to always be on top
-            . (TaskBar  ? " +ToolWindow"  : "")         ; Removes the taskbar button
-            . "+HWNDguiHwnd "                           ; Saves the handle of the GUI to guiHwnd
-        Gui, Show, NA                                   ; Make window visible but transparent
-        Return guiHwnd
-    }
+
     
     
     ;####################################################################################################################
@@ -224,33 +219,33 @@ Class GDIP
             dt.HDESK         := p    ,dt.LRESULT           := p    ,dt.PWORD                  := p
             dt.HDROP         := p    ,dt.PBOOL             := p    ,dt.PWSTR                  := p
             dt.HDWP          := p    ,dt.PBOOLEAN          := p    ,dt.QWORD                  := 8
-            dt.HENHMETAFILE  := p    ,dt.PBYTE             := p    ,dt.SC_HANDLE              := p
-            dt.HFILE         := 4    ,dt.PCHAR             := p    ,dt.SC_LOCK                := p
-            dt.HFONT         := p    ,dt.PDWORD            := p    ,dt.SERVICE_STATUS_HANDLE  := p
-            dt.HGDIOBJ       := p    ,dt.PDWORD32          := p    ,dt.SIZE_T                 := p
-            dt.HGLOBAL       := p    ,dt.PDWORD64          := p    ,dt.SSIZE_T                := p
-            dt.HHOOK         := p    ,dt.PDWORD_PTR        := p    ,dt.TBYTE                  := u
-            dt.HICON         := p    ,dt.PDWORDLONG        := p    ,dt.TCHAR                  := u
-            dt.HINSTANCE     := p    ,dt.PFLOAT            := p    ,dt.UCHAR                  := 1
-            dt.HKEY          := p    ,dt.PHALF_PTR         := p    ,dt.UHALF_PTR              := h
-            dt.HKL           := p    ,dt.PHANDLE           := p    ,dt.UINT                   := 4
-            dt.HLOCAL        := p    ,dt.PHKEY             := p    ,dt.UINT16                 := 2
-            dt.HMENU         := p    ,dt.PINT              := p    ,dt.UINT32                 := 4
-            dt.HMETAFILE     := p    ,dt.PINT16            := p    ,dt.UINT64                 := 8
-            dt.HMODULE       := p    ,dt.PINT32            := p    ,dt.UINT8                  := 1
-            dt.HMONITOR      := p    ,dt.PINT64            := p    ,dt.UINT_PTR               := p
-            dt.HPALETTE      := p    ,dt.PINT8             := p    ,dt.ULONG                  := 4
-            dt.HPEN          := p    ,dt.PINT_PTR          := p    ,dt.ULONG32                := 4
-            dt.HRESULT       := 4    ,dt.PLCID             := p    ,dt.ULONG64                := 8
-            dt.HRGN          := p    ,dt.PLONG             := p    ,dt.ULONG_PTR              := p
-            dt.HRSRC         := p    ,dt.PLONG32           := p    ,dt.ULONGLONG              := 8
-            dt.HSZ           := p    ,dt.PLONG64           := p    ,dt.USHORT                 := 2
-            dt.HWINSTA       := p    ,dt.PLONG_PTR         := p    ,dt.USN                    := 8
-            dt.HWND          := p    ,dt.PLONGLONG         := p    ,dt.VOID                   := 0
-            dt.INT16         := 2    ,dt.POINTER_32        := p    ,dt.WCHAR                  := 2
-            dt.INT32         := 4    ,dt.POINTER_64        := p    ,dt.WORD                   := 2
-            dt.INT64         := 8    ,dt.POINTER_SIGNED    := p    ,dt.WPARAM                 := p
-            dt.INT8          := 1    ,dt.POINTER_UNSIGNED  := p
+            dt.HENHMETAFILE  := p    ,dt.PBYTE             := p    ,dt.REAL                   := 4
+            dt.HFILE         := 4    ,dt.PCHAR             := p    ,dt.SC_HANDLE              := p
+            dt.HFONT         := p    ,dt.PDWORD            := p    ,dt.SC_LOCK                := p
+            dt.HGDIOBJ       := p    ,dt.PDWORD32          := p    ,dt.SERVICE_STATUS_HANDLE  := p
+            dt.HGLOBAL       := p    ,dt.PDWORD64          := p    ,dt.SIZE_T                 := p
+            dt.HHOOK         := p    ,dt.PDWORD_PTR        := p    ,dt.SSIZE_T                := p
+            dt.HICON         := p    ,dt.PDWORDLONG        := p    ,dt.TBYTE                  := u
+            dt.HINSTANCE     := p    ,dt.PFLOAT            := p    ,dt.TCHAR                  := u
+            dt.HKEY          := p    ,dt.PHALF_PTR         := p    ,dt.UCHAR                  := 1
+            dt.HKL           := p    ,dt.PHANDLE           := p    ,dt.UHALF_PTR              := h
+            dt.HLOCAL        := p    ,dt.PHKEY             := p    ,dt.UINT                   := 4
+            dt.HMENU         := p    ,dt.PINT              := p    ,dt.UINT16                 := 2
+            dt.HMETAFILE     := p    ,dt.PINT16            := p    ,dt.UINT32                 := 4
+            dt.HMODULE       := p    ,dt.PINT32            := p    ,dt.UINT64                 := 8
+            dt.HMONITOR      := p    ,dt.PINT64            := p    ,dt.UINT8                  := 1
+            dt.HPALETTE      := p    ,dt.PINT8             := p    ,dt.UINT_PTR               := p
+            dt.HPEN          := p    ,dt.PINT_PTR          := p    ,dt.ULONG                  := 4
+            dt.HRESULT       := 4    ,dt.PLCID             := p    ,dt.ULONG32                := 4
+            dt.HRGN          := p    ,dt.PLONG             := p    ,dt.ULONG64                := 8
+            dt.HRSRC         := p    ,dt.PLONG32           := p    ,dt.ULONG_PTR              := p
+            dt.HSZ           := p    ,dt.PLONG64           := p    ,dt.ULONGLONG              := 8
+            dt.HWINSTA       := p    ,dt.PLONG_PTR         := p    ,dt.USHORT                 := 2
+            dt.HWND          := p    ,dt.PLONGLONG         := p    ,dt.USN                    := 8
+            dt.INT16         := 2    ,dt.POINTER_32        := p    ,dt.VOID                   := 0
+            dt.INT32         := 4    ,dt.POINTER_64        := p    ,dt.WCHAR                  := 2
+            dt.INT64         := 8    ,dt.POINTER_SIGNED    := p    ,dt.WORD                   := 2
+            dt.INT8          := 1    ,dt.POINTER_UNSIGNED  := p    ,dt.WPARAM                 := p                               
         }
         bytes := dt[type]
         If (bytes != "")
@@ -284,13 +279,15 @@ Class GDIP
     
     Class Image Extends GDIP
     {
+        Static  native_image_p := ""
         ; The Clone method creates a new Image object and initializes it with the contents of this Image object.
-        Clone(imop)
+        Clone(image_p="")
         {
+            (image_p = "") ? image_p := this.native_image_p : ""
             VarSetCapacity(clone_p, A_PtrSize)
             estat := DllCall("gdip\GdipCloneImage"
-                            ,this.Ptr   , imop
-                            ,this.Ptr   , clone_p)
+                            ,this.Ptr   , &image_p
+                            ,this.PtrA  , clone_p)
             estat ? this.error_log(A_ThisFunc, "Enum Status", estat) : ""
             MsgBox, % "imop: " imop "`nclone_p: " clone_p "`nestat: " estat 
             Return clone_p
@@ -628,7 +625,7 @@ Class GDIP
     ;####################################################################################################################
     ;  Graphics Class                                                                                                   |
     ;####################################################################################################################
-    Class grahics extends GDIP
+    Class graphics extends GDIP
     {
         ; Adds a text comment to an existing metafile
         ; text      The text to add
@@ -876,149 +873,7 @@ Class GDIP
         
         ;~ The Graphics::DrawEllipse method draws an ellipse.
         
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws a specified portion of an image at a specified location.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image at a specified location.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image at a specified location.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The Graphics::DrawImage method draws an image.
-        
-        ;~ DrawImage()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ The method draws a portion of an image after applying a specified effect.
+
         
         ;~ DrawLine()
         ;~ {
@@ -2331,9 +2186,241 @@ Class GDIP
         
         Return
     }
+    
+    Class point extends GDIP
+    {
+        ; Point() is an overloaded constructor that allows you to create a point structutre (8 byte variable) in multiple ways
+        ; Point structures contain x/y coordinates, with x stored in the first 4 bytes and y in the last 4.
+        ; Point()           Creates a point struct containing zeroes
+        ; Point(x, y)       Creates a point using the x and y values provided
+        ; Point(size)       Creates a point using the 2 values stored in a size struct
+        ; Point(point)      Clones a point struct
+        ; Description       
+        ; Return            Returns 
+        Point(obj_x="", y="")
+        {
+            VarSetCapacity(point, 8, 0)
+            (obj_x = "" && y = "")                      ? ""
+            : (this.is_num(obj_x) && this.is_num(y))    ? (NumPut(obj_x, point, 0, "Int"), NumPut(y, point, 4, "Int"))
+            : (VarSetCapacity(obj_x) = 8)               ? point := obj_x
+            :                                           ? (this.error_log(A_ThisFunc, "", expected, found), point := "")
+            Return point
+        }
+        
+        ; METHODS
+        ; Description       Determines whether two PointF objects are equal
+        Equals(point1, point2)
+        {
+            Return (NumGet(point1, 0, "Int64") = NumGet(point1, 0, "Int64")) ? 1 : 0
+        }
+        
+        ; The PointF::operator+ method adds the X and Y data members of two PointF objects.
+        sum(point1, point2)
+        {
+            sx := NumGet(point1, 0, "Int") + NumGet(point2, 0, "Int")
+            sy := NumGet(point1, 4, "Int") + NumGet(point2, 4, "Int")
+            Return this.Point(sy, sx)
+        }
+        
+        ; The PointF::operator- method subtracts the X and Y data members of two PointF objects.
+        diff(point1, point2)
+        {
+            Return
+        }
+        
+    }
+    
+    Class size extends GDIP
+    {
+        
+    }
+    
+    Class rect extends GDIP
+    {
+        ; Constructors
+        ; Rect() is an overloaded method that allows you to create a rect struct multiple ways
+        ; If any value has a decimal/fractional value, a rectf struct is made instead to accommodate the floating point value(s)
+        ; Rect()                     Creates an empty rect struct with all 4 values set to 0
+        ; Rect(Point, Size)          Creates a rect using the x/y from a point struct and the width/height from a size struct
+        ; Rect(x, y, width, height)  Creates a rect using x, y, width, and height values 
+        Rect(px="", sy="", w="", h="")                             ; Creates a RectF object and initializes the X and Y data members to zero. This is the default constructor.
+        {
+            VarSetCapacity(rect, 16, 0)
+            off := 0
+            rect := (!px && !sy && !w && !y) ? rect
+                 :  NumPut(x)
+                
+            If (this.is_int(point_x) && this.is_int(size_y) && this.is_int(width) && this.is_int(height))
+                NumPut(point_x, var, off), NumPut(y), NumPut(w), NumPut(h)
+            If (IsObject(point_x) && IsObject(size_y))
+                offset := NumPut(this.point, var, offset)
+            Return 
+                :  ()
+        }
+        
+        
+        
+        ;~ ; Methods
+        ;~ Clone()                             ; Clone method creates a new RectF object and initializes it with the contents of this RectF object.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Contains(PointF&)                   ; Contains method determines whether a point is inside this rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Contains(REAL,REAL)                 ; Contains method determines whether the point (x, y) is inside this rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Contains(RectF&)                    ; Contains method determines whether another rectangle is inside this rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Equals()                            ; Equals method determines whether two rectangles are the same.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetBottom()                         ; GetBottom method gets the y-coordinate of the bottom edge of the rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetBounds()                         ; GetBounds method makes a copy of this rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetLeft()                           ; GetLeft method gets the x-coordinate of the left edge of the rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetLocation()                       ; GetLocation method gets the coordinates of the upper-left corner of this rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetRight()                          ; GetRight method gets the x-coordinate of the right edge of the rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetSize()                           ; GetSize method gets the width and height of this rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ GetTop()                            ; GetTop method gets the y-coordinate of the top edge of the rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Inflate(PointF&)                    ; Inflate method expands the rectangle by the value of point.X on the left and right edges, and by the value of point.Y on the top and bottom edges.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Inflate(REAL,REAL)                  ; Inflate method expands the rectangle by dx on the left and right edges, and by dy on the top and bottom edges.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Intersect(RectF&)                   ; Intersect method replaces this rectangle with the intersection of itself and another rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Intersect(RectF&,RectF&,RectF&)     ; Intersect method determines the intersection of two rectangles and stores the result in a RectF object.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ IntersectsWith                      ; IntersectsWith method determines whether this rectangle intersects another rectangle.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ IsEmptyArea                         ; IsEmptyArea method determines whether this rectangle is empty.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Offset(PointF&)                     ; Offset method moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Offset(REAL,REAL)                   ; Offset method moves the rectangle by dx horizontally and by dx vertically.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+        ;~ Union                               ; Union method determines the union of two rectangles and stores the result in a RectF object.
+        ;~ {
+            ;~ Return
+        ;~ }
+        
+    }
+    
+    ; ##################
+    ; ##  Validators  ##
+    ; ##################
+    is_int(num)
+    {
+        Return (Mod(number, 1) = 0) ? 1 : 0
+    }
+    
+    is_float(num)
+    {
+        Return (Mod(number, 1) = 0) ? 0 : 1
+    }
+    
+    is_num(num)
+    {
+        Return (0*num = 0) ? 1 : 0
+    }
+    
+    ; ########################################
+    ; ##  Testing and Troubleshooting Code  ##
+    ; ########################################
+    Class test
+    {
+        show_img(image_p)
+        {
+            hwnd := this.gui.new_layered_window(A_ScreenWidth, A_ScreenHeight)
+            
+        }
+    }
+    
 }
 
-
+Class gui
+{
+    ;___________________________________________________________________________________________________________________|
+    ; Call              new_layered_window(OnTop:=1,TitleBar:=0,TaskBar:=0)                                             |
+    ; Description       Cleans up resources used by Windows GDI+ and clears GDIP token.                                 |
+    ;                                                                                                                   |
+    ; OnTop             Set window to always on top                                                                     |
+    ;                                                                                                                   |
+    ; Return            Handle to gui                                                                                   |
+    ;___________________________________________________________________________________________________________________|
+    new_layered_window(width, height, OnTop=1, TitleBar=0, TaskBar=0)
+    {
+        Gui, New, % "+E0x80000 "                        ; Create a new layered window
+            . (TitleBar ? " -Caption"     : "")         ; Remove title bar and thick window border/edge
+            . (OnTop    ? " +AlwaysOnTop" : "")         ; Force GUI to always be on top
+            . (TaskBar  ? " +ToolWindow"  : "")         ; Removes the taskbar button
+            . "+HWNDguiHwnd "                           ; Saves the handle of the GUI to guiHwnd
+        Gui, Show, NA                                   ; Make window visible but transparent
+        Return guiHwnd
+    }
+}
 
 
 
@@ -12443,3 +12530,97 @@ TextureBrush::GetImage() const
 }
 
 #endif /* _GDIPLUSHEADERS_H */
+
+
+/* test code for other file
+#SingleInstance, Force
+#NoEnv
+#Warn
+SetBatchLines, -1
+
+p1 := point.point(33, 400)
+p2 := point.point(36, 20) 
+ps := point.sum(p1, p2)
+MsgBox, % "psx: " NumGet(ps, 0, "Int") "`npsy: " NumGet(ps, 4, "Int")
+ExitApp
+
+*Esc::ExitApp
+
+Class testclass
+{
+    Static hwnd := {a:1, b:2}
+}
+
+Class point
+{
+    ; Point() is an overloaded constructor that allows you to create a point structutre (8 byte variable) in multiple ways
+    ; Point structures contain x/y coordinates, with x stored in the first 4 bytes and y in the last 4.
+    ; Point()           Creates a point struct containing zeroes
+    ; Point(x, y)       Creates a point using the x and y values provided
+    ; Point(size)       Creates a point using the 2 values stored in a size struct
+    ; Point(point)      Clones a point struct
+    ; Description       
+    ; Return            Returns 
+    Point(x="", y="")
+    {
+        VarSetCapacity(struct, 8, 0)
+        If (x = "" && y = "")
+            Return struct
+        Else If (this.is_int(x) && this.is_int(y))
+        {
+            NumPut(x, struct, 0, "Int")
+            NumPut(y, struct, 4, "Int")
+        }
+        Else If (VarSetCapacity(x) = 8)
+            Return x
+        Else 
+            this.error_log(A_ThisFunc, "Point object could not be created due to bad parameters."
+                          , "Point()`nPoint(x, y)`nPoint(pointStruct)`nPoint(sizeStruct)", {"x":x, "y":y})
+            , struct := ""
+        
+        MsgBox, % "x: " x "`ny: " y
+        
+        this.show(&struct)
+        
+        Return struct
+    }
+    
+    ; METHODS
+    ; Description       Determine if two Point objects are equal
+    Equals(point1, point2)
+    {
+        Return (NumGet(point1, 0, "Int64") = NumGet(point2, 0, "Int64")) ? 1 : 0
+    }
+    
+    ; Description       Adds the X and Y data members of two Point objects.
+    sum(point1, point2)
+    {
+        sum1 := (NumGet(point1, 0, "Int") + NumGet(point2, 0, "Int"))
+        sum2 := (NumGet(point1, 4, "Int") + NumGet(point2, 4, "Int"))
+        MsgBox, % "sum1: " sum1 "`nsum2: " sum2
+        Return
+    }
+    
+    ; Description       Finds the difference between the X and Y data members of two Point objects.
+    diff(point1, point2)
+    {
+        Return
+    }
+    
+    Show(struct)
+    {
+        MsgBox, % A_ThisFunc "`nstruct size: " VarSetCapacity(struct) "`nx: " NumGet(struct, 0, "Int") "`ny: " NumGet(struct, 4, "Int")
+        Return
+    }
+    
+    is_num(num)
+    {
+        Return (0*num = 0) ? 1 : 0
+    }
+    
+    is_int(num)
+    {
+        Return (Mod(num, 1) = 0) ? 1 : 0
+    }
+    
+}
