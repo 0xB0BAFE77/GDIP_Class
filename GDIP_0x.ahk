@@ -2232,7 +2232,10 @@ Class GDIP
     
     Class size extends GDIP
     {
-        
+        method()
+        {
+            Return
+        }
     }
     
     Class rect extends GDIP
@@ -2422,6 +2425,14 @@ Class gui
     }
 }
 
+; ##### THANK YOU #####
+; These are people that helped me figure out something/suggested a great idea along the way.
+; tic (github)          - For creating the original GDI AHK lib
+; Rseding91 (AHK forums)- For information and clarificaiton
+; Runie (discord)       - For making the AHK discord and for random help and answers
+; mim (discord)         - Can't remember exactly what (sry!) but it was 
+; SoftCore (discord)    - Helped with understanding
+; Cloaker (discord)     - Taught me a ton about how AHK handles variables and structs
 
 
 
@@ -12532,90 +12543,124 @@ TextureBrush::GetImage() const
 #endif /* _GDIPLUSHEADERS_H */
 
 
-/* test code for other file
+/* Test file
 #SingleInstance, Force
-#NoEnv
 #Warn
+#NoEnv
 SetBatchLines, -1
+if !A_IsAdmin || !(DllCall("GetCommandLine","Str")~=" /restart(?!\S)")
+    Try Run % "*RunAs """ (A_IsCompiled?A_ScriptFullPath """ /restart":A_AhkPath """ /restart """ A_ScriptFullPath """")
+    Finally ExitApp
 
-p1 := point.point(33, 400)
-p2 := point.point(36, 20) 
-ps := point.sum(p1, p2)
-MsgBox, % "psx: " NumGet(ps, 0, "Int") "`npsy: " NumGet(ps, 4, "Int")
+test()
 ExitApp
 
 *Esc::ExitApp
 
-Class testclass
+test()
 {
-    Static hwnd := {a:1, b:2}
+    p1  := new gdip.point()
+    p2  := new gdip.point(10, 20)
+    p3  := new gdip.point(p2)
+    show(p1)
+    show(p2)
+    show(p3)
+    Return
 }
 
-Class point
+show(point)
 {
-    ; Point() is an overloaded constructor that allows you to create a point structutre (8 byte variable) in multiple ways
-    ; Point structures contain x/y coordinates, with x stored in the first 4 bytes and y in the last 4.
-    ; Point()           Creates a point struct containing zeroes
-    ; Point(x, y)       Creates a point using the x and y values provided
-    ; Point(size)       Creates a point using the 2 values stored in a size struct
-    ; Point(point)      Clones a point struct
-    ; Description       
-    ; Return            Returns 
-    Point(x="", y="")
+    MsgBox, % "point.structP: " point.structP 
+    MsgBox, % "point.width: "   point.width
+        . "`npoint.height: "    point.height 
+        . "`nStruct width: "    NumGet(point.struct,    0, "Int")
+        . "`nStruct height: "   NumGet(point.struct,    0, "Int")
+        . "`nStructP width: "   NumGet(point.structP+0, 0, "Int")
+        . "`nStructP height: "  NumGet(point.structP+0, 0, "Int")
+    Return
+}
+
+Class GDIP
+{
+    ;===================================================================================================================.
+    ; A point objects/structures contain 2 integers representing x and y coordinates.                                   |
+    ; Properties:                                                                                                       |
+    ; .x                X coord (integer)                                                                               |
+    ; .y                Y coord (integer)                                                                               |
+    ; .struct           Actual 8 byte struct                                                                            |
+    ; .structP          Pointer to Point struct                                                                         |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; equals(point2)    Determines if 2 Points have equal values. Returns true/false                                    |
+    ; sum(point2)       Adds Point2 to the current Point. Returns a new Point object.                                   |
+    ; diff(point2)      Subtracts Point2 from the current Point. Returns a new Point object.                            |
+    ;___________________________________________________________________________________________________________________|
+    Class point extends GDIP
     {
-        VarSetCapacity(struct, 8, 0)
-        If (x = "" && y = "")
-            Return struct
-        Else If (this.is_int(x) && this.is_int(y))
+        type    := "Point"
+        x       := 0
+        y       := 0
+        struct  := 0
+        structP := 0
+        
+        ; The new creation method is overloaded, giving multiple ways to create a point object
+        ; Point()           Creates a point struct containing all zeroes
+        ; Point(x, y)       Creates a point using an int for x and one for y
+        ; Point(Size)       Creates a point using the 2 values stored in a size struct
+        ; Point(Point)      Clones a point struct
+        __New(obj_x="", y="")0
         {
-            NumPut(x, struct, 0, "Int")
-            NumPut(y, struct, 4, "Int")
+            err := 0
+            (this.is_int(obj_x) && this.is_int(y))  ? (this.width := obj_x, this.height := y)
+                : (obj_x = "" && y = "")            ? (this.width := 0, this.height := 0)
+                : (obj_x.type = "Size")             ? (this.width := obj_x.x, this.height := obj_x.y)
+                : (obj_x.type = "Point")            ? (this.width := obj_x.w, this.height := obj_x.h)
+                :                                     err := 1
+            
+            If (err)
+                this.error_log(A_ThisFunc, "Failed to create point struct.", "Expected", {obj_x:obj_x, y:y})
+            Else 
+            {
+                MsgBox, % "this.structP: " this.structP 
+                this.SetCapacity("struct", 8)           ; Set struct to 8 bytes
+                MsgBox, % "Capacity: " this.GetCapacity("struct")
+                ptr := this.GetAddress("struct")        ; Get struct pointer
+                NumPut(this.width,  ptr+0, 0, "Int")    ; Set first 4 bytes to width
+                NumPut(this.height, ptr+0, 4, "Int")    ; Set last 4 bytes to height
+                this.structP := ptr                     ; Save pointer
+                MsgBox, % "this.structP: " this.structP "`nptr: " ptr
+            }
         }
-        Else If (VarSetCapacity(x) = 8)
-            Return x
-        Else 
-            this.error_log(A_ThisFunc, "Point object could not be created due to bad parameters."
-                          , "Point()`nPoint(x, y)`nPoint(pointStruct)`nPoint(sizeStruct)", {"x":x, "y":y})
-            , struct := ""
         
-        MsgBox, % "x: " x "`ny: " y
+        ;~ ; METHODS
+        ;~ ; Description       Determines whether two PointF objects are equal
+        ;~ Equals(point1, point2)
+        ;~ {
+            ;~ Return (NumGet(point1, 0, "Int64") = NumGet(point1, 0, "Int64")) ? 1 : 0
+        ;~ }
         
-        this.show(&struct)
+        ;~ ; The PointF::operator+ method adds the X and Y data members of two PointF objects.
+        ;~ sum(point1, point2)
+        ;~ {
+            ;~ sx := NumGet(point1, 0, "Int") + NumGet(point2, 0, "Int")
+            ;~ sy := NumGet(point1, 4, "Int") + NumGet(point2, 4, "Int")
+            ;~ Return this.Point(sy, sx)
+        ;~ }
         
-        Return struct
+        ;~ ; The PointF::operator- method subtracts the X and Y data members of two PointF objects.
+        ;~ diff(point1, point2)
+        ;~ {
+            ;~ Return
+        ;~ }
+        
     }
     
-    ; METHODS
-    ; Description       Determine if two Point objects are equal
-    Equals(point1, point2)
+    Class size extends GDIP
     {
-        Return (NumGet(point1, 0, "Int64") = NumGet(point2, 0, "Int64")) ? 1 : 0
-    }
-    
-    ; Description       Adds the X and Y data members of two Point objects.
-    sum(point1, point2)
-    {
-        sum1 := (NumGet(point1, 0, "Int") + NumGet(point2, 0, "Int"))
-        sum2 := (NumGet(point1, 4, "Int") + NumGet(point2, 4, "Int"))
-        MsgBox, % "sum1: " sum1 "`nsum2: " sum2
-        Return
-    }
-    
-    ; Description       Finds the difference between the X and Y data members of two Point objects.
-    diff(point1, point2)
-    {
-        Return
-    }
-    
-    Show(struct)
-    {
-        MsgBox, % A_ThisFunc "`nstruct size: " VarSetCapacity(struct) "`nx: " NumGet(struct, 0, "Int") "`ny: " NumGet(struct, 4, "Int")
-        Return
-    }
-    
-    is_num(num)
-    {
-        Return (0*num = 0) ? 1 : 0
+        method()
+        {
+            Return
+        }
     }
     
     is_int(num)
@@ -12623,4 +12668,55 @@ Class point
         Return (Mod(num, 1) = 0) ? 1 : 0
     }
     
+    is_float(num)
+    {
+        Return (Mod(num, 1) = 0) ? 0 : 1
+    }
+    
+    is_num(num)
+    {
+        Return (0*num = 0) ? 1 : 0
+    }
 }
+
+
+
+
+
+
+
+
+class testingclass
+{
+}
+
+Rounding_Mindfuck()
+{
+    percent := 50
+    x := 255 * percent / 100
+    y := 255 / 100 * percent
+    MsgBox, % "Percent = " percent
+            . "`nvar`tRounded`tFormula"
+            . "`nx`t" Round(x) "`t255 * percent / 100"
+            . "`ny`t" Round(y) "`t255 / 100 * percent"
+            
+    ;MsgBox, % "x: " x "`nRounded`nx: " Round(x) "`ny: " y "`ny: "Round(y)
+    Return
+}
+
+to_hex(num){
+    Return Format("{1:#x}", num)
+}
+
+; qpx(1) starts it and qpx() stops timer and returns time
+qpx(N=0) {  ; Wrapper for QueryPerformanceCounter() by SKAN  | CD: 06/Dec/2009
+    Local   ; www.autohotkey.com/forum/viewtopic.php?t=52083 | LM: 10/Dec/2009
+    Static F:="", A:="", Q:="", P:="", X:=""
+    If (N && !P)
+        Return DllCall("QueryPerformanceFrequency",Int64P,F) + (X:=A:=0)
+             + DllCall("QueryPerformanceCounter",Int64P,P)
+    DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
+    Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
+}
+
+
