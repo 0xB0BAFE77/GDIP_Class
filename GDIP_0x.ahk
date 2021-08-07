@@ -41,9 +41,14 @@ GDIP.__New()
         Corrected some errors.
         Began writing test files
         Rect Test file is almost complete.
-        
+    20210806
+        Started working on PointF, SizeF, and RectF
+    20210807
+        Finished all the float variants of Point, Size, and Rect
+        Still need to test all 6 classes
 */
 
+*Escape::ExitApp
 
 Class GDIP
 {
@@ -2080,6 +2085,7 @@ Class GDIP
     ;####################################################################################################################
     ;  Generators                                                                                                       |
     ;####################################################################################################################
+    
     ;####################################################################################################################
     ; Description   Generates an object containing all the named colors from CSS3/X11 and their hex codes.              |
     ;               These colors can be accessed by calling this.ColorHex.ColorsName                                    |
@@ -2185,11 +2191,34 @@ Class GDIP
     }
     
     ;===================================================================================================================.
-    ; A Point object contains 2 integer properties representing x and y values. The object also stores a struct.        |
+    ; A PointF object contains 2 float values representing x and y coords.                                              |
+    ; Properties:                                                                                                       |
+    ; .x                X coord (float)                                                                                 |
+    ; .y                Y coord (float)                                                                                 |
+    ; .structP          Pointer to PointF struct                                                                        |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; PointF()          Create a PointF object with x and y values of 0                                                 |
+    ; PointF(f, f)      Create a PointF object with float x and float y values                                          |
+    ; PointF(SizeF)     Create a PointF object with x equal to SizeF.width and y equal to SizeF.height                  |
+    ; PointF(PointF)    Create a clone of the provided PointF struct                                                    |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; .equals(PointF)   Returns true if native PointF values are equal to provided PointF values                        |
+    ; .plus(PointF)     Returns a new PointF object containing the sum of  PointF objects > returns new PointF object   |
+    ; .minus(PointF)    Subtracts the x and y PointF values from the native PointF object > returns a new PointF object |
+    ;                                                                                                                   |
+    ; Remarks           If working with only integers, use Point.                                                       |
+    ;                   Int numbers are accepted by float methods and will be treated as float.                         |
+    ;                   Point and Size are accepted but are converted to float.                                         |
+    ;                   There is no way to use the + and - operators with PointFs. Use the plus() or minus() methods.   |
+    ;___________________________________________________________________________________________________________________|
+    ;===================================================================================================================.
+    ; A Point object contains 2 integer properties representing x and y values.                                         |
     ; Properties:                                                                                                       |
     ; .x                X coord (integer)                                                                               |
     ; .y                Y coord (integer)                                                                               |
-    ; .structP          Pointer to Point struct (x > y)                                                                 |
+    ; .structP          Pointer to Point struct                                                                         |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Point()           Create a Point object with x and y values of 0                                                  |
@@ -2198,9 +2227,9 @@ Class GDIP
     ; Point(Point)      Create a clone of the provided Point struct                                                     |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .equals(Point)    Determine if native and provided Point objects have equal values then returns true or false     |
-    ; .plus(Point)      Adds the x and y values of the native and provided Point objects then returns new Point object  |
-    ; .minus(Point)     Subtracts the x and y Point values from the native Point object then returns a new Point object |
+    ; .equals(Point)    Returns true if native Point values are equal to provided Point values                          |
+    ; .plus(Point)      Returns a new Point object containing the sum of  Point objects > returns new Point object      |
+    ; .minus(Point)     Subtracts the x and y Point values from the native Point object > returns a new Point object    |
     ;                                                                                                                   |
     ; Remarks           If working with float/decimal numbers, use PointF.                                              |
     ;                   There is no way to use the + and - operators with Points. Use the plus() or minus() methods.    |
@@ -2216,15 +2245,15 @@ Class GDIP
         ; ## CONSTRUCTOR ##
         ; Point()
         ; Point(int, int)
-        ; Point(Size)
-        ; Point(Point)
+        ; Point(SizeObj)
+        ; Point(PointObj)
         __New(obj_x="U", y="U")
         {
             err := 0
             (this.is_int(obj_x) && this.is_int(y))     ? (this.x := obj_x       ,this.y := y)
-                : (obj_x = "U" && y = "U")             ? (this.x := 0           ,this.y := 0)
-                : (obj_x.type == "Point") && (y = "U") ? (this.x := obj_x.x     ,this.y := obj_x.y)
-                : (obj_x.type == "Size") && (y = "U")  ? (this.x := obj_x.width ,this.y := obj_x.height)
+                : (obj_x == "U" && y == "U")             ? (this.x := 0           ,this.y := 0)
+                : (obj_x.type == "Point") && (y == "U") ? (this.x := obj_x.x     ,this.y := obj_x.y)
+                : (obj_x.type == "Size") && (y == "U")  ? (this.x := obj_x.width ,this.y := obj_x.height)
                 : err := 1
             
             (err)
@@ -2237,7 +2266,7 @@ Class GDIP
                     , NumPut(this.y, this.structP+0, 4, "Int") )
         }
         
-        ; For testing purposes > Shows contents of object
+        ; For testing purposes > Shows contents of this object
         show(msg="")
         {
             MsgBox, % (msg = "" ? "" : msg "`n")
@@ -2290,7 +2319,116 @@ Class GDIP
     }
     
     ;===================================================================================================================.
-    ; A Size object contains 2 integer properties representing width and height. The object also stores a struct.       |
+    ; A PointF object contains 2 float values representing x and y coords.                                              |
+    ; Properties:                                                                                                       |
+    ; .x                X coord (float)                                                                                 |
+    ; .y                Y coord (float)                                                                                 |
+    ; .structP          Pointer to PointF struct                                                                        |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; PointF()          Create a PointF object with x and y values of 0                                                 |
+    ; PointF(f, f)      Create a PointF object with float x and float y values                                          |
+    ; PointF(SizeF)     Create a PointF object with x equal to SizeF.width and y equal to SizeF.height                  |
+    ; PointF(PointF)    Create a clone of the provided PointF struct                                                    |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; .equals(PointF)   Returns true if native PointF values are equal to provided PointF values                        |
+    ; .plus(PointF)     Returns a new PointF object containing the sum of  PointF objects > returns new PointF object   |
+    ; .minus(PointF)    Subtracts the x and y PointF values from the native PointF object > returns a new PointF object |
+    ;                                                                                                                   |
+    ; Remarks           If working with only integers, use Point.                                                       |
+    ;                   Int numbers are accepted by float methods and will be treated as float.                         |
+    ;                   Point and Size are accepted but are converted to float.                                         |
+    ;                   There is no way to use the + and - operators with PointFs. Use the plus() or minus() methods.   |
+    ;___________________________________________________________________________________________________________________|
+    Class PointF extends GDIP
+    {
+        type    := "PointF"
+        x       := ""
+        y       := ""
+        struct  := ""
+        structP := ""
+        
+        ; ## CONSTRUCTOR ##
+        ; PointF()
+        ; PointF(float, float)
+        ; PointF(SizeFObj)
+        ; PointF(PointFObj)
+        __New(obj_x="U", y="U")
+        {
+            err := 0
+            (this.is_num(obj_x) && this.is_num(y))      ? (this.x := obj_x       ,this.y := y)
+                : (obj_x == "U" && y == "U")              ? (this.x := 0           ,this.y := 0)
+                : (y == "U") && (obj_x.type == "PointF"
+                    || obj_x.type == "Point")           ? (this.x := obj_x.x     ,this.y := obj_x.y)
+                : (y == "U") && (obj_x.type == "SizeF"
+                    || obj_x.type == "Size")            ? (this.x := obj_x.width ,this.y := obj_x.height)
+                : err := 1
+            
+            (err)
+                ? this.error_log(A_ThisFunc, "Failed to create PointF struct."  ; If error, log it
+                    , "No params, 2 floats, SizeF object, or PointF object"
+                    , {obj_x:obj_x, y:y})
+                : (this.SetCapacity("struct", 8)                                ; Else build PointF
+                    , this.structP := this.GetAddress("struct")
+                    , NumPut(this.x, this.structP+0, 0, "Float")
+                    , NumPut(this.y, this.structP+0, 4, "Float") )
+        }
+        
+        ; For testing purposes > Shows contents of this object
+        show(msg="")
+        {
+            MsgBox, % (msg = "" ? "" : msg "`n")
+                . "type: " this.type    "`nstructP: " this.structP
+                . "`nx: "  this.x       "`ny: "       this.y
+                . "`nStructP x: " NumGet(this.structP+0, 0, "Float")
+                . "`nStructP y: " NumGet(this.structP+0, 4, "Float")
+            Return
+        }
+        
+        ; ## METHODS ##
+        
+        ; Description   Determine if native and provided PointF objects have equal values
+        ; PointF        PointF object to do equality check against native PointF object
+        ; Return        1 = True, 0 = False
+        equals(PointF)
+        {
+            (PointF.type == "PointF") ? ""
+                : this.error_log(A_ThisFunc, "This method requires a PointF object be passed in as a parameter."
+                    , "Must supply a PointF object.", {providedObject: PointF})
+            Return (this.x = PointF.x) && (this.y = PointF.y) ? 1 : 0
+        }
+        
+        ; Description   Adds the x and y values of the native and provided PointF objects
+        ; PointF        PointF object to add to the native PointF object
+        ; Return        New PointF object containing the added x and y values
+        ; Remark        The x values and y values are added together, not x+y
+        ;               This is a replacement for the PointF +Operator
+        plus(PointF)
+        {
+            (PointF.type == "PointF") ? ""
+                : this.error_log(A_ThisFunc, "This method requires a PointF object be passed in as a parameter."
+                    , "Must supply a PointF object.", {providedObject: PointF})
+            Return new GDIP.PointF(this.x + PointF.x, this.y + PointF.y)
+        }
+        
+        ; Description   Subtracts the x and y PointF values from the native PointF object
+        ; PointF        PointF object to subtract from the native PointF object
+        ; Return        A new PointF object containing the difference of the x and y values
+        ; Remark        The x values and y values are subtracted, not x-y
+        ;               Native PointF is the minuend and provided PointF is the subtrahend
+        ;               This replaces the PointF -Operator
+        minus(PointF)
+        {
+            (PointF.type == "PointF") ? ""
+                : this.error_log(A_ThisFunc, "This method requires a PointF object be passed in as a parameter."
+                    , "Must supply a PointF object.", {providedObject: PointF})
+            Return new GDIP.PointF(this.x - PointF.x, this.y - PointF.y)
+        }
+    }
+    
+    ;===================================================================================================================.
+    ; A Size object contains 2 int values representing width and height.                                                |
     ; Properties:                                                                                                       |
     ; .width            width (integer)                                                                                 |
     ; .height           height (integer)                                                                                |
@@ -2302,10 +2440,10 @@ Class GDIP
     ; Size(Size)        Create a clone of the provided Size object                                                      |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .empty()          Determine if native Size object width and height are both set to 0 then returns true or false   |
-    ; .equals(Size)     Determine if native and provided Size objects have equal values then returns true or false      |
-    ; .plus(Size)       Add width and height values of native and provided Size objects then return new Size object     |
-    ; .minus(Size)      Subtract width and height values of provided and native Size objects then return new Size object|
+    ; .empty()          Returns true if the native width or height is 0 or less                                         |
+    ; .equals(Size)     Returns true if the native Size is equal to the supplied Size                                   |
+    ; .plus(Size)       Returns a new Size object containing the sum of the native Size and the provided Size           |
+    ; .minus(Size)      Returns a new Size object containing the difference of the native Size and the provided Size    |
     ;                                                                                                                   |
     ; Remarks           If working with float/decimal numbers, use SizeF.                                               |
     ;                   There is no way to use the + and - operators with Sizes. Use the plus() or minus() methods.     |
@@ -2326,8 +2464,8 @@ Class GDIP
         {
             err := 0
             (this.is_int(obj_width) && this.is_int(height))   ? (this.width  := obj_width ,this.height := height)
-                : (obj_width = "U" && height = "U")           ? (this.width  := 0         ,this.height := 0)
-                : (obj_width.type = "Size") && (height = "U") ? (this.width  := obj_width.width
+                : (obj_width == "U" && height == "U")           ? (this.width  := 0         ,this.height := 0)
+                : (obj_width.type = "Size") && (height == "U") ? (this.width  := obj_width.width
                                                                 ,this.height := obj_width.height)
                 : err := 1
             
@@ -2341,7 +2479,7 @@ Class GDIP
                     ,NumPut(this.height, this.structP+0, 4, "Int") )
         }
         
-        ; For testing purposes > Shows contents of object
+        ; For testing purposes > Shows contents of this object
         show(msg="")
         {
             MsgBox, % (msg = "" ? "" : msg "`n")
@@ -2399,7 +2537,118 @@ Class GDIP
     }
     
     ;===================================================================================================================.
-    ; A Rect object contains 4 integer properties representing x, y, width, and height. The object also stores a struct.|
+    ; A SizeF object contains 2 float values representing width and height.                                             |
+    ; Properties:                                                                                                       |
+    ; .width            width (float)                                                                                   |
+    ; .height           height (float)                                                                                  |
+    ; .structP          Pointer to SizeF struct (width > height)                                                        |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; SizeF()           Create a SizeF object with width and height values of 0                                         |
+    ; SizeF(f1, f2)     Create a SizeF object with float width and float height                                         |
+    ; SizeF(SizeF)      Create a clone of the provided SizeF object                                                     |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; .empty()          Returns true if the native width or height is 0 or less                                         |
+    ; .equals(SizeF)    Returns true if the native SizeF is equal to the supplied SizeF                                 |
+    ; .plus(SizeF)      Returns a new SizeF object containing the sum of the native SizeF and the provided SizeF        |
+    ; .minus(SizeF)     Returns a new SizeF object containing the difference of the native SizeF and the provided SizeF |
+    ;                                                                                                                   |
+    ; Remarks           If working with only integers, use Size.                                                        |
+    ;                   Int numbers are accepted by float methods and will be treated as float.                         |
+    ;                   Point and Size are accepted but are converted to float.                                         |
+    ;                   There is no way to use the + and - operators with SizeF. Use the plus() or minus() methods.     |
+    ;___________________________________________________________________________________________________________________|
+    Class SizeF extends GDIP
+    {
+        type    := "SizeF"
+        width   := ""
+        height  := ""
+        struct  := ""
+        structP := ""
+        
+        ; ## CONSTRUCTOR ##
+        ; SizeF()
+        ; SizeF(float, float)
+        ; SizeF(SizeF)
+        __New(obj_width="U", height="U")
+        {
+            err := 0
+            (this.is_num(obj_width) && this.is_num(height))   ? (this.width  := obj_width ,this.height := height)
+                : (obj_width == "U" && height == "U")           ? (this.width  := 0         ,this.height := 0)
+                : (obj_width.type = "SizeF") && (height == "U") ? (this.width  := obj_width.width
+                                                                ,this.height := obj_width.height)
+                : err := 1
+            
+            (err)
+                ? this.error_log(A_ThisFunc, "Failed to create SizeF struct."    ; If error, log it
+                    , "No params, 2 floats, 1 SizeF object, or 1 Point object"
+                    , {obj_or_width:obj_width, height:height})
+                : (this.SetCapacity("struct", 8)                                ; Else build SizeF struct
+                    ,this.structP := this.GetAddress("struct")
+                    ,NumPut(this.width , this.structP+0, 0, "Float")
+                    ,NumPut(this.height, this.structP+0, 4, "Float") )
+        }
+        
+        ; For testing purposes > Shows contents of this object
+        show(msg="")
+        {
+            MsgBox, % (msg = "" ? "" : msg "`n")
+                    . "type: "    this.type     "`nstructP: " this.structP
+                    . "`nwidth: " this.width    "`nheight: "  this.height
+                    . "`nStructP width: "  NumGet(this.structP+0, 0, "Float")
+                    . "`nStructP height: " NumGet(this.structP+0, 4, "Float")
+            Return
+        }
+        
+        ; ## METHODS ##
+        
+        ; Description   Determine if SizeF object width and height are set to 0
+        ; Return        1 = True, 0 = False
+        Empty()
+        {
+            Return (this.width = 0 || this.height = 0) ? 1 : 0
+        }
+        
+        ; Description   Determine if native SizeF and provided SizeF have equal width/height values
+        ; SizeF         SizeF object to do equality check against native SizeF object
+        ; Return        1 = True, 0 = False
+        Equals(SizeF)
+        {
+            (SizeF.type == "SizeF") ? ""
+                : this.error_log(A_ThisFunc, "This method requires a SizeF object be passed in as a parameter."
+                    , "Must supply a SizeF object.", {SizeF: SizeF})
+            Return (this.width = SizeF.width && this.height = SizeF.height) ? 1 : 0
+        }
+        
+        ; Description   Add width and height values of native and provided SizeF objects
+        ; SizeF         SizeF object to add to the native SizeF object
+        ; Return        New SizeF object containing the added width and height values
+        ; Remark        This is a replacement for the GDIPlus +Operator (IE: SizeF1 + SizeF2)
+        plus(SizeF)
+        {
+            (SizeF.type == "SizeF") ? ""
+                : this.error_log(A_ThisFunc, "This method requires a SizeF object be passed in as a parameter."
+                    , "Must supply a SizeF object.", {SizeF: SizeF})
+            Return new GDIP.SizeF((this.width + SizeF.width), (this.height + SizeF.height))
+        }
+        
+        ; Description   Subtracts the x and y SizeF values from the native SizeF object
+        ; SizeF         SizeF object to subtract from the native SizeF object
+        ; Return        A new SizeF object containing the difference of the width and height values
+        ; Remark        The provided SizeF values are always subtracted from the native SizeF values
+        ;               This is a replacement for the GDIPlus -Operator (IE: SizeF1 - SizeF2)
+        minus(SizeF)
+        {
+            (SizeF.type == "SizeF") ? ""
+                : this.error_log(A_ThisFunc, "This method requires a SizeF object be passed in as a parameter."
+                    , "Must supply a SizeF object.", {SizeF: SizeF})
+            Return new GDIP.SizeF((this.width - SizeF.width), (this.height - SizeF.height))
+        }
+    }
+    
+    ;===================================================================================================================.
+    ; A RectF object contains 4 integer values representing x, y, width, and height.                                    |
     ; Properties:                                                                                                       |
     ; .x                Rect leftmost x coordinate (integer)                                                            |
     ; .y                Rect topmost y coordinate (integer)                                                             |
@@ -2413,34 +2662,34 @@ Class GDIP
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Rect()            Create a Rect object with width and height values of 0                                          |
-    ; Rect(i1, i2, i3, i4) Create a Rect object with int width and int height                                           |
+    ; Rect(i1, i2, i3, i4) Create a Rect object with int x, y, width, and height                                        |
     ; Rect(Point, Size) Create a Rect object using a Point and Size object                                              |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; Clone()           Creates a new Rect object and initializes it with the contents of this Rect object.             |
-    ; Contains(x, y)    Determine if point int x and int y falls within native Rect                                     |
-    ; Contains(Point)   Determine if Point falls within native Rect                                                     |
-    ; Contains(Rect)    Determine if provided Rect falls within native Rect                                             |
-    ; Equals(Rect)      Determine if the supplied and native have equal x, y, width, and height values                  |
-    ; GetBottom()       Retrieves coordinate for the bottom edge of this Rect                                           |
-    ; GetBounds(Rect)   Copy the current rect values to the provide Rect object                                         |
-    ; GetLeft()         Retrieves coordinate for the left edge of this Rect                                             |
-    ; GetLocation(Point) Get x and y value from Rect and assign them to the provided Point object                       |
-    ; GetRight()        Retrieves coordinate for the right edge of this Rect                                            |
-    ; GetSize(Size)     Get width and height value from Rect and assign them to the provided Size object                |
-    ; GetTop()          Retrieves coordinate for the top edge of this Rect                                              |
-    ; Inflate(dx, dy)   Expand left & right edges by int dx and top & bottom edges by int dy                            |
-    ; Inflate(Point)    Expand left & right edges by Point.x and the top & bottom edges by Point.y                      |
-    ; Inflate(Size)     Expand left & right edges by Size.width and the top & bottom edges by Size.height               |
-    ; Intersect(Rect)   Update current Rect values to represent the rectangle created by the intersection.              |
-    ; Intersect(Rect1   Create new Rect using values of the rectangle created by Rect1 and Rect2 intersecting           |
+    ; Clone()           Returns a new Rect object with the same values as the native Rect object.                       |
+    ; Contains(x, y)    Returns true if int x and int y fall within the native Rect                                     |
+    ; Contains(Point)   Returns true if Point.x and Point.y falls within native Rect                                    |
+    ; Contains(Rect)    Returns true if provided Rect falls within native Rect                                          |
+    ; Equals(Rect)      Returns true if supplied and native Rect have equal x, y, width, and height values              |
+    ; GetBottom()       Returns bottom y coordinate of this Rect                                                        |
+    ; GetBounds(Rect)   Copies native Rect values to the provide Rect object > no return                                |
+    ; GetLeft()         Returns left x coordinate of this Rect                                                          |
+    ; GetLocation(Point) Copies native x and y value from Rect to the provided Point object > no return                 |
+    ; GetRight()        Returns right x coordinate of this Rect                                                         |
+    ; GetSize(Size)     Copies native width and height from Rect to the provided Size object > no return                |
+    ; GetTop()          Returns top y coordinate of this Rect                                                           |
+    ; Inflate(dx, dy)   Expands native Rect by int dx wide on both sides and int dy on top and bottom > no return       |
+    ; Inflate(Point)    Expands native Rect by point.x on both sides and point.y on top and bottom > no return          |
+    ; Inflate(Size)     Expands native Rect by size.width on both sides and size.height on th top and bottom > no return|
+    ; Intersect(Rect)   Get values of Rect created by intersecting native with  provided rect then assign to native rect|
+    ; Intersect(Rect1   Get values of Rect created by intersecting Rect1 and Rect2 then assign to native rect           |
     ;   ,Rect2, RectOut)                                                                                                |
-    ; IntersectsWith(Rect) Determine if provided Rect and native Rect intersect                                         |
-    ; IsEmptyArea()     Determines whether this rectangle is empty.                                                     |
-    ; Offset(Point)     Moves the rectangle by int dx horizontally and by int dy vertically.                            |
-    ; Offset(dx, dy)    Moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.   |
-    ; Union(Rect1       Creates a new Rect that stores the union of two other Rect objects.                             |
-    ;   , Rect2, RectOut)                                                                                                |
+    ; IntersectsWith(Rect) Return true if provided Rect intersects native Rect                                          |
+    ; IsEmptyArea()     Return true if width or height of Rect is 0 or less                                             |
+    ; Offset(Point)     Reposition Rect by moving x Point.x and y by Point.y                                            |
+    ; Offset(dx, dy)    Reposition Rect by moving x by int dx and y by int dy                                           |
+    ; Union(RectOut     Find Rect size to unionize Rect1 and Rect2 then assign them to RectOut                          |
+    ;   , Rect1, Rect2)                                                                                                 |
     ;                                                                                                                   |
     ; Remarks           If working with float/decimal numbers, use RectF.                                               |
     ;                   There is no way to use the + and - operators with Rects. Use the plus() or minus() methods.     |
@@ -2469,11 +2718,11 @@ Class GDIP
                 ? (this.left  := this.x := obj_x     ,this.top    := this.y := obj_y
                   ,this.width := width               ,this.height := height
                   ,this.right := obj_x + width       ,this.bottom := obj_y + height )
-            : (obj_x = "U" && obj_y = "U" && width = "U" && height = "U")                           ; All blank
+            : (obj_x == "U" && obj_y == "U" && width == "U" && height == "U")                           ; All blank
                 ? (this.left  := this.x := 0         ,this.top    := this.y := 0
                   ,this.width := 0                   ,this.height := 0
                   ,this.right := 0                   ,this.bottom := 0 )
-            : (obj_x.type == "Point" && obj_y.type == "Size" && width = "U" && height = "U")        ; Point + Size
+            : (obj_x.type == "Point" && obj_y.type == "Size" && width == "U" && height == "U")        ; Point + Size
                 ? (this.left  := this.x := obj_x.x   ,this.top    := this.y := obj_x.y 
                   ,this.width := obj_y.width         ,this.height := obj_y.height
                   ,this.right := this.x + this.width ,this.bottom := this.y + this.height )
@@ -2496,7 +2745,7 @@ Class GDIP
             ,NumPut(this.height, this.structP+0, 12, "Int")
         }
         
-        ; For testing purposes > Shows contents of object
+        ; For testing purposes > Shows contents of this object
         show(msg="")
         {
             MsgBox, % (msg = "" ? "" : msg "`n")
@@ -2530,10 +2779,10 @@ Class GDIP
             Return (this.is_int(obj_x) && this.is_int(y) ; check x y coords
                     && (obj_x >= this.left)     && (obj_x < this.right)
                     && (    y >= this.top)      && (    y < this.bottom)         ) ? 1
-                : (obj_x.type == "Point" && y = "U"       ; check Point.x Point.y coords
+                : (obj_x.type == "Point" && y == "U"       ; check Point.x Point.y coords
                     && (obj_x.x >= this.left)   && (obj_x.x < this.right)
                     && (obj_x.y >= this.top)    && (obj_x.y < this.bottom)       ) ? 1
-                : (obj_x.type == "Rect" && y = "U"        ; check if Rect is inside rect
+                : (obj_x.type == "Rect" && y == "U"        ; check if Rect is inside rect
                     && (this.x <= obj_x.x)      && (this.right  <= obj_x.right)
                     && (this.y <= obj_x.y)      && (this.bottom <= obj_x.bottom) ) ? 1
                 : 0                                      ; does not contain
@@ -2607,17 +2856,17 @@ Class GDIP
         {
             err := 0
             (this.is_int(dx_obj) && this.is_int(dy)) ; Both int
-                ? (this.left  := this.x -= dx_obj        ,this.right  += dx_obj
-                  ,this.top   := this.y -= dy            ,this.bottom += dy
-                  ,this.width += (dx_obj*2)              ,this.height += (dy*2) )
-            : (dx_obj.type == "Point" && dy = "U")   ; Point obj
-                ? (this.left  := this.x -= dx_obj.x      ,this.right  += dx_obj.x
-                  ,this.top   := this.y -= dx_obj.y      ,this.bottom += dx_obj.y
-                  ,this.width += (dx_obj.x*2)            ,this.height += (dx_obj.y*2) )
-            : (dx_obj.type == "Size" && dy = "U")    ; Size obj
-                ? (this.left  := this.x -= dx_obj.width  ,this.right  += dx_obj.width
-                  ,this.top   := this.y -= dx_obj.height ,this.bottom += dx_obj.height
-                  ,this.width += (dx_obj.width*2)        ,this.height += (dx_obj.height*2) )
+                ? (this.left  := this.x -= dx_obj       ,this.top    := this.y -= dy
+                  ,this.right += dx_obj                 ,this.bottom += dy
+                  ,this.width += (dx_obj*2)             ,this.height += (dy*2) )
+            : (dx_obj.type == "Point" && dy == "U")   ; Point obj
+                ? (this.left  := this.x -= dx_obj.x     ,this.top    := this.y -= dx_obj.y
+                  ,this.right += dx_obj.x               ,this.bottom += dx_obj.y
+                  ,this.width += (dx_obj.x*2)           ,this.height += (dx_obj.y*2) )
+            : (dx_obj.type == "Size" && dy == "U")    ; Size obj
+                ? (this.left  := this.x -= dx_obj.width ,this.top    := this.y -= dx_obj.height
+                  ,this.right += dx_obj.width           ,this.bottom += dx_obj.height
+                  ,this.width += (dx_obj.width*2)       ,this.height += (dx_obj.height*2) )
             : err := 1
             
             (err)
@@ -2629,7 +2878,7 @@ Class GDIP
         ; This is an overloaded method:
         ; Intersect(Rect)   Update current Rect values to represent the rectangle created by the intersection.
         ; Intersect(Rect1   Create new Rect using values of the rectangle created by Rect1 and Rect2 intersecting
-        ;   ,Rect1,RectOut) 
+        ;   , Rect2, RectOut) 
         ; Description       
         ; Rect              Rect object to to intersect with
         ; Return            0 = No intersection, 1 = Intersect found
@@ -2655,7 +2904,6 @@ Class GDIP
                   ,RectOut._update_struct() ,status := RectOut.IsEmptyArea() )
             : this.error_log(A_ThisFunc, "Bad parameter", "A single Rect or 3 Rects are required."
                 , {Rect1:Rect1, Rect2:Rect2, RectOut:RectOut}) ; Error > Bad parameter passed
-            
             Return status
         }
         
@@ -2663,8 +2911,10 @@ Class GDIP
         ; Return            1 = True, 0 = False
         IntersectsWith(Rect)
         {
-            Return ((this.left < Rect.right) && (this.top < Rect.bottom)
-                &&  (this.right > Rect.left) && (this.bottom > Rect.top) ) ? 1 : 0
+            Return ((this.left < Rect.right)
+                &&  (this.right > Rect.left)
+                &&  (this.top < Rect.bottom)
+                &&  (this.bottom > Rect.top) ) ? 1 : 0
         }
         
         ; Description       Determines whether this rectangle is empty.
@@ -2683,7 +2933,7 @@ Class GDIP
                 ? (this.left := this.x += dx_obj    ,this.top := this.y += dy
                   ,this.right          += dx_obj    ,this.bottom        += dy
                   ,this._update_struct() )
-            : (dx_obj == "Point" && y = "U")
+            : (dx_obj == "Point" && y == "U")
                 ? (this.left := this.x += dx_obj.x  ,this.top := this.y += dx_obj.y
                   ,this.right          += dx_obj.x  ,this.bottom        += dx_obj.y
                   ,this._update_struct() )
@@ -2698,7 +2948,7 @@ Class GDIP
         Union(ByRef RectOut, Rect1, Rect2)
         {
             status := 0
-            (Rect1.type == "Rect" && Rect2.type == "Rect" && RectOut.type == "Rect")
+            (RectOut.type == "Rect" && Rect1.type == "Rect" && Rect2.type == "Rect")
                 ? (RectOut.left := RectOut.x := (Rect1.left   < Rect2.left   ? Rect1.left   : Rect2.left)
                   ,RectOut.top  := RectOut.y := (Rect1.top    < Rect2.top    ? Rect1.top    : Rect2.top)
                   ,RectOut.right             := (Rect1.right  > Rect2.right  ? Rect1.right  : Rect2.right)
@@ -2713,6 +2963,324 @@ Class GDIP
             Return status
         }
         
+    }
+    
+    ;===================================================================================================================.
+    ; A RectF object contains 4 float values representing x, y, width, and height.                                      |
+    ; Properties:                                                                                                       |
+    ; .x                RectF leftmost x coordinate (integer)                                                           |
+    ; .y                RectF topmost y coordinate (integer)                                                            |
+    ; .width            RectF width (integer)                                                                           |
+    ; .height           RectF height (integer)                                                                          |
+    ; .left             Left x coord (synonymous with .x)                                                               |
+    ; .right            Right x coord                                                                                   |
+    ; .top              Top y coord (synonymous with .y)                                                                |
+    ; .bottom           Bottom y coord                                                                                  |
+    ; .structP          Pointer to RectF struct (x > y > width > height)                                                |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; RectF()           Create a RectF object with width and height values of 0                                         |
+    ; RectF(f1, f2, f3, f4) Create a RectF object with int x, y, width, and height                                      |
+    ; RectF(PointF, SizeF) Create a RectF object using a PointF and SizeF object                                        |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; Clone()           Returns a new RectF object with the same values as the native RectF object.                     |
+    ; Contains(x, y)    Returns true if int x and int y fall within the native RectF                                    |
+    ; Contains(PointF)  Returns true if PointF.x and PointF.y falls within native RectF                                 |
+    ; Contains(RectF)   Returns true if provided RectF falls within native RectF                                        |
+    ; Equals(RectF)     Returns true if supplied and native RectF have equal x, y, width, and height values             |
+    ; GetBottom()       Returns bottom y coordinate of this RectF                                                       |
+    ; GetBounds(RectF)  Copies native RectF values to the provide RectF object > no return                              |
+    ; GetLeft()         Returns left x coordinate of this RectF                                                         |
+    ; GetLocation(PointF) Copies native x and y value from RectF to the provided PointF object > no return              |
+    ; GetRight()        Returns right x coordinate of this RectF                                                        |
+    ; GetSizeF(SizeF)   Copies native width and height from RectF to the provided SizeF object > no return              |
+    ; GetTop()          Returns top y coordinate of this RectF                                                          |
+    ; Inflate(dx, dy)   Expands native RectF by int dx wide on both sides and int dy on top and bottom                  |
+    ; Inflate(PointF)   Expands native RectF by PointF.x on both sides and PointF.y on top and bottom                   |
+    ; Inflate(SizeF)    Expands native RectF by SizeF.width on both sides and SizeF.height on th top and bottom         |
+    ; Intersect(RectF)  Returns a new RectF with values set to the rectangle intersection made by the 2 RectFs          |
+    ; Intersect(RectF1  Returns a new RectF with values set to the rectangle intersection made by RectF1 and RectF2     |
+    ;   ,RectF2, RectFOut)                                                                                              |
+    ; IntersectsWith(RectF) Return true if provided RectF intersects native RectF                                       |
+    ; IsEmptyArea()     Return true if width or height of RectF is 0 or less                                            |
+    ; Offset(PointF)    Reposition RectF by moving x PointF.x and y by PointF.y                                         |
+    ; Offset(dx, dy)    Reposition RectF by moving x by int dx and y by int dy                                          |
+    ; Union(RectFOut    Find RectF SizeF to unionize RectF1 and RectF2 then assign them to RectFOut                     |
+    ;   , RectF1, RectF2)                                                                                               |
+    ;                                                                                                                   |
+    ; Remarks           If working with float/decimal numbers, use RectFF.                                              |
+    ;                   There is no way to use the + and - operators with RectFs. Use the plus() or minus() methods.    |
+    ;___________________________________________________________________________________________________________________|
+    Class RectF extends GDIP
+    {
+        type    := "RectF"
+        x       := ""
+        y       := ""
+        width   := ""
+        height  := ""
+        bottom  := ""
+        top     := ""
+        struct  := ""
+        structP := ""
+        
+        
+        ; ##  Constructor ##
+        ; RectF()
+        ; RectF(float, float, float, float)
+        ; RectF(PointF, SizeF)
+        __New(obj_x="U", obj_y="U", width="U", height="U")
+        {
+            err := 0
+            (this.is_num(obj_x) && this.is_num(obj_y) && this.is_num(width) && this.is_num(height))     ; All float
+                ? (this.left  := this.x := obj_x        ,this.top    := this.y := obj_y
+                  ,this.width := width                  ,this.height := height
+                  ,this.right := obj_x + width          ,this.bottom := obj_y + height )
+            : (obj_x == "U" && obj_y == "U" && width == "U" && height == "U")                           ; All blank
+                ? (this.left  := this.x := 0            ,this.top    := this.y := 0
+                  ,this.width := 0                      ,this.height := 0
+                  ,this.right := 0                      ,this.bottom := 0 )
+            : ((obj_x.type == "PointF" || obj_x.type == "Point")                                        ; PointF + SizeF
+                && (obj_y.type == "SizeF" || obj_y.type == "Size")
+                && width == "U" && height == "U")
+                ? (this.left  := this.x := obj_x.x      ,this.top    := this.y := obj_x.y 
+                  ,this.width := obj_y.width            ,this.height := obj_y.height
+                  ,this.right := this.x + this.width    ,this.bottom := this.y + this.height )
+            : err := 1                                                                                  ; Error
+            
+            (err)
+                ? this.error_log(A_ThisFunc, "Failed to create RectF struct."                           ; If error, log it
+                    , "No params, 4 floats, 1 SizeF object and 1 PointF object"
+                    , {obj_x:obj_x, obj_y:obj_y, width:width, height:height})
+                : (this.SetCapacity("struct", 16)                                                       ; Else build RectF
+                    ,this.structP := this.GetAddress("struct")
+                    ,this._update_struct() )
+        }
+        
+        _update_struct()
+        {
+             NumPut(this.x     , this.structP+0,  0, "Float")
+            ,NumPut(this.y     , this.structP+0,  4, "Float")
+            ,NumPut(this.width , this.structP+0,  8, "Float")
+            ,NumPut(this.height, this.structP+0, 12, "Float")
+        }
+        
+        ; For testing purposes > Shows contents of this object
+        show(msg="")
+        {
+            MsgBox, % (msg = "" ? "" : msg "`n")
+                . "type: "             this.type                "`nstructP: "   this.structP
+                . "`nx: "              this.x                   "`ny: "         this.y
+                . "`nwidth: "          this.width               "`nheight: "    this.height
+                . "`nleft: "           this.left                "`nright: "     this.right
+                . "`ntop: "            this.top                 "`nbottom: "    this.bottom
+                . "`nStructP x: "      NumGet(this.structP+0,  0, "Float")
+                . "`nStructP y: "      NumGet(this.structP+0,  4, "Float")
+                . "`nStructP width: "  NumGet(this.structP+0,  8, "Float")
+                . "`nStructP height: " NumGet(this.structP+0, 12, "Float")
+            Return
+        }
+        
+        ; ## METHODS ##
+        ; Description       Creates a new RectF object and initializes it with the contents of this RectF object.
+        Clone()
+        {
+            Return new gdip.RectF(this.x, this.y, this.width, this.height)
+        }
+        
+        ; This is an overloaded method:
+        ; Contains(x, y)    Determine if float x and float y fall within native RectF
+        ; Contains(PointF)  Determine if PointF falls within native RectF
+        ; Contains(RectF)   Determine if provided RectF falls within native RectF
+        ; Return            1 = True, 0 = False
+        ; Remark            Contains include lines falling on 
+        Contains(obj_x, y="U")
+        {
+            Return (this.is_num(obj_x) && this.is_num(y)                            ; check x y coords
+                    && (obj_x >= this.left)     && (obj_x < this.right)
+                    && (    y >= this.top)      && (    y < this.bottom)            ) ? 1
+                : ((obj_x.type == "PointF" || obj_x.type == "Point") && y == "U"    ; check PointF xy coords
+                    && (obj_x.x >= this.left)   && (obj_x.x < this.right)
+                    && (obj_x.y >= this.top)    && (obj_x.y < this.bottom)          ) ? 1
+                : (obj_x.type == "RectF" && y == "U"                                ; check if RectF is inside RectF
+                    && (this.x <= obj_x.x)      && (this.right >= obj_x.right)
+                    && (this.y <= obj_x.y)      && (this.bottom >= obj_x.bottom)    ) ? 1
+                : 0                                                                 ; does not contain
+        }
+        
+        ; Description       Determine if the supplied and native have equal x, y, width, and height values
+        ; RectF             RectF struct to compare
+        ; Return            1 = True, 0 = False
+        Equals(RectF)
+        {
+            Return (RectF.x     = this.x     && RectF.y      = this.y
+                &&  RectF.width = this.width && RectF.height = this.height ) ? 1 : 0
+        }
+        
+        ; Description       Retrieves coordinate for the bottom edge of this RectF
+        GetBottom()
+        {
+            Return this.bottom
+        }
+        
+        ; Description       Copy the current RectF values to the provide RectF object
+        GetBounds(ByRef RectF)
+        {
+            (RectF.type == "RectF")
+                ? (RectF.x := this.x, RectF.y := this.y, RectF.width := this.width, RectF.height := this.height)
+                : this.error_log(A_ThisFunc, "This functions requires a RectF object for the parameter."
+                    , "RectF object", {providedRectF:RectF})
+        }
+        
+        ; Description       Retrieves coordinate for the left edge of this RectF
+        ; Remark            Left is synonymous with x of a RectF
+        GetLeft()
+        {
+            Return this.left
+        }
+        
+        ; Description       Get x and y value from RectF and assign them to the provided PointF object
+        ; Return            No return value
+        GetLocation(ByRef PointF)
+        {
+            PointF := new GDIP.PointF(this.x, this.y)
+        }
+        
+        ; Description       Retrieves coordinate for the right edge of this RectF
+        GetRight()
+        {
+            Return this.right
+        }
+        
+        ; Description       Get width and height value from RectF and assign them to the provided SizeF object
+        ; Return            No return value
+        GetSizeF(ByRef SizeF)
+        {
+            SizeF := new GDIP.SizeF(this.width, this.height)
+        }
+        
+        ; Description       Retrieves coordinate for the top edge of this RectF
+        ; Remark            Top is synonymous with y of a RectF
+        GetTop()
+        {
+            Return this.top
+        }
+        
+        ; Overloaded method:
+        ; Inflate(dx, dy)   Expand left & right edges by float dx and top & bottom edges by float dy
+        ; Inflate(PointF)   Expand left & right edges by PointF.x and the top & bottom edges by PointF.y
+        ; Inflate(SizeF)    Expand left & right edges by SizeF.width and the top & bottom edges by SizeF.height
+        ; Return            No return value
+        ; Remark            A RectFangle should not be able to have a negative width or height
+        Inflate(dx_obj, dy="U")
+        {
+            err := 0
+            (this.is_num(dx_obj) && this.is_num(dy))                                ; Both float
+                ? (this.left  := this.x -= dx_obj       ,this.top    := this.y -= dy
+                  ,this.right += dx_obj                 ,this.bottom += dy
+                  ,this.width += (dx_obj*2)             ,this.height += (dy*2) )
+            : ((dx_obj.type == "PointF" || dx_obj.type == "Point") && dy == "U")    ; PointF obj
+                ? (this.left  := this.x -= dx_obj.x     ,this.top    := this.y -= dx_obj.y
+                  ,this.right += dx_obj.x               ,this.bottom += dx_obj.y
+                  ,this.width += (dx_obj.x*2)           ,this.height += (dx_obj.y*2) )
+            : ((dx_obj.type == "SizeF" || dx_obj.type == "Size") && dy == "U")      ; SizeF obj
+                ? (this.left  := this.x -= dx_obj.width ,this.top    := this.y -= dx_obj.height
+                  ,this.right += dx_obj.width           ,this.bottom += dx_obj.height
+                  ,this.width += (dx_obj.width*2)       ,this.height += (dx_obj.height*2) )
+            : err := 1
+            
+            (err)
+                ? this.error_log(A_ThisFunc, "This functions requires two Floats, a PointF object, or a SizeF "
+                    . "object parameter.", "PointF Object, SizeF Object, 2 Floats", {dx_obj:dx_obj, dy:dy})
+                : this._update_struct()
+        }
+        
+        ; This is an overloaded method:
+        ; Intersect(RectF)  Update current RectF values to represent the RectFangle created by the intersection.
+        ; Intersect(RectF1  Create new RectF using values of the RectFangle created by RectF1 and RectF2 intersecting
+        ;   ,RectF2,RectFOut) 
+        ; Description       
+        ; RectF             RectF object to to intersect with
+        ; Return            0 = No intersection, 1 = Intersect found
+        ; Remark            If there is no intersection, all values are updated to 0
+        Intersect(RectF1, RectF2="U", ByRef RectFOut="U")
+        {
+            status := "err"
+            (RectF1.type == "RectF" && RectF2 == "U" && RectFOut == "U")  ; Only RectF1
+                ? (this.left := this.x := (this.left   > RectF.left)   ? this.left   : RectF.left
+                  ,this.top  := this.y := (this.top    > RectF.top)    ? this.top    : RectF.top
+                  ,this.right          := (this.right  < RectF.right)  ? this.right  : RectF.right
+                  ,this.bottom         := (this.bottom < RectF.bottom) ? this.bottom : RectF.bottom
+                  ,this.width          := (this.right  - this.left)
+                  ,this.height         := (this.bottom - this.top)
+                  ,this._update_struct(), status := !this.IsEmptyArea() )
+            : (RectF1.type == "RectF" && RectF2.type == "RectF" && RectFOut.type == "RectF")  ; RectF1, RectF2, and RectFOut
+                ? (RectFOut.left := RectFOut.x := (RectF1.left     > RectF2.left)   ? RectF1.left   : RectF2.left
+                  ,RectFOut.top  := RectFOut.y := (RectF1.top      > RectF2.top)    ? RectF1.top    : RectF2.top
+                  ,RectFOut.right              := (RectF1.right    < RectF2.right)  ? RectF1.right  : RectF2.right
+                  ,RectFOut.bottom             := (RectF1.bottom   < RectF2.bottom) ? RectF1.bottom : RectF2.bottom
+                  ,RectFOut.width              := (RectFOut.right  - RectFOut.left)
+                  ,RectFOut.height             := (RectFOut.bottom - RectFOut.top)
+                  ,RectFOut._update_struct(), status := !this.IsEmptyArea() )
+            : this.error_log(A_ThisFunc, "Bad parameter", "A single RectF or 3 RectFs are required."
+                , {RectF1:RectF1, RectF2:RectF2, RectFOut:RectFOut}) ; Error > Bad parameter passed
+            Return status
+        }
+        
+        ; Description       Determine if provided RectF and native RectF intersect
+        ; Return            1 = True, 0 = False
+        IntersectsWith(RectF)
+        {
+            Return ((this.left < RectF.right)
+                &&  (this.right > RectF.left)
+                &&  (this.top < RectF.bottom)
+                &&  (this.bottom > RectF.top) ) ? 1 : 0
+        }
+        
+        ; Description       Determines whether this RectFangle is empty.
+        ; Return            1 = Empty, 0 = Not empty
+        IsEmptyArea()
+        {
+            Return (this.width <= 0 || this.height <= 0) ? 1 : 0
+        }
+        
+        ; Offset(PointF)    Moves the RectFangle by float dx horizontally and by float dy vertically.
+        ; Offset(dx, dy)    Moves this RectFangle horizontally a distance of PointF.X and vertically a distance of PointF.Y.
+        ; Return            No return value
+        Offset(dx_obj, dy="U")
+        {
+            (this.is_num(dx_obj) && this.is_num(dy))
+                ? (this.left := this.x += dx_obj    ,this.top := this.y += dy
+                  ,this.right          += dx_obj    ,this.bottom        += dy
+                  ,this._update_struct() )
+            : ((dx_obj == "PointF" || dx_obj == "Point" ) && y == "U")
+                ? (this.left := this.x += dx_obj.x  ,this.top := this.y += dx_obj.y
+                  ,this.right          += dx_obj.x  ,this.bottom        += dx_obj.y
+                  ,this._update_struct() )
+            : this.error_log(A_ThisFunc, "Bad parameter", "PointF object or two Floats", {dx_obj:dx_obj, dy:dy})
+        }
+        
+        ; Description       Creates a new RectF that stores the union of two other RectF objects.
+        ; RectF1, RectF2    The two RectF objects to join
+        ; RectFOut          The RectF output that will contain the unioned RectFs.
+        ; Return            1 = Empty RectF, 0 = Not Empty, Err = Error occurred
+        ; Remark            A union RectF is a RectF big enough to accommodate both RectF objects.
+        Union(ByRef RectFOut, RectF1, RectF2)
+        {
+            status := "err"
+            (RectFOut.type == "RectF" && RectF1.type == "RectF" && RectF2.type == "RectF")
+                ? (RectFOut.left := RectFOut.x := (RectF1.left   < RectF2.left   ? RectF1.left   : RectF2.left)
+                  ,RectFOut.top  := RectFOut.y := (RectF1.top    < RectF2.top    ? RectF1.top    : RectF2.top)
+                  ,RectFOut.right              := (RectF1.right  > RectF2.right  ? RectF1.right  : RectF2.right)
+                  ,RectFOut.bottom             := (RectF1.bottom > RectF2.bottom ? RectF1.bottom : RectF2.bottom)
+                  ,RectFOut.width  := (RectFOut.right - RectFOut.left)
+                  ,RectFOut.height := (RectFOut.bottom - RectFOut.top)
+                  ,RectFOut._update_struct()
+                  ,status := !RectFOut.IsEmptyArea() )
+                : this.error_log(A_ThisFunc, "Bad parameter", "Requires 3 RectF objects."
+                    , {RectFOut:RectFOut, RectF1:RectF1, RectF2:RectF2})
+            Return status
+        }
     }
     
     ; ############
@@ -2741,11 +3309,6 @@ Class GDIP
     is_int(num)
     {
         Return (Mod(num, 1) = 0) ? 1 : 0
-    }
-    
-    is_float(num)
-    {
-        Return (Mod(num, 1) = 0) ? 0 : 1
     }
     
     is_num(num)
