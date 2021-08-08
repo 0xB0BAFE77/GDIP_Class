@@ -47,9 +47,6 @@ GDIP.__New()
         Finished all the float variants of Point, Size, and Rect
         Still need to test all 6 classes
 */
-
-*Escape::ExitApp
-
 Class GDIP
 {
     Static  gdip_token  := ""
@@ -282,7 +279,11 @@ Class GDIP
     Class Image Extends GDIP
     {
         Static  native_image_p := ""
-        ; The Clone method creates a new Image object and initializes it with the contents of this Image object.
+        
+        ; ## CONSTRUCTORS ##
+        
+        ; ## Methods ##
+        ; Description       Creates a new Image object that is a duplicate of the native Image object.
         Clone(image_p="")
         {
             (image_p = "") ? image_p := this.native_image_p : ""
@@ -316,12 +317,14 @@ Class GDIP
         ; Returns       Pointer to new Image object
         FromFile(filename, icm=0)
         {
-            VarSetCapacity(imop, A_PtrSize)
+            VarSetCapacity(imoP, A_PtrSize)
             estat := DllCall("gdiplus\GdipLoadImageFromFile" . (icm ? "ICM" : "")
                             ,this.Ptr     , &filename
-                            ,this.PtrA    , imop)
-            estat ? this.error_log(A_ThisFunc, "Enum Status", estat) : ""
-            Return imop
+                            ,this.PtrA    , imoP)
+            (estat)
+                ? this.error_log(A_ThisFunc, "Error opening an image from file.", "Valid filename" 
+                    , {filename:filename, status_enum:estat, img_obj_ptr:imoP}) : ""
+            Return imoP
         }
         
         ; The FromStream method creates a new Image object based on a stream.
@@ -629,6 +632,14 @@ Class GDIP
     ;####################################################################################################################
     Class graphics extends GDIP
     {
+    
+        ; ## CONSTRUCTORS ##
+        ; Graphics(HDC)         Creates a Graphics object associated with a device context
+        ; Graphics(Image*)      Creates a Graphics object associated with an Image object
+        ; Graphics(HWND,BOOL)	Creates a Graphics object associated with a window
+        ; Graphics(HDC,HANDLE)	Creates a Graphics object associated with a device context and specified device
+        graphics(ptr, p2="")
+        
         ; Adds a text comment to an existing metafile
         ; text      The text to add
         ; gp        Pointer to graphics
@@ -1381,37 +1392,34 @@ Class GDIP
         
         ;~ The Graphics::Flush method flushes all pending graphics operations.
         
+        ;~ ; The Graphics::FromHDC method creates a Graphics object that is associated with a specified device context.
         ;~ FromHDC()
         ;~ {
             ;~ DllCall(""
                    ;~ , type      , value)
         ;~ }
         
-        ;~ The Graphics::FromHDC method creates a Graphics object that is associated with a specified device context.
-        
+        ;~ ; The Graphics::FromHDC method creates a Graphics object that is associated with a specified device context and a specified device.
         ;~ FromHDC()
         ;~ {
             ;~ DllCall(""
                    ;~ , type      , value)
         ;~ }
         
-        ;~ The Graphics::FromHDC method creates a Graphics object that is associated with a specified device context and a specified device.
-        
+        ;~ ; The Graphics::FromHWND method creates a Graphicsobject that is associated with a specified window.
         ;~ FromHWND()
         ;~ {
             ;~ DllCall(""
                    ;~ , type      , value)
         ;~ }
         
-        ;~ The Graphics::FromHWND method creates a Graphicsobject that is associated with a specified window.
-        
+        ;~ ; The Graphics::FromImage method creates a Graphicsobject that is associated with a specified Image object.
         ;~ FromImage()
         ;~ {
             ;~ DllCall(""
                    ;~ , type      , value)
         ;~ }
         
-        ;~ The Graphics::FromImage method creates a Graphicsobject that is associated with a specified Image object.
         
         ;~ GetClip()
         ;~ {
@@ -1604,38 +1612,6 @@ Class GDIP
         ;~ }
         
         ;~ This topic lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
-        
-        ;~ Graphics()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ Creates a Graphics::Graphics object that is associated with a specified device context.
-        
-        ;~ Graphics()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ Creates a Graphics::Graphics object that is associated with a specified device context and a specified device.
-        
-        ;~ Graphics()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ Creates a Graphics::Graphics object that is associated with a specified window.
-        
-        ;~ Graphics()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
-        
-        ;~ Creates a Graphics::Graphics object that is associated with an Image object.
         
         ;~ IntersectClip()
         ;~ {
@@ -3283,6 +3259,67 @@ Class GDIP
         }
     }
     
+    Class gui extends GDIP
+    {
+        gHwnd   := {}
+        title   := ""
+        width   := ""
+        height  := ""
+        
+        ;___________________________________________________________________________________________________________________
+        ; Call              new gdip.gui(title="OnTop:=1,TitleBar:=0,TaskBar:=0)                                            |
+        ; Description       Creates a new GUI object                                                                        |
+        ;                                                                                                                   |
+        ; OnTop             Set window to always on top                                                                     |
+        ;                                                                                                                   |
+        ; Return            Handle to gui                                                                                   |
+        ;___________________________________________________________________________________________________________________|
+        __New(title="Main", width="", height="", OnTop=1, TitleBar=0, TaskBar=1)
+        {
+            this.title  := title
+            this.width  := (width = "") ? A_ScreenWidth : width
+            this.height := (height = "") ? A_ScreenHeight : height
+            
+            Gui, % title ":" New, % "+E0x80000 "                ; Create a new layered window
+                . (TitleBar ? "+" : "-") "Caption "             ; Remove title bar and thick window border/edge
+                . (OnTop    ? "+" : "-") "AlwaysOnTop "         ; Force GUI to always be on top
+                . (TaskBar  ? "+" : "-") "ToolWindow "          ; Removes the taskbar button
+                . "+HWNDguiHwnd "                               ; Saves the handle of the GUI to guiHwnd
+            Gui, Show, NA                                       ; Make window visible but transparent
+            this.hwnd.gui := guiHwnd
+            Return guiHwnd
+        }
+        
+        _get_dc()
+        {
+            Return
+        }
+        
+        _update(title="Main")
+        {
+            DllCall("UpdateLayeredWindow"
+                    , HWND          , this.gHwnd.gui[title]     ; Handle to window
+                    , HDC           , hdcDst                    ; Handle to DC destination
+                    , this.Ptr      , *pptDst                   ; Set new screen position using Point struct
+                    , this.Ptr      , *psize                    ; Set new screen size using Size struct
+                    , HDC           , hdcSrc                    ; Handle to DC source
+                    , this.Ptr      , *pptSrc                   ; Set layer locaiton using Point struct
+                    , COLORREF      , crKey                     ; ColorRef struct
+                    , this.Ptr      , *pblend                   ; Pointer to a BlendFunction struct
+                    , DWORD         , dwFlags )                 ; Add: 0x1 - ULW_COLORKEY
+                                                                ;      0x2 - ULW_ALPHA
+                                                                ;      0x4 - ULW_OPAQUE
+                                                                ;      0x8 - ULW_EX_NORESIZE
+            Return
+        }
+        
+        default()
+        {
+            Gui, % this.title ":Default"
+            Return
+        }
+    }
+    
     ; ############
     ; ## Errors ##
     ; ############
@@ -3330,30 +3367,10 @@ Class GDIP
     
 }
 
-Class gui
-{
-    ;___________________________________________________________________________________________________________________|
-    ; Call              new_layered_window(OnTop:=1,TitleBar:=0,TaskBar:=0)                                             |
-    ; Description       Cleans up resources used by Windows GDI+ and clears GDIP token.                                 |
-    ;                                                                                                                   |
-    ; OnTop             Set window to always on top                                                                     |
-    ;                                                                                                                   |
-    ; Return            Handle to gui                                                                                   |
-    ;___________________________________________________________________________________________________________________|
-    new_layered_window(width, height, OnTop=1, TitleBar=0, TaskBar=0)
-    {
-        Gui, New, % "+E0x80000 "                        ; Create a new layered window
-            . (TitleBar ? " -Caption"     : "")         ; Remove title bar and thick window border/edge
-            . (OnTop    ? " +AlwaysOnTop" : "")         ; Force GUI to always be on top
-            . (TaskBar  ? " +ToolWindow"  : "")         ; Removes the taskbar button
-            . "+HWNDguiHwnd "                           ; Saves the handle of the GUI to guiHwnd
-        Gui, Show, NA                                   ; Make window visible but transparent
-        Return guiHwnd
-    }
-}
 ; Helpful links:
 ; https://pdfium.googlesource.com/pdfium/+/5110c4743751145c4ae1934cd1d83bc6c55bb43f/core/src/fxge/Microsoft%20SDK/include?autodive=0/
 ; https://doxygen.reactos.org/d5/def/gdiplustypes_8h_source.html
+
 
 /*
 ### IDEAS ###
