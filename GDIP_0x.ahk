@@ -1,6 +1,3 @@
-#Warn
-GDIP.__New()
-
 /*
     Log:
     20210729
@@ -9,9 +6,10 @@ GDIP.__New()
         Image.FromFile() works
     20210730
         Image.GetType() works
-        Added NativeImage to base.image to store the current image
+        Added NativeImage to image class to store the current image
             NativeImage is used by many methods to interact with the "Native Image"
             IMOP = IMO Pointer
+            Other classes operate like this, such as the graphics class
     20210731
         Created Rect, Point, and Size classes
             Added overloaded constructors
@@ -46,7 +44,13 @@ GDIP.__New()
     20210807
         Finished all the float variants of Point, Size, and Rect
         Still need to test all 6 classes
+    20210808
+        Updated the Gui class and the layered window method
+        Started working with the Graphics class
 */
+
+GDIP.__New()
+
 Class GDIP
 {
     Static  gdip_token  := ""
@@ -99,8 +103,6 @@ Class GDIP
                         :                    "UInt"     ; Default to UInt
         this.PtrA       := this.Ptr . "*"               ; Set pointer address type
         OnExit(this._method("__Delete"))                ; Ensure shutdown runs at script exit
-        VarSetCapacity(imo, A_PtrSize)                  ; Create a variable to store the native image pointer
-        this.image.imo  := imo                          ; This pointer resides in base.image
         estat           := this.Startup()               ; Run GDIP startup and get token
         ;this.generate_colorName()                      ; Generate color object
         ;add other generators here
@@ -125,8 +127,8 @@ Class GDIP
         If (this.gdip_token != "")
             Return -1
         
-        DllCall("GetModuleHandle", "str", "gdiplus")
-            ? "" : DllCall("LoadLibrary", "str", "gdiplus")
+        DllCall("GetModuleHandle", "str", "gdiplus") ? ""   ; Check if GDIPlus is loaded
+            : DllCall("LoadLibrary", "str", "gdiplus")      ; 
         
         VarSetCapacity(token, A_PtrSize)
         ,VarSetCapacity(gdip_si, (A_PtrSize = 8) ? 24 : 16, 0)
@@ -278,7 +280,7 @@ Class GDIP
     
     Class Image Extends GDIP
     {
-        Static  native_image_p := ""
+        Static  NativeImage := ""
         
         ; ## CONSTRUCTORS ##
         
@@ -286,7 +288,7 @@ Class GDIP
         ; Description       Creates a new Image object that is a duplicate of the native Image object.
         Clone(image_p="")
         {
-            (image_p = "") ? image_p := this.native_image_p : ""
+            (image_p = "") ? image_p := this.NativeImage : ""
             VarSetCapacity(clone_p, A_PtrSize)
             estat := DllCall("gdip\GdipCloneImage"
                             ,this.Ptr   , &image_p
@@ -632,13 +634,26 @@ Class GDIP
     ;####################################################################################################################
     Class graphics extends GDIP
     {
-    
         ; ## CONSTRUCTORS ##
         ; Graphics(HDC)         Creates a Graphics object associated with a device context
+        ; FromHDC(HDC)
         ; Graphics(Image*)      Creates a Graphics object associated with an Image object
+        ; FromImage(ImageP)
         ; Graphics(HWND,BOOL)	Creates a Graphics object associated with a window
+        ; FromHWND(HWND, ICM)
         ; Graphics(HDC,HANDLE)	Creates a Graphics object associated with a device context and specified device
-        graphics(ptr, p2="")
+        ; FromDevice(HDC, Handle)
+        ; overloaded: graphics(ptr, p2="")
+        
+        FromHWND(HWND, ICM)
+        {
+            VarSetCapacity(gp, A_PtrSize, 0)
+            this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
+                                      ,this.Ptr     , HWND
+                                      ,this.PtrA    , gp)
+            this.native_graphics := gp
+            Return gp
+        }
         
         ; Adds a text comment to an existing metafile
         ; text      The text to add
