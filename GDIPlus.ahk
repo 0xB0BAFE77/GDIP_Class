@@ -47,14 +47,16 @@
     20210808
         Updated the Gui class and the layered window method
         Started working with the Graphics class
+    20210809
+        
 */
 
 GDIP.__New()
 
 Class GDIP
 {
-    Static  gdip_token  := ""
-            , version   := 1.0
+    Static  _token  := ""
+            , _version   := 1.0
     
     ;####################################################################################################################
     ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
@@ -112,7 +114,7 @@ Class GDIP
     __Delete()
     {
         this.Shutdown()
-        , this.gdip_token := ""
+        , this._token := ""
         Return
     }
     
@@ -124,7 +126,7 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Startup()
     {
-        If (this.gdip_token != "")
+        If (this._token != "")
             Return -1
         
         DllCall("GetModuleHandle", "str", "gdiplus") ? ""   ; Check if GDIPlus is loaded
@@ -142,7 +144,7 @@ Class GDIP
             ? this.error_log(A_ThisFunc, "Startup has failed.", "Enum Status: " this.enum.status[estat])
             : ""
         
-        this.gdip_token := token
+        this._token := token
         
         Return estat
     }
@@ -155,7 +157,7 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Shutdown()
     {
-        DllCall("gdiplus\GdiplusShutdown", "UInt", this.gdip_token)
+        DllCall("gdiplus\GdiplusShutdown", "UInt", this._token)
         Return
     }
 
@@ -645,13 +647,21 @@ Class GDIP
         ; FromDevice(HDC, Handle)
         ; overloaded: graphics(ptr, p2="")
         
-        FromHWND(HWND, ICM)
+        
+        FromHDC(HDC, device="")
+        {
+            
+            Return
+        }
+        
+        ; Description       
+        FromHWND(HWND, ICM=0)
         {
             VarSetCapacity(gp, A_PtrSize, 0)
-            this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
-                                      ,this.Ptr     , HWND
-                                      ,this.PtrA    , gp)
-            this.native_graphics := gp
+            ,this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
+                                       ,this.Ptr     , HWND
+                                       ,this.PtrA    , gp)
+            ,this.native_graphics := gp
             Return gp
         }
         
@@ -901,7 +911,14 @@ Class GDIP
         
         ;~ The Graphics::DrawEllipse method draws an ellipse.
         
-
+        
+        DrawImage()
+        {
+            
+            Return
+        }
+        
+        ; Description       Draws a line that connects two points.
         
         ;~ DrawLine()
         ;~ {
@@ -909,7 +926,6 @@ Class GDIP
                    ;~ , type      , value)
         ;~ }
         
-        ;~ The Graphics::DrawLine method draws a line that connects two points.
         
         ;~ DrawLine()
         ;~ {
@@ -2043,34 +2059,42 @@ Class GDIP
     Class enum
     {
         ; Identify's an image's main type
-        Static  ImageType   := {0   :"ImageTypeUnknown"
-                               ,1   :"ImageTypeBitmap"
-                               ,2   :"ImageTypeMetafile" }
+        Static  ImageType   := {"ImageTypeUnknown"  : 0
+                               ,"ImageTypeBitmap"   : 1
+                               ,"ImageTypeMetafile" : 2 }
         
         ; GDIP status error codes
-        Static  Status      := {0   : "Ok"                          ; Method call was successful.                                                     |
-                               ,1   : "GenericError"                ; Error on method call that is not covered by anything else in this list.         |
-                               ,2   : "InvalidParameter"            ; One of the method arguments passed was not valid.                               |
-                               ,3   : "OutOfMemory"                 ; Operating system is out of memory / could not allocate memory.                  |
-                               ,4   : "ObjectBusy"                  ; One of the arguments specified in the API call is already in use.               |
-                               ,5   : "InsufficientBuffer"          ; A buffer passed in the API call is not large enough for the data.               |
-                               ,6   : "NotImplemented"              ; Method is not implemented.                                                      |
-                               ,7   : "Win32Error"                  ; Method generated a Win32 error.                                                 |
-                               ,8   : "WrongState"                  ; An object state is invalid for the API call.                                    |
-                               ,9   : "Aborted"                     ; Method was aborted.                                                             |
-                               ,10  : "FileNotFound"                ; Specified image file or metafile cannot be found.                               |
-                               ,11  : "ValueOverflow"               ; An arithmetic operation produced a numeric overflow.                            |
-                               ,12  : "AccessDenied"                ; Writing is not allowed to the specified file.                                   |
-                               ,13  : "UnknownImageFormat"          ; Specified image file format is not known.                                       |
-                               ,14  : "FontFamilyNotFound"          ; Specified font family not found. Either not installed or spelled incorrectly.   |
-                               ,15  : "FontStyleNotFound"           ; Specified style not available for this font family.                             |
-                               ,16  : "NotTrueTypeFont"             ; Font retrieved from HDC or LOGFONT is not TrueType and cannot be used.          |
-                               ,17  : "UnsupportedGdiplusVersion"   ; Installed GDI+ version not compatible with the application's compiled version.  |
-                               ,18  : "GdiplusNotInitialized"       ; GDI+ API not initialized.                                                       |
-                               ,19  : "PropertyNotFound"            ; Specified property does not exist in the image.                                 |
-                               ,20  : "PropertyNotSupported"        ; Specified property not supported by image format and cannot be set.             |
-                               ,21  : "ProfileNotFound" }           ; Color profile required to save in CMYK image format was not found.              |
+        Static  Status      := {0   :"Ok"                           ; Method call was successful.
+                               ,1   :"GenericError"                 ; Error on method call that is not covered by anything else in this list.
+                               ,2   :"InvalidParameter"             ; One of the method arguments passed was not valid.
+                               ,3   :"OutOfMemory"                  ; Operating system is out of memory / could not allocate memory.
+                               ,4   :"ObjectBusy"                   ; One of the arguments specified in the API call is already in use.
+                               ,5   :"InsufficientBuffer"           ; A buffer passed in the API call is not large enough for the data.
+                               ,6   :"NotImplemented"               ; Method is not implemented.
+                               ,7   :"Win32Error"                   ; Method generated a Win32 error.
+                               ,8   :"WrongState"                   ; An object state is invalid for the API call.
+                               ,9   :"Aborted"                      ; Method was aborted.
+                               ,10  :"FileNotFound"                 ; Specified image file or metafile cannot be found.
+                               ,11  :"ValueOverflow"                ; An arithmetic operation produced a numeric overflow.
+                               ,12  :"AccessDenied"                 ; Writing is not allowed to the specified file.
+                               ,13  :"UnknownImageFormat"           ; Specified image file format is not known.
+                               ,14  :"FontFamilyNotFound"           ; Specified font family not found. Either not installed or spelled incorrectly.
+                               ,15  :"FontStyleNotFound"            ; Specified style not available for this font family.
+                               ,16  :"NotTrueTypeFont"              ; Font retrieved from HDC or LOGFONT is not TrueType and cannot be used.
+                               ,17  :"UnsupportedGdiplusVersion"    ; Installed GDI+ version not compatible with the application's compiled version.
+                               ,18  :"GdiplusNotInitialized"        ; GDI+ API not initialized.
+                               ,19  :"PropertyNotFound"             ; Specified property does not exist in the image.
+                               ,20  :"PropertyNotSupported"         ; Specified property not supported by image format and cannot be set.
+                               ,21  :"ProfileNotFound" }            ; Color profile required to save in CMYK image format was not found.
         
+        Static  Unit        := {0   :"UnitWorld",
+                               ,1   :"UnitDisplay"
+                               ,2   :"UnitPixel"
+                               ,3   :"UnitPoint"
+                               ,4   :"UnitInch"
+                               ,5   :"UnitDocument"
+                               ,6   :"UnitMillimeter"
+                               ,7   :"UnitAbsolute"}
     }
     
     ;####################################################################################################################
@@ -3295,19 +3319,13 @@ Class GDIP
             this.width  := (width = "") ? A_ScreenWidth : width
             this.height := (height = "") ? A_ScreenHeight : height
             
-            Gui, % title ":" New, % "+E0x80000 "                ; Create a new layered window
+            Gui, % title ":New", % "+E0x80000 "                ; Create a new layered window
                 . (TitleBar ? "+" : "-") "Caption "             ; Remove title bar and thick window border/edge
                 . (OnTop    ? "+" : "-") "AlwaysOnTop "         ; Force GUI to always be on top
                 . (TaskBar  ? "+" : "-") "ToolWindow "          ; Removes the taskbar button
                 . "+HWNDguiHwnd "                               ; Saves the handle of the GUI to guiHwnd
             Gui, Show, NA                                       ; Make window visible but transparent
-            this.hwnd.gui := guiHwnd
-            Return guiHwnd
-        }
-        
-        _get_dc()
-        {
-            Return
+            this.gHwnd.gui := guiHwnd
         }
         
         _update(title="Main")
@@ -3325,6 +3343,18 @@ Class GDIP
                                                                 ;      0x2 - ULW_ALPHA
                                                                 ;      0x4 - ULW_OPAQUE
                                                                 ;      0x8 - ULW_EX_NORESIZE
+            Return
+        }
+        
+        show()
+        {
+            Gui, % this.title ":Show"
+            Return
+        }
+        
+        hide()
+        {
+            Gui, % this.title ":Hide"
             Return
         }
         
@@ -3373,6 +3403,12 @@ Class GDIP
     ; ########################################
     Class test
     {
+        msg(msg="Working!")
+        {
+            MsgBox, % msg
+            Return
+        }
+        
         show_img(image_p)
         {
             hwnd := this.gui.new_layered_window(A_ScreenWidth, A_ScreenHeight)
@@ -3591,3 +3627,68 @@ qpx(N=0) {  ; Wrapper for QueryPerformanceCounter() by SKAN  | CD: 06/Dec/2009
     DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
     Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
 }
+
+/*
+Extra code fromm work:
+GDIP.Graphics.DrawImage()
+
+
+
+; INT VARIANTS
+; Draw image at specified x/y coordinate but use original img width & height
+GdipDrawImage(graphicP, imoP)
+
+GdipDrawImageI(graphicP, imoP, INT x, INT y)
+GdipDrawImage(graphicP, imoP, REAL x, REAL y)
+
+; Draw image at specified x/y coord and make image width by height.
+GdipDrawImageRectI(graphicP, imoP, INT x, INT y, INT width, INT height)
+GdipDrawImageRect(graphicP, imoP, REAL x, REAL y, REAL width, REAL height)
+
+; Draws an image.
+;~ * Affine or perspective blt
+;~ *  destPoints.length = 3:
+;~ *      rect => parallelogram
+;~ *      destPoints[0] <=> top-left corner of the source rectangle
+;~ *      destPoints[1] <=> top-right corner
+;~ *      destPoints[2] <=> bottom-left corner
+;~ *  destPoints.length = 4:
+;~ *      rect => quad
+;~ *      destPoints[3] <=> bottom-right corner
+; Draw image
+; Description       Draw image using the dest_point_arr provided.
+; dest_point_arr    An array containing 3-4 Point objects
+; count             Number of elements in dest_point_arr
+; Remark            Count is number of elements in dp_arr and must be 3 (parallelogram) or 4 (quad).
+GdipDrawImagePointsI(graphicP, imoP, dest_point_arr, INT count)
+GdipDrawImagePoints(graphicP, imoP, GDIPCONST GpPointF *dstpoints, INT count)
+
+; Capture part of an image using srcx, srcy, srcwidth, and srcheight then draw that image at the x/y coordinates.
+GdipDrawImagePointRectI(graphicP, imoP, INT x, INT y, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit)
+GdipDrawImagePointRect(graphicP, imoP, REAL x, REAL y, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit)
+
+; Description       Capture part of an image using src_x/y/w/h and draw image at dst_x/y with src_width/height.
+; src_x/y/w/h       The source WHXY that you want captured
+; dst_x/y/w/h       The destination you want to draw the captured part of the image
+; src_unit          A number from the Unit type enumeration
+; img_attributes    
+; callback          
+; callback_data     
+; Remark            In the flat function, the dstx, dsty, dstwidth, and dstheight parameters specify a rectangle that corresponds to the dstRect parameter in the wrapper method.
+
+GdipDrawImageRectRectI(graphicP, imoP
+                      , INT dstx, INT dsty, INT dstwidth, INT dstheight
+                      , INT srcx, INT srcy, INT srcwidth, INT srcheight
+                      , GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
+GdipDrawImageRectRect(graphicP, imoP, REAL dstx, REAL dsty, REAL dstwidth, REAL dstheight   , REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
+
+; Draws an image.
+GdipDrawImagePointsRectI(graphicP, imoP, GDIPCONST GpPoint *points, INT count, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
+GdipDrawImagePointsRect(graphicP, imoP, GDIPCONST GpPointF *points, INT count, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
+
+; OTHER
+; Draws a portion of an image after applying a specified effect.
+GdipDrawImageFX(graphicP, imoP, GpRectF *source, GpMatrix *xForm, CGpEffect *effect, GpImageAttributes *imageAttributes, GpUnit srcUnit)
+
+
+
