@@ -55,8 +55,8 @@ GDIP.__New()
 
 Class GDIP
 {
-    Static  _token  := ""
-            , _version   := 1.0
+    Static  gdip_token  := ""
+            ,_version   := 1.0
     
     ;####################################################################################################################
     ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
@@ -104,17 +104,17 @@ Class GDIP
                         :  (A_PtrSize = 8) ? "Ptr"      ; There is no UPtr for 64-bit, only Ptr
                         :                    "UInt"     ; Default to UInt
         this.PtrA       := this.Ptr . "*"               ; Set pointer address type
-        OnExit(this._method("__Delete"))                ; Ensure shutdown runs at script exit
+        OnExit(this._method("ExitGDIP"))                ; Ensure shutdown runs at script exit
         estat           := this.Startup()               ; Run GDIP startup and get token
         ;this.generate_colorName()                      ; Generate color object
         ;add other generators here
         Return estat
     }
     
-    __Delete()
+    ExitGDIP()
     {
         this.Shutdown()
-        , this._token := ""
+        , this.gdip_token := ""
         Return
     }
     
@@ -126,7 +126,7 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Startup()
     {
-        If (this._token != "")
+        If (this.gdip_token != "")
             Return -1
         
         DllCall("GetModuleHandle", "str", "gdiplus") ? ""   ; Check if GDIPlus is loaded
@@ -144,7 +144,7 @@ Class GDIP
             ? this.error_log(A_ThisFunc, "Startup has failed.", "Enum Status: " this.enum.status[estat])
             : ""
         
-        this._token := token
+        this.gdip_token := token
         
         Return estat
     }
@@ -157,7 +157,7 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Shutdown()
     {
-        DllCall("gdiplus\GdiplusShutdown", "UInt", this._token)
+        DllCall("gdiplus\GdiplusShutdown", "UInt", this.gdip_token)
         Return
     }
 
@@ -286,7 +286,14 @@ Class GDIP
         
         ; ## CONSTRUCTORS ##
         
-        ; ## Methods ##
+        ; ## DESTRUCTOR ##
+        __Delete()
+        {
+            DllCall("GdipDisposeImage"
+                   ,this.Ptr    , this.nativeImage)
+        }
+        
+        ; ## METHODS ##
         ; Description       Creates a new Image object that is a duplicate of the native Image object.
         Clone(image_p="")
         {
@@ -636,34 +643,56 @@ Class GDIP
     ;####################################################################################################################
     Class graphics extends GDIP
     {
-        ; ## CONSTRUCTORS ##
-        ; Graphics(HDC)         Creates a Graphics object associated with a device context
-        ; FromHDC(HDC)
-        ; Graphics(Image*)      Creates a Graphics object associated with an Image object
-        ; FromImage(ImageP)
-        ; Graphics(HWND,BOOL)	Creates a Graphics object associated with a window
-        ; FromHWND(HWND, ICM)
-        ; Graphics(HDC,HANDLE)	Creates a Graphics object associated with a device context and specified device
-        ; FromDevice(HDC, Handle)
-        ; overloaded: graphics(ptr, p2="")
+        nativeGraphics := ""
+        lastResult     := ""
         
+        ; ## CONSTRUCTORS ##
+        ; FromHDC(HDC)          Creates a Graphics object from a device context handle
+        ; FromHDC(HDC,HANDLE)   Creates a Graphics object from a device context handle and a specified device
+        ; FromImage(Image)      Creates a Graphics object associated with an Image object
+        ; FromHWND(HWND,BOOL)	Creates a Graphics object associated with a window
+        FromImage(image)
+        {
+            VarSetCapacity(gp, A_PtrSize, 0)
+            (image)
+                ? this.lastResult = DllCall("gdiplus\GdipGetImageGraphicsContext"
+                                           , this.Ptr  , (this.image.nativeImage := image)
+                                           , this.PtrA , &gp)
+                : this.error_log(A_ThisFunc, "A pointer to an image object was required"
+                                ,"", {image_pointer:image})
+            this.nativeGraphics := gp
+        }
         
         FromHDC(HDC, device="")
         {
-            
-            Return
+            VarSetCapacity(gp, A_PtrSize, 0)
+            (device = "")
+                ? this.lastResult = DllCall("gdiplus\GdipCreateFromHDC"
+                                           , this.Ptr    , HDC
+                                           , this.PtrA   , &gp)
+                : this.lastResult = DllCall("gdiplus\GdipCreateFromHDC2"
+                                           , this.Ptr    , HDC
+                                           , this.Ptr    , device
+                                           , this.PtrA   , &gp)
+            this.nativeGraphics := gp
         }
         
-        ; Description       
         FromHWND(HWND, ICM=0)
         {
             VarSetCapacity(gp, A_PtrSize, 0)
-            ,this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
+            this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
                                        ,this.Ptr     , HWND
-                                       ,this.PtrA    , gp)
-            ,this.native_graphics := gp
+                                       ,this.PtrA    , &gp)
+            this.native_graphics := gp
             Return gp
         }
+        
+        ; ## DESTRUCTOR ##
+        __Delete()
+        {
+            DllCall("GdipDeleteGraphics", this.Ptr, this.nativeGraphics)
+        }
+        
         
         ; Adds a text comment to an existing metafile
         ; text      The text to add
@@ -2059,890 +2088,780 @@ Class GDIP
     Class enum
     {
         ; Indicates one of five brush types
-        Static BrushType := {0 :"BrushTypeSolidColor"                       ; Paints a single, constant color that can be opaque or transparent.
-                            ,1 :"BrushTypeHatchFill"                        ; Paints a background and paints, over that background, a pattern of lines, dots, dashes, squares, crosshatch, or some variation of these.
-                            ,2 :"BrushTypeTextureFill"                      ; Paints an image.
-                            ,3 :"BrushTypePathGradient"                     ; Paints a color gradient in which the color changes from a center point outward to a boundary that is defined by a closed curve or path.
-                            ,4 :"BrushTypeLinearGradient" }                 ; Paints a color gradient in which the color changes evenly from the starting boundary line of the linear gradient brush to the ending boundary line of the linear gradient brush.
+        Static BrushType := {"BrushTypeSolidColor"     : 0   ; Paints a single, constant color that can be opaque or transparent.
+                            ,"BrushTypeHatchFill"      : 1   ; Paints a background and paints, over that background, a pattern of lines, dots, dashes, squares, crosshatch, or some variation of these.
+                            ,"BrushTypeTextureFill"    : 2   ; Paints an image.
+                            ,"BrushTypePathGradient"   : 3   ; Paints a color gradient in which the color changes from a center point outward to a boundary that is defined by a closed curve or path.
+                            ,"BrushTypeLinearGradient" : 4 } ; Paints a color gradient in which the color changes evenly from the starting boundary line of the linear gradient brush to the ending boundary line of the linear gradient brush.
         
         ; Specifies which GDI+ objects use color-adjustment information.
-        Static ColorAdjustType := {0: "ColorAdjustTypeDefault"              ; Applies to all categories that do not have adjustment settings of their own.
-                                  ,1: "ColorAdjustTypeBitmap"               ; Applies to bitmapped images.
-                                  ,2: "ColorAdjustTypeBrush"                ; Applies to brush operations in metafiles.
-                                  ,3: "ColorAdjustTypePen"                  ; Applies to pen operations in metafiles.
-                                  ,4: "ColorAdjustTypeText"                 ; Applies to text drawn in metafiles.
-                                  ,5: "ColorAdjustTypeCount"                ; Used internally to record the number of color adjustment types.
-                                  ,6: "ColorAdjustTypeAny" }                ; Reserved
+        Static ColorAdjustType := {"ColorAdjustTypeDefault" : 0   ; Applies to all categories that do not have adjustment settings of their own.
+                                  ,"ColorAdjustTypeBitmap"  : 1   ; Applies to bitmapped images.
+                                  ,"ColorAdjustTypeBrush"   : 2   ; Applies to brush operations in metafiles.
+                                  ,"ColorAdjustTypePen"     : 3   ; Applies to pen operations in metafiles.
+                                  ,"ColorAdjustTypeText"    : 4   ; Applies to text drawn in metafiles.
+                                  ,"ColorAdjustTypeCount"   : 5   ; Used internally to record the number of color adjustment types.
+                                  ,"ColorAdjustTypeAny"     : 6 } ; Reserved
         
         ; Specifies individual channels in the CMYK (cyan, magenta, yellow, black) color space.
-        Static ColorChannelFlags := {0: "ColorChannelFlagsC"                ; Cyan
-                                    ,1: "ColorChannelFlagsM"                ; Magenta
-                                    ,2: "ColorChannelFlagsY"                ; Yellow
-                                    ,3: "ColorChannelFlagsK"                ; Black
-                                    ,4: "ColorChannelFlagsLast" }           ; Undefined
+        Static ColorChannelFlags := {"ColorChannelFlagsC"    : 0   ; Cyan
+                                    ,"ColorChannelFlagsM"    : 1   ; Magenta
+                                    ,"ColorChannelFlagsY"    : 2   ; Yellow
+                                    ,"ColorChannelFlagsK"    : 3   ; Black
+                                    ,"ColorChannelFlagsLast" : 4 } ; Undefined
         
         ; Specifies the types of images and colors that will be affected by the color and grayscale adjustment settings of an ImageAttributes object.
-        Static ColorMatrixFlags := {0: "ColorMatrixFlagsDefault"            ; All color values (including grays) are adjusted by the same color-adjustment matrix.
-                                   ,1: "ColorMatrixFlagsSkipGrays"          ; Colors are adjusted but gray shades are not adjusted.
-                                   ,2: "ColorMatrixFlagsAltGray" }          ; Colors are adjusted by one matrix and gray shades are adjusted by another matrix.
+        Static ColorMatrixFlags := {"ColorMatrixFlagsDefault"   : 0   ; All color values (including grays) are adjusted by the same color-adjustment matrix.
+                                   ,"ColorMatrixFlagsSkipGrays" : 1   ; Colors are adjusted but gray shades are not adjusted.
+                                   ,"ColorMatrixFlagsAltGray"   : 2 } ; Colors are adjusted by one matrix and gray shades are adjusted by another matrix.
         
         ; Specifies how a new region is combined with an existing region.
-        Static CombineMode := {0: "CombineModeReplace"                      ; Replaced by the new region.
-                              ,1: "CombineModeIntersect"                    ; Replaced by the intersection of itself and the new region.
-                              ,2: "CombineModeUnion"                        ; Replaced by the union of itself and the new region.
-                              ,3: "CombineModeXor"                          ; Replaced by the result of performing an XOR on the two regions.
-                              ,4: "CombineModeExclude"                      ; Replaced by the portion of itself that is outside of the new region.
-                              ,5: "CombineModeComplement" }                 ; Replaced by the portion of the new region that is outside of the existing region.
+        Static CombineMode := {"CombineModeReplace"    : 0   ; Replaced by the new region.
+                              ,"CombineModeIntersect"  : 1   ; Replaced by the intersection of itself and the new region.
+                              ,"CombineModeUnion"      : 2   ; Replaced by the union of itself and the new region.
+                              ,"CombineModeXor"        : 3   ; Replaced by the result of performing an XOR on the two regions.
+                              ,"CombineModeExclude"    : 4   ; Replaced by the portion of itself that is outside of the new region.
+                              ,"CombineModeComplement" : 5 } ; Replaced by the portion of the new region that is outside of the existing region.
         
         ; Specifies how rendered colors are combined with background colors.
-        Static CompositingMode := {0: "CompositingModeSourceOver"           ; when a color is rendered, it is blended with the background color.
-                                  ,1: "CompositingModeSourceCopy" }         ; when a color is rendered, it overwrites the background color.
+        Static CompositingMode := {"CompositingModeSourceOver" : 0   ; when a color is rendered, it is blended with the background color.
+                                  ,"CompositingModeSourceCopy" : 1 } ; when a color is rendered, it overwrites the background color.
         
         ; Specifies whether gamma correction is applied when colors are blended with background colors.
-        Static CompositingQuality := {0: "CompositingQualityInvalid"        ; Invalid
-                                     ,1: "CompositingQualityDefault"        ; Gamma correction is not applied.
-                                     ,2: "CompositingQualityHighSpeed"      ; Gamma correction is not applied.
-                                     ,3: "CompositingQualityHighQuality"    ; Gamma correction is applied.
-                                     ,4: "CompositingQualityGammaCorrected" ; Gamma correction is applied.
-                                     ,5: "CompositingQualityAssumeLinear" } ; Gamma correction is not applied.
+        Static CompositingQuality := {"CompositingQualityInvalid"        : -1  ; Invalid
+                                     ,"CompositingQualityDefault"        : 0   ; Gamma correction is not applied.
+                                     ,"CompositingQualityHighSpeed"      : 1   ; Gamma correction is not applied.
+                                     ,"CompositingQualityHighQuality"    : 2   ; Gamma correction is applied.
+                                     ,"CompositingQualityGammaCorrected" : 3   ; Gamma correction is applied.
+                                     ,"CompositingQualityAssumeLinear"   : 4 } ; Gamma correction is not applied.
         
         ; Specifies coordinate spaces.
-        Static CoordinateSpace := {0: "CoordinateSpaceWorld"                ; Specify world space
-                                  ,1: "CoordinateSpacePage"                 ; Specify page space
-                                  ,2: "CoordinateSpaceDevice" }             ; Specify device space
+        Static CoordinateSpace := {"CoordinateSpaceWorld"  : 0   ; Specify world space
+                                  ,"CoordinateSpacePage"   : 1   ; Specify page space
+                                  ,"CoordinateSpaceDevice" : 2 } ; Specify device space
         
         ; Encompasses the eight bitmap adjustments listed in the CurveAdjustments enumeration.
-        Static CurveAdjustments := {0: "AdjustExposure"                     ; Simulates increasing or decreasing the exposure of a photograph.
-                                   ,1: "AdjustDensity"                      ; Simulates increasing or decreasing the film density of a photograph.
-                                   ,2: "AdjustContrast"                     ; Increases or decreases the contrast of a bitmap.
-                                   ,3: "AdjustHighlight"                    ; Increases or decreases the value of a color channel if that channel already has a value that is above half intensity. 
-                                   ,4: "AdjustShadow"                       ; Increases or decreases the value of a color channel if that channel already has a value that is below half intensity.
-                                   ,5: "AdjustMidtone"                      ; Lightens or darkens an image.
-                                   ,6: "AdjustWhiteSaturation"              ; Set the adjustment member of a ColorCurveParams object.
-                                   ,7: "AdjustBlackSaturation" }            ; Set the adjustment member of a ColorCurveParams object.
+        Static CurveAdjustments := {"AdjustExposure"        : 0   ; Simulates increasing or decreasing the exposure of a photograph.
+                                   ,"AdjustDensity"         : 1   ; Simulates increasing or decreasing the film density of a photograph.
+                                   ,"AdjustContrast"        : 2   ; Increases or decreases the contrast of a bitmap.
+                                   ,"AdjustHighlight"       : 3   ; Increases or decreases the value of a color channel if that channel already has a value that is above half intensity. 
+                                   ,"AdjustShadow"          : 4   ; Increases or decreases the value of a color channel if that channel already has a value that is below half intensity.
+                                   ,"AdjustMidtone"         : 5   ; Lightens or darkens an image.
+                                   ,"AdjustWhiteSaturation" : 6   ; Set the adjustment member of a ColorCurveParams object.
+                                   ,"AdjustBlackSaturation" : 7 } ; Set the adjustment member of a ColorCurveParams object.
         
         ; Specifies which color channels are affected by a ColorCurve bitmap adjustment.
-        Static CurveChannel := {0: "CurveChannelAll"                        ; Specifies that the color adjustment applies to all channels.
-                               ,1: "CurveChannelRed"                        ; Specifies that the color adjustment applies only to the red channel.
-                               ,2: "CurveChannelGreen"                      ; Specifies that the color adjustment applies only to the green channel.
-                               ,3: "CurveChannelBlue" }                     ; Specifies that the color adjustment applies only to the blue channel.
+        Static CurveChannel := {"CurveChannelAll"   : 0   ; Specifies that the color adjustment applies to all channels.
+                               ,"CurveChannelRed"   : 1   ; Specifies that the color adjustment applies only to the red channel.
+                               ,"CurveChannelGreen" : 2   ; Specifies that the color adjustment applies only to the green channel.
+                               ,"CurveChannelBlue"  : 3 } ; Specifies that the color adjustment applies only to the blue channel.
         
         ; Specifies the type of graphic shape to use on both ends of each dash in a dashed line.
-        Static DashCap := {0: "DashCapFlat"                                 ; Square cap that squares off both ends of each dash.
-                          ,1: "DashCapRound"                                ; Circular cap that rounds off both ends of each dash.
-                          ,2: "DashCapTriangle" }                           ; Triangular cap that points both ends of each dash.
+        Static DashCap := {"DashCapFlat"     : 0   ; Square cap that squares off both ends of each dash.
+                          ,"DashCapRound"    : 2   ; Circular cap that rounds off both ends of each dash.
+                          ,"DashCapTriangle" : 3 } ; Triangular cap that points both ends of each dash.
         
         ; Specifies the line style of a line drawn with a Windows GDI+ pen.
-        Static DashStyle := {0: "DashStyleSolid"                            ; Solid line.
-                            ,1: "DashStyleDash"                             ; Dashed line.
-                            ,2: "DashStyleDot"                              ; Dotted line.
-                            ,3: "DashStyleDashDot"                          ; Alternating dash-dot line.
-                            ,4: "DashStyleDashDotDot"                       ; Alternated dash-dot-dot line.
-                            ,5: "DashStyleCustom" }                         ; User-Defined, custom dashed line.
+        Static DashStyle := {"DashStyleSolid"      : 0   ; Solid line.
+                            ,"DashStyleDash"       : 1   ; Dashed line.
+                            ,"DashStyleDot"        : 2   ; Dotted line.
+                            ,"DashStyleDashDot"    : 3   ; Alternating dash-dot line.
+                            ,"DashStyleDashDotDot" : 4   ; Alternated dash-dot-dot line.
+                            ,"DashStyleCustom"     : 5 } ; User-Defined, custom dashed line.
         
         ; Identifies the available algorithms for dithering when a bitmap is converted.
-        Static DitherType := { 0: "DitherTypeNone"                          ; No dithering is performed.
-                             , 1: "DitherTypeSolid"                         ; No dithering is performed.
-                             , 2: "DitherTypeOrdered4x4"                    ; perform dithering based on the colors in one of the standard fixed palettes.
-                             , 3: "DitherTypeOrdered8x8"                    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             , 4: "DitherTypeOrdered16x16"                  ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             , 5: "DitherTypeSpiral4x4"                     ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             , 6: "DitherTypeSpiral8x8"                     ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             , 7: "DitherTypeDualSpiral4x4"                 ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             , 8: "DitherTypeDualSpiral8x8"                 ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             , 9: "DitherTypeErrorDiffusion"                ; Dithering is performed based on the palette specified by the palette parameter of the Bitmap::ConvertFormat method. 
-                             ,10: "DitherTypeMax" }                         ; TBD
+        Static DitherType := {"DitherTypeNone"           : 0    ; No dithering is performed.
+                             ,"DitherTypeSolid"          : 1    ; No dithering is performed.
+                             ,"DitherTypeOrdered4x4"     : 2    ; perform dithering based on the colors in one of the standard fixed palettes.
+                             ,"DitherTypeOrdered8x8"     : 3    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                             ,"DitherTypeOrdered16x16"   : 4    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                             ,"DitherTypeSpiral4x4"      : 5    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                             ,"DitherTypeSpiral8x8"      : 6    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                             ,"DitherTypeDualSpiral4x4"  : 7    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                             ,"DitherTypeDualSpiral8x8"  : 8    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                             ,"DitherTypeErrorDiffusion" : 9    ; Dithering is performed based on the palette specified by the palette parameter of the Bitmap::ConvertFormat method. 
+                             ,"DitherTypeMax"            : 10 } ; TBD
         
         ; Specifies the spacing, orientation, and quality of the rendering for driver strings.
-        Static DriverStringOptions := {0: "DriverStringOptionsCmapLookup"           ; String array contains Unicode character values.
-                                      ,1: "DriverStringOptionsVertical"             ; String is displayed vertically.
-                                      ,2: "DriverStringOptionsRealizedAdvance"      ; Glyph positions are calculated from the position of the first glyph. 
-                                      ,3: "DriverStringOptionsLimitSubpixel" }      ; Less memory should be used for cache of antialiased glyphs.
+        Static DriverStringOptions := {"DriverStringOptionsCmapLookup"      : 1   ; String array contains Unicode character values.
+                                      ,"DriverStringOptionsVertical"        : 2   ; String is displayed vertically.
+                                      ,"DriverStringOptionsRealizedAdvance" : 4   ; Glyph positions are calculated from the position of the first glyph. 
+                                      ,"DriverStringOptionsLimitSubpixel"   : 8 } ; Less memory should be used for cache of antialiased glyphs.
         
-        Static EmfPlusRecordType := {  0: "WmfRecordTypeSetBkColor"                  ; TBD
-                                    ,  1: "WmfRecordTypeSetBkMode"                   ; TBD
-                                    ,  2: "WmfRecordTypeSetMapMode"                  ; TBD
-                                    ,  3: "WmfRecordTypeSetROP2"                     ; TBD
-                                    ,  4: "WmfRecordTypeSetRelAbs"                   ; TBD
-                                    ,  5: "WmfRecordTypeSetPolyFillMode"             ; TBD
-                                    ,  6: "WmfRecordTypeSetStretchBltMode"           ; TBD
-                                    ,  7: "WmfRecordTypeSetTextCharExtra"            ; TBD
-                                    ,  8: "WmfRecordTypeSetTextColor"                ; TBD
-                                    ,  9: "WmfRecordTypeSetTextJustification"        ; TBD
-                                    , 10: "WmfRecordTypeSetWindowOrg"                ; TBD
-                                    , 11: "WmfRecordTypeSetWindowExt"                ; TBD
-                                    , 12: "WmfRecordTypeSetViewportOrg"              ; TBD
-                                    , 13: "WmfRecordTypeSetViewportExt"              ; TBD
-                                    , 14: "WmfRecordTypeOffsetWindowOrg"             ; TBD
-                                    , 15: "WmfRecordTypeScaleWindowExt"              ; TBD
-                                    , 16: "WmfRecordTypeOffsetViewportOrg"           ; TBD
-                                    , 17: "WmfRecordTypeScaleViewportExt"            ; TBD
-                                    , 18: "WmfRecordTypeLineTo"                      ; TBD
-                                    , 19: "WmfRecordTypeMoveTo"                      ; TBD
-                                    , 20: "WmfRecordTypeExcludeClipRect"             ; TBD
-                                    , 21: "WmfRecordTypeIntersectClipRect"           ; TBD
-                                    , 22: "WmfRecordTypeArc"                         ; TBD
-                                    , 23: "WmfRecordTypeEllipse"                     ; TBD
-                                    , 24: "WmfRecordTypeFloodFill"                   ; TBD
-                                    , 25: "WmfRecordTypePie"                         ; TBD
-                                    , 26: "WmfRecordTypeRectangle"                   ; TBD
-                                    , 27: "WmfRecordTypeRoundRect"                   ; TBD
-                                    , 28: "WmfRecordTypePatBlt"                      ; TBD
-                                    , 29: "WmfRecordTypeSaveDC"                      ; TBD
-                                    , 30: "WmfRecordTypeSetPixel"                    ; TBD
-                                    , 31: "WmfRecordTypeOffsetClipRgn"               ; TBD
-                                    , 32: "WmfRecordTypeTextOut"                     ; TBD
-                                    , 33: "WmfRecordTypeBitBlt"                      ; TBD
-                                    , 34: "WmfRecordTypeStretchBlt"                  ; TBD
-                                    , 35: "WmfRecordTypePolygon"                     ; TBD
-                                    , 36: "WmfRecordTypePolyline"                    ; TBD
-                                    , 37: "WmfRecordTypeEscape"                      ; TBD
-                                    , 38: "WmfRecordTypeRestoreDC"                   ; TBD
-                                    , 39: "WmfRecordTypeFillRegion"                  ; TBD
-                                    , 40: "WmfRecordTypeFrameRegion"                 ; TBD
-                                    , 41: "WmfRecordTypeInvertRegion"                ; TBD
-                                    , 42: "WmfRecordTypePaintRegion"                 ; TBD
-                                    , 43: "WmfRecordTypeSelectClipRegion"            ; TBD
-                                    , 44: "WmfRecordTypeSelectObject"                ; TBD
-                                    , 45: "WmfRecordTypeSetTextAlign"                ; TBD
-                                    , 46: "WmfRecordTypeDrawText"                    ; TBD
-                                    , 47: "WmfRecordTypeChord"                       ; TBD
-                                    , 48: "WmfRecordTypeSetMapperFlags"              ; TBD
-                                    , 49: "WmfRecordTypeExtTextOut"                  ; TBD
-                                    , 50: "WmfRecordTypeSetDIBToDev"                 ; TBD
-                                    , 51: "WmfRecordTypeSelectPalette"               ; TBD
-                                    , 52: "WmfRecordTypeRealizePalette"              ; TBD
-                                    , 53: "WmfRecordTypeAnimatePalette"              ; TBD
-                                    , 54: "WmfRecordTypeSetPalEntries"               ; TBD
-                                    , 55: "WmfRecordTypePolyPolygon"                 ; TBD
-                                    , 56: "WmfRecordTypeResizePalette"               ; TBD
-                                    , 57: "WmfRecordTypeDIBBitBlt"                   ; TBD
-                                    , 58: "WmfRecordTypeDIBStretchBlt"               ; TBD
-                                    , 59: "WmfRecordTypeDIBCreatePatternBrush"       ; TBD
-                                    , 60: "WmfRecordTypeStretchDIB"                  ; TBD
-                                    , 61: "WmfRecordTypeExtFloodFill"                ; TBD
-                                    , 62: "WmfRecordTypeSetLayout"                   ; TBD
-                                    , 63: "WmfRecordTypeResetDC"                     ; TBD
-                                    , 64: "WmfRecordTypeStartDoc"                    ; TBD
-                                    , 65: "WmfRecordTypeStartPage"                   ; TBD
-                                    , 66: "WmfRecordTypeEndPage"                     ; TBD
-                                    , 67: "WmfRecordTypeAbortDoc"                    ; TBD
-                                    , 68: "WmfRecordTypeEndDoc"                      ; TBD
-                                    , 69: "WmfRecordTypeDeleteObject"                ; TBD
-                                    , 70: "WmfRecordTypeCreatePalette"               ; TBD
-                                    , 71: "WmfRecordTypeCreateBrush"                 ; TBD
-                                    , 72: "WmfRecordTypeCreatePatternBrush"          ; TBD
-                                    , 73: "WmfRecordTypeCreatePenIndirect"           ; TBD
-                                    , 74: "WmfRecordTypeCreateFontIndirect"          ; TBD
-                                    , 75: "WmfRecordTypeCreateBrushIndirect"         ; TBD
-                                    , 76: "WmfRecordTypeCreateBitmapIndirect"        ; TBD
-                                    , 77: "WmfRecordTypeCreateBitmap"                ; TBD
-                                    , 78: "WmfRecordTypeCreateRegion"                ; TBD
-                                    , 79: "EmfRecordTypeHeader"                      ; TBD
-                                    , 80: "EmfRecordTypePolyBezier"                  ; TBD
-                                    , 81: "EmfRecordTypePolygon"                     ; TBD
-                                    , 82: "EmfRecordTypePolyline"                    ; TBD
-                                    , 83: "EmfRecordTypePolyBezierTo"                ; TBD
-                                    , 84: "EmfRecordTypePolyLineTo"                  ; TBD
-                                    , 85: "EmfRecordTypePolyPolyline"                ; TBD
-                                    , 86: "EmfRecordTypePolyPolygon"                 ; TBD
-                                    , 87: "EmfRecordTypeSetWindowExtEx"              ; TBD
-                                    , 88: "EmfRecordTypeSetWindowOrgEx"              ; TBD
-                                    , 89: "EmfRecordTypeSetViewportExtEx"            ; TBD
-                                    , 90: "EmfRecordTypeSetViewportOrgEx"            ; TBD
-                                    , 91: "EmfRecordTypeSetBrushOrgEx"               ; TBD
-                                    , 92: "EmfRecordTypeEOF"                         ; TBD
-                                    , 93: "EmfRecordTypeSetPixelV"                   ; TBD
-                                    , 94: "EmfRecordTypeSetMapperFlags"              ; TBD
-                                    , 95: "EmfRecordTypeSetMapMode"                  ; TBD
-                                    , 96: "EmfRecordTypeSetBkMode"                   ; TBD
-                                    , 97: "EmfRecordTypeSetPolyFillMode"             ; TBD
-                                    , 98: "EmfRecordTypeSetROP2"                     ; TBD
-                                    , 99: "EmfRecordTypeSetStretchBltMode"           ; TBD
-                                    ,100: "EmfRecordTypeSetTextAlign"                ; TBD
-                                    ,101: "EmfRecordTypeSetColorAdjustment"          ; TBD
-                                    ,102: "EmfRecordTypeSetTextColor"                ; TBD
-                                    ,103: "EmfRecordTypeSetBkColor"                  ; TBD
-                                    ,104: "EmfRecordTypeOffsetClipRgn"               ; TBD
-                                    ,105: "EmfRecordTypeMoveToEx"                    ; TBD
-                                    ,106: "EmfRecordTypeSetMetaRgn"                  ; TBD
-                                    ,107: "EmfRecordTypeExcludeClipRect"             ; TBD
-                                    ,108: "EmfRecordTypeIntersectClipRect"           ; TBD
-                                    ,109: "EmfRecordTypeScaleViewportExtEx"          ; TBD
-                                    ,110: "EmfRecordTypeScaleWindowExtEx"            ; TBD
-                                    ,111: "EmfRecordTypeSaveDC"                      ; TBD
-                                    ,112: "EmfRecordTypeRestoreDC"                   ; TBD
-                                    ,113: "EmfRecordTypeSetWorldTransform"           ; TBD
-                                    ,114: "EmfRecordTypeModifyWorldTransform"        ; TBD
-                                    ,115: "EmfRecordTypeSelectObject"                ; TBD
-                                    ,116: "EmfRecordTypeCreatePen"                   ; TBD
-                                    ,117: "EmfRecordTypeCreateBrushIndirect"         ; TBD
-                                    ,118: "EmfRecordTypeDeleteObject"                ; TBD
-                                    ,119: "EmfRecordTypeAngleArc"                    ; TBD
-                                    ,120: "EmfRecordTypeEllipse"                     ; TBD
-                                    ,121: "EmfRecordTypeRectangle"                   ; TBD
-                                    ,122: "EmfRecordTypeRoundRect"                   ; TBD
-                                    ,123: "EmfRecordTypeArc"                         ; TBD
-                                    ,124: "EmfRecordTypeChord"                       ; TBD
-                                    ,125: "EmfRecordTypePie"                         ; TBD
-                                    ,126: "EmfRecordTypeSelectPalette"               ; TBD
-                                    ,127: "EmfRecordTypeCreatePalette"               ; TBD
-                                    ,128: "EmfRecordTypeSetPaletteEntries"           ; TBD
-                                    ,129: "EmfRecordTypeResizePalette"               ; TBD
-                                    ,130: "EmfRecordTypeRealizePalette"              ; TBD
-                                    ,131: "EmfRecordTypeExtFloodFill"                ; TBD
-                                    ,132: "EmfRecordTypeLineTo"                      ; TBD
-                                    ,133: "EmfRecordTypeArcTo"                       ; TBD
-                                    ,134: "EmfRecordTypePolyDraw"                    ; TBD
-                                    ,135: "EmfRecordTypeSetArcDirection"             ; TBD
-                                    ,136: "EmfRecordTypeSetMiterLimit"               ; TBD
-                                    ,137: "EmfRecordTypeBeginPath"                   ; TBD
-                                    ,138: "EmfRecordTypeEndPath"                     ; TBD
-                                    ,139: "EmfRecordTypeCloseFigure"                 ; TBD
-                                    ,140: "EmfRecordTypeFillPath"                    ; TBD
-                                    ,141: "EmfRecordTypeStrokeAndFillPath"           ; TBD
-                                    ,142: "EmfRecordTypeStrokePath"                  ; TBD
-                                    ,143: "EmfRecordTypeFlattenPath"                 ; TBD
-                                    ,144: "EmfRecordTypeWidenPath"                   ; TBD
-                                    ,145: "EmfRecordTypeSelectClipPath"              ; TBD
-                                    ,146: "EmfRecordTypeAbortPath"                   ; TBD
-                                    ,147: "EmfRecordTypeReserved_069"                ; TBD
-                                    ,148: "EmfRecordTypeGdiComment"                  ; TBD
-                                    ,149: "EmfRecordTypeFillRgn"                     ; TBD
-                                    ,150: "EmfRecordTypeFrameRgn"                    ; TBD
-                                    ,151: "EmfRecordTypeInvertRgn"                   ; TBD
-                                    ,152: "EmfRecordTypePaintRgn"                    ; TBD
-                                    ,153: "EmfRecordTypeExtSelectClipRgn"            ; TBD
-                                    ,154: "EmfRecordTypeBitBlt"                      ; TBD
-                                    ,155: "EmfRecordTypeStretchBlt"                  ; TBD
-                                    ,156: "EmfRecordTypeMaskBlt"                     ; TBD
-                                    ,157: "EmfRecordTypePlgBlt"                      ; TBD
-                                    ,158: "EmfRecordTypeSetDIBitsToDevice"           ; TBD
-                                    ,159: "EmfRecordTypeStretchDIBits"               ; TBD
-                                    ,160: "EmfRecordTypeExtCreateFontIndirect"       ; TBD
-                                    ,161: "EmfRecordTypeExtTextOutA"                 ; TBD
-                                    ,162: "EmfRecordTypeExtTextOutW"                 ; TBD
-                                    ,163: "EmfRecordTypePolyBezier16"                ; TBD
-                                    ,164: "EmfRecordTypePolygon16"                   ; TBD
-                                    ,165: "EmfRecordTypePolyline16"                  ; TBD
-                                    ,166: "EmfRecordTypePolyBezierTo16"              ; TBD
-                                    ,167: "EmfRecordTypePolylineTo16"                ; TBD
-                                    ,168: "EmfRecordTypePolyPolyline16"              ; TBD
-                                    ,169: "EmfRecordTypePolyPolygon16"               ; TBD
-                                    ,170: "EmfRecordTypePolyDraw16"                  ; TBD
-                                    ,171: "EmfRecordTypeCreateMonoBrush"             ; TBD
-                                    ,172: "EmfRecordTypeCreateDIBPatternBrushPt"     ; TBD
-                                    ,173: "EmfRecordTypeExtCreatePen"                ; TBD
-                                    ,174: "EmfRecordTypePolyTextOutA"                ; TBD
-                                    ,175: "EmfRecordTypePolyTextOutW"                ; TBD
-                                    ,176: "EmfRecordTypeSetICMMode"                  ; TBD
-                                    ,177: "EmfRecordTypeCreateColorSpace"            ; TBD
-                                    ,178: "EmfRecordTypeSetColorSpace"               ; TBD
-                                    ,179: "EmfRecordTypeDeleteColorSpace"            ; TBD
-                                    ,180: "EmfRecordTypeGLSRecord"                   ; TBD
-                                    ,181: "EmfRecordTypeGLSBoundedRecord"            ; TBD
-                                    ,182: "EmfRecordTypePixelFormat"                 ; TBD
-                                    ,183: "EmfRecordTypeDrawEscape"                  ; TBD
-                                    ,184: "EmfRecordTypeExtEscape"                   ; TBD
-                                    ,185: "EmfRecordTypeStartDoc"                    ; TBD
-                                    ,186: "EmfRecordTypeSmallTextOut"                ; TBD
-                                    ,187: "EmfRecordTypeForceUFIMapping"             ; TBD
-                                    ,188: "EmfRecordTypeNamedEscape"                 ; TBD
-                                    ,189: "EmfRecordTypeColorCorrectPalette"         ; TBD
-                                    ,190: "EmfRecordTypeSetICMProfileA"              ; TBD
-                                    ,191: "EmfRecordTypeSetICMProfileW"              ; TBD
-                                    ,192: "EmfRecordTypeAlphaBlend"                  ; TBD
-                                    ,193: "EmfRecordTypeSetLayout"                   ; TBD
-                                    ,194: "EmfRecordTypeTransparentBlt"              ; TBD
-                                    ,195: "EmfRecordTypeReserved_117"                ; TBD
-                                    ,196: "EmfRecordTypeGradientFill"                ; TBD
-                                    ,197: "EmfRecordTypeSetLinkedUFIs"               ; TBD
-                                    ,198: "EmfRecordTypeSetTextJustification"        ; TBD
-                                    ,199: "EmfRecordTypeColorMatchToTargetW"         ; TBD
-                                    ,200: "EmfRecordTypeCreateColorSpaceW"           ; TBD
-                                    ,201: "EmfRecordTypeMax"                         ; TBD
-                                    ,202: "EmfRecordTypeMin"                         ; TBD
-                                    ,203: "EmfPlusRecordTypeInvalid"                 ; TBD
-                                    ,204: "EmfPlusRecordTypeHeader"                  ; Identifies a record that is the EMF+ header.
-                                    ,205: "EmfPlusRecordTypeEndOfFile"               ; Identifies a record that marks the last EMF+ record of a metafile.
-                                    ,206: "EmfPlusRecordTypeComment"                 ; GDIP.Graphics.AddMetafileComment()
-                                    ,207: "EmfPlusRecordTypeGetDC"                   ; GDIP.Graphics.GetHDC()
-                                    ,208: "EmfPlusRecordTypeMultiFormatStart"        ; Identifies the start of a multiple-format block.
-                                    ,209: "EmfPlusRecordTypeMultiFormatSection"      ; Identifies a section in a multiple-format block.
-                                    ,210: "EmfPlusRecordTypeMultiFormatEnd"          ; Identifies the end of a multiple-format block.
-                                    ,211: "EmfPlusRecordTypeObject"                  ; TBD
-                                    ,212: "EmfPlusRecordTypeClear"                   ; GDIP.Graphics.Clear()
-                                    ,213: "EmfPlusRecordTypeFillRects"               ; FillRectangles Methods
-                                    ,214: "EmfPlusRecordTypeDrawRects"               ; DrawRectangles Methods
-                                    ,215: "EmfPlusRecordTypeFillPolygon"             ; FillPolygon Methods
-                                    ,216: "EmfPlusRecordTypeDrawLines"               ; DrawLines Methods
-                                    ,217: "EmfPlusRecordTypeFillEllipse"             ; FillEllipse Methods
-                                    ,218: "EmfPlusRecordTypeDrawEllipse"             ; DrawEllipse Methods
-                                    ,219: "EmfPlusRecordTypeFillPie"                 ; FillPie Methods
-                                    ,220: "EmfPlusRecordTypeDrawPie"                 ; DrawPie Methods
-                                    ,221: "EmfPlusRecordTypeDrawArc"                 ; DrawArc Methods
-                                    ,222: "EmfPlusRecordTypeFillRegion"              ; GDIP.Graphics.()
-                                    ,223: "EmfPlusRecordTypeFillPath"                ; GDIP.Graphics.()
-                                    ,224: "EmfPlusRecordTypeDrawPath"                ; GDIP.Graphics.()
-                                    ,225: "EmfPlusRecordTypeFillClosedCurve"         ; FillClosedCurve Methods
-                                    ,226: "EmfPlusRecordTypeDrawClosedCurve"         ; DrawClosedCurve Methods
-                                    ,227: "EmfPlusRecordTypeDrawCurve"               ; DrawCurve Methods
-                                    ,228: "EmfPlusRecordTypeDrawBeziers"             ; DrawBeziers Methods
-                                    ,229: "EmfPlusRecordTypeDrawImage"               ; DrawImage Methods
-                                    ,230: "EmfPlusRecordTypeDrawImagePoints"         ; DrawImage Methods (destination point arrays)
-                                    ,231: "EmfPlusRecordTypeDrawString"              ; DrawString Methods
-                                    ,232: "EmfPlusRecordTypeSetRenderingOrigin"      ; GDIP.Graphics.SetRenderingOrigin()
-                                    ,233: "EmfPlusRecordTypeSetAntiAliasMode"        ; GDIP.Graphics.SetSmoothingMode()
-                                    ,234: "EmfPlusRecordTypeSetTextRenderingHint"    ; GDIP.Graphics.SetTextRenderingHint()
-                                    ,235: "EmfPlusRecordTypeSetTextContrast"         ; GDIP.Graphics.SetTextContrast()
-                                    ,236: "EmfPlusRecordTypeSetInterpolationMode"    ; GDIP.Graphics.SetInterpolationMode()
-                                    ,237: "EmfPlusRecordTypeSetPixelOffsetMode"      ; GDIP.Graphics.SetPixelOffsetMode()
-                                    ,238: "EmfPlusRecordTypeSetCompositingMode"      ; GDIP.Graphics.SetCompositingMode()
-                                    ,239: "EmfPlusRecordTypeSetCompositingQuality"   ; GDIP.Graphics.SetCompositingQuality()
-                                    ,240: "EmfPlusRecordTypeSave"                    ; GDIP.Graphics.Save()
-                                    ,241: "EmfPlusRecordTypeRestore"                 ; GDIP.Graphics.Restore()
-                                    ,242: "EmfPlusRecordTypeBeginContainer"          ; GDIP.Graphics.BeginContainer()
-                                    ,243: "EmfPlusRecordTypeBeginContainerNoParams"  ; GDIP.Graphics.BeginContainer()
-                                    ,244: "EmfPlusRecordTypeEndContainer"            ; GDIP.Graphics.EndContainer()
-                                    ,245: "EmfPlusRecordTypeSetWorldTransform"       ; GDIP.Graphics.SetTransform()
-                                    ,246: "EmfPlusRecordTypeResetWorldTransform"     ; GDIP.Graphics.ResetTransform()
-                                    ,247: "EmfPlusRecordTypeMultiplyWorldTransform"  ; GDIP.Graphics.MultiplyTransform()
-                                    ,248: "EmfPlusRecordTypeTranslateWorldTransform" ; GDIP.Graphics.TranslateTransform()
-                                    ,249: "EmfPlusRecordTypeScaleWorldTransform"     ; GDIP.Graphics.ScaleTransform()
-                                    ,250: "EmfPlusRecordTypeRotateWorldTransform"    ; GDIP.Graphics.RotateTransform()
-                                    ,251: "EmfPlusRecordTypeSetPageTransform"        ; GDIP.Graphics.SetPageScale() and GDIP.Graphics.SetPageUnit()
-                                    ,252: "EmfPlusRecordTypeResetClip"               ; GDIP.Graphics.ResetClip()
-                                    ,253: "EmfPlusRecordTypeSetClipRect"             ; GDIP.Graphics.SetClip()
-                                    ,254: "EmfPlusRecordTypeSetClipPath"             ; GDIP.Graphics.SetClip()
-                                    ,255: "EmfPlusRecordTypeSetClipRegion"           ; GDIP.Graphics.SetClip()
-                                    ,256: "EmfPlusRecordTypeOffsetClip"              ; TranslateClip Methods
-                                    ,257: "EmfPlusRecordTypeDrawDriverString"        ; GDIP.Graphics.DrawDriverString()
-                                    ,258: "EmfPlusRecordTypeStrokeFillPath"          ; TBD
-                                    ,259: "EmfPlusRecordTypeSerializableObject"      ; TBD
-                                    ,260: "EmfPlusRecordTypeSetTSGraphics"           ; TBD
-                                    ,261: "EmfPlusRecordTypeSetTSClip"               ; TBD
-                                    ,262: "EmfPlusRecordTotal"                       ; TBD
-                                    ,263: "EmfPlusRecordTypeMax"                     ; TBD
-                                    ,264: "EmfPlusRecordTypeMin" }                   ; TBD
+        ; 
+        Static EmfPlusRecordType := {"WmfRecordTypeSetBkColor"                  : (0x201|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetBkMode"                   : (0x102|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetMapMode"                  : (0x103|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetROP2"                     : (0x104|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetRelAbs"                   : (0x105|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetPolyFillMode"             : (0x106|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetStretchBltMode"           : (0x107|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetTextCharExtra"            : (0x108|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetTextColor"                : (0x209|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetTextJustification"        : (0x20A|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetWindowOrg"                : (0x20B|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetWindowExt"                : (0x20C|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetViewportOrg"              : (0x20D|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetViewportExt"              : (0x20E|0x4000) ; TBD
+                                    ,"WmfRecordTypeOffsetWindowOrg"             : (0x20F|0x4000) ; TBD
+                                    ,"WmfRecordTypeScaleWindowExt"              : (0x410|0x4000) ; TBD
+                                    ,"WmfRecordTypeOffsetViewportOrg"           : (0x211|0x4000) ; TBD
+                                    ,"WmfRecordTypeScaleViewportExt"            : (0x412|0x4000) ; TBD
+                                    ,"WmfRecordTypeLineTo"                      : (0x213|0x4000) ; TBD
+                                    ,"WmfRecordTypeMoveTo"                      : (0x214|0x4000) ; TBD
+                                    ,"WmfRecordTypeExcludeClipRect"             : (0x415|0x4000) ; TBD
+                                    ,"WmfRecordTypeIntersectClipRect"           : (0x416|0x4000) ; TBD
+                                    ,"WmfRecordTypeArc"                         : (0x817|0x4000) ; TBD
+                                    ,"WmfRecordTypeEllipse"                     : (0x418|0x4000) ; TBD
+                                    ,"WmfRecordTypeFloodFill"                   : (0x419|0x4000) ; TBD
+                                    ,"WmfRecordTypePie"                         : (0x81A|0x4000) ; TBD
+                                    ,"WmfRecordTypeRectangle"                   : (0x41B|0x4000) ; TBD
+                                    ,"WmfRecordTypeRoundRect"                   : (0x61C|0x4000) ; TBD
+                                    ,"WmfRecordTypePatBlt"                      : (0x61D|0x4000) ; TBD
+                                    ,"WmfRecordTypeSaveDC"                      : (0x01E|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetPixel"                    : (0x41F|0x4000) ; TBD
+                                    ,"WmfRecordTypeOffsetClipRgn"               : (0x220|0x4000) ; TBD
+                                    ,"WmfRecordTypeTextOut"                     : (0x521|0x4000) ; TBD
+                                    ,"WmfRecordTypeBitBlt"                      : (0x922|0x4000) ; TBD
+                                    ,"WmfRecordTypeStretchBlt"                  : (0xB23|0x4000) ; TBD
+                                    ,"WmfRecordTypePolygon"                     : (0x324|0x4000) ; TBD
+                                    ,"WmfRecordTypePolyline"                    : (0x325|0x4000) ; TBD
+                                    ,"WmfRecordTypeEscape"                      : (0x626|0x4000) ; TBD
+                                    ,"WmfRecordTypeRestoreDC"                   : (0x127|0x4000) ; TBD
+                                    ,"WmfRecordTypeFillRegion"                  : (0x228|0x4000) ; TBD
+                                    ,"WmfRecordTypeFrameRegion"                 : (0x429|0x4000) ; TBD
+                                    ,"WmfRecordTypeInvertRegion"                : (0x12A|0x4000) ; TBD
+                                    ,"WmfRecordTypePaintRegion"                 : (0x12B|0x4000) ; TBD
+                                    ,"WmfRecordTypeSelectClipRegion"            : (0x12C|0x4000) ; TBD
+                                    ,"WmfRecordTypeSelectObject"                : (0x12D|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetTextAlign"                : (0x12E|0x4000) ; TBD
+                                    ,"WmfRecordTypeDrawText"                    : (0x62F|0x4000) ; TBD
+                                    ,"WmfRecordTypeChord"                       : (0x830|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetMapperFlags"              : (0x231|0x4000) ; TBD
+                                    ,"WmfRecordTypeExtTextOut"                  : (0xA32|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetDIBToDev"                 : (0xD33|0x4000) ; TBD
+                                    ,"WmfRecordTypeSelectPalette"               : (0x234|0x4000) ; TBD
+                                    ,"WmfRecordTypeRealizePalette"              : (0x035|0x4000) ; TBD
+                                    ,"WmfRecordTypeAnimatePalette"              : (0x436|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetPalEntries"               : (0x037|0x4000) ; TBD
+                                    ,"WmfRecordTypePolyPolygon"                 : (0x538|0x4000) ; TBD
+                                    ,"WmfRecordTypeResizePalette"               : (0x139|0x4000) ; TBD
+                                    ,"WmfRecordTypeDIBBitBlt"                   : (0x940|0x4000) ; TBD
+                                    ,"WmfRecordTypeDIBStretchBlt"               : (0xB41|0x4000) ; TBD
+                                    ,"WmfRecordTypeDIBCreatePatternBrush"       : (0x142|0x4000) ; TBD
+                                    ,"WmfRecordTypeStretchDIB"                  : (0xF43|0x4000) ; TBD
+                                    ,"WmfRecordTypeExtFloodFill"                : (0x548|0x4000) ; TBD
+                                    ,"WmfRecordTypeSetLayout"                   : (0x149|0x4000) ; TBD
+                                    ,"WmfRecordTypeResetDC"                     : (0x14C|0x4000) ; TBD
+                                    ,"WmfRecordTypeStartDoc"                    : (0x14D|0x4000) ; TBD
+                                    ,"WmfRecordTypeStartPage"                   : (0x04F|0x4000) ; TBD
+                                    ,"WmfRecordTypeEndPage"                     : (0x050|0x4000) ; TBD
+                                    ,"WmfRecordTypeAbortDoc"                    : (0x052|0x4000) ; TBD
+                                    ,"WmfRecordTypeEndDoc"                      : (0x05E|0x4000) ; TBD
+                                    ,"WmfRecordTypeDeleteObject"                : (0x1F0|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreatePalette"               : (0x0F7|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreateBrush"                 : (0x0F8|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreatePatternBrush"          : (0x1F9|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreatePenIndirect"           : (0x2FA|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreateFontIndirect"          : (0x2FB|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreateBrushIndirect"         : (0x2FC|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreateBitmapIndirect"        : (0x2FD|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreateBitmap"                : (0x6FE|0x4000) ; TBD
+                                    ,"WmfRecordTypeCreateRegion"                : (0x6FF|0x4000) ; TBD
+                                    ,"EmfRecordTypeHeader"                      : 1        ; TBD
+                                    ,"EmfRecordTypePolyBezier"                  : 2        ; TBD
+                                    ,"EmfRecordTypePolygon"                     : 3        ; TBD
+                                    ,"EmfRecordTypePolyline"                    : 4        ; TBD
+                                    ,"EmfRecordTypePolyBezierTo"                : 5        ; TBD
+                                    ,"EmfRecordTypePolyLineTo"                  : 6        ; TBD
+                                    ,"EmfRecordTypePolyPolyline"                : 7        ; TBD
+                                    ,"EmfRecordTypePolyPolygon"                 : 8        ; TBD
+                                    ,"EmfRecordTypeSetWindowExtEx"              : 9        ; TBD
+                                    ,"EmfRecordTypeSetWindowOrgEx"              : 10       ; TBD
+                                    ,"EmfRecordTypeSetViewportExtEx"            : 11       ; TBD
+                                    ,"EmfRecordTypeSetViewportOrgEx"            : 12       ; TBD
+                                    ,"EmfRecordTypeSetBrushOrgEx"               : 13       ; TBD
+                                    ,"EmfRecordTypeEOF"                         : 14       ; TBD
+                                    ,"EmfRecordTypeSetPixelV"                   : 15       ; TBD
+                                    ,"EmfRecordTypeSetMapperFlags"              : 16       ; TBD
+                                    ,"EmfRecordTypeSetMapMode"                  : 17       ; TBD
+                                    ,"EmfRecordTypeSetBkMode"                   : 18       ; TBD
+                                    ,"EmfRecordTypeSetPolyFillMode"             : 19       ; TBD
+                                    ,"EmfRecordTypeSetROP2"                     : 20       ; TBD
+                                    ,"EmfRecordTypeSetStretchBltMode"           : 21       ; TBD
+                                    ,"EmfRecordTypeSetTextAlign"                : 22       ; TBD
+                                    ,"EmfRecordTypeSetColorAdjustment"          : 23       ; TBD
+                                    ,"EmfRecordTypeSetTextColor"                : 24       ; TBD
+                                    ,"EmfRecordTypeSetBkColor"                  : 25       ; TBD
+                                    ,"EmfRecordTypeOffsetClipRgn"               : 26       ; TBD
+                                    ,"EmfRecordTypeMoveToEx"                    : 27       ; TBD
+                                    ,"EmfRecordTypeSetMetaRgn"                  : 28       ; TBD
+                                    ,"EmfRecordTypeExcludeClipRect"             : 29       ; TBD
+                                    ,"EmfRecordTypeIntersectClipRect"           : 30       ; TBD
+                                    ,"EmfRecordTypeScaleViewportExtEx"          : 31       ; TBD
+                                    ,"EmfRecordTypeScaleWindowExtEx"            : 32       ; TBD
+                                    ,"EmfRecordTypeSaveDC"                      : 33       ; TBD
+                                    ,"EmfRecordTypeRestoreDC"                   : 34       ; TBD
+                                    ,"EmfRecordTypeSetWorldTransform"           : 35       ; TBD
+                                    ,"EmfRecordTypeModifyWorldTransform"        : 36       ; TBD
+                                    ,"EmfRecordTypeSelectObject"                : 37       ; TBD
+                                    ,"EmfRecordTypeCreatePen"                   : 38       ; TBD
+                                    ,"EmfRecordTypeCreateBrushIndirect"         : 39       ; TBD
+                                    ,"EmfRecordTypeDeleteObject"                : 40       ; TBD
+                                    ,"EmfRecordTypeAngleArc"                    : 41       ; TBD
+                                    ,"EmfRecordTypeEllipse"                     : 42       ; TBD
+                                    ,"EmfRecordTypeRectangle"                   : 43       ; TBD
+                                    ,"EmfRecordTypeRoundRect"                   : 44       ; TBD
+                                    ,"EmfRecordTypeArc"                         : 45       ; TBD
+                                    ,"EmfRecordTypeChord"                       : 46       ; TBD
+                                    ,"EmfRecordTypePie"                         : 47       ; TBD
+                                    ,"EmfRecordTypeSelectPalette"               : 48       ; TBD
+                                    ,"EmfRecordTypeCreatePalette"               : 49       ; TBD
+                                    ,"EmfRecordTypeSetPaletteEntries"           : 50       ; TBD
+                                    ,"EmfRecordTypeResizePalette"               : 51       ; TBD
+                                    ,"EmfRecordTypeRealizePalette"              : 52       ; TBD
+                                    ,"EmfRecordTypeExtFloodFill"                : 53       ; TBD
+                                    ,"EmfRecordTypeLineTo"                      : 54       ; TBD
+                                    ,"EmfRecordTypeArcTo"                       : 55       ; TBD
+                                    ,"EmfRecordTypePolyDraw"                    : 56       ; TBD
+                                    ,"EmfRecordTypeSetArcDirection"             : 57       ; TBD
+                                    ,"EmfRecordTypeSetMiterLimit"               : 58       ; TBD
+                                    ,"EmfRecordTypeBeginPath"                   : 59       ; TBD
+                                    ,"EmfRecordTypeEndPath"                     : 60       ; TBD
+                                    ,"EmfRecordTypeCloseFigure"                 : 61       ; TBD
+                                    ,"EmfRecordTypeFillPath"                    : 62       ; TBD
+                                    ,"EmfRecordTypeStrokeAndFillPath"           : 63       ; TBD
+                                    ,"EmfRecordTypeStrokePath"                  : 64       ; TBD
+                                    ,"EmfRecordTypeFlattenPath"                 : 65       ; TBD
+                                    ,"EmfRecordTypeWidenPath"                   : 66       ; TBD
+                                    ,"EmfRecordTypeSelectClipPath"              : 67       ; TBD
+                                    ,"EmfRecordTypeAbortPath"                   : 68       ; TBD
+                                    ,"EmfRecordTypeReserved_069"                : 69       ; TBD
+                                    ,"EmfRecordTypeGdiComment"                  : 70       ; TBD
+                                    ,"EmfRecordTypeFillRgn"                     : 71       ; TBD
+                                    ,"EmfRecordTypeFrameRgn"                    : 72       ; TBD
+                                    ,"EmfRecordTypeInvertRgn"                   : 73       ; TBD
+                                    ,"EmfRecordTypePaintRgn"                    : 74       ; TBD
+                                    ,"EmfRecordTypeExtSelectClipRgn"            : 75       ; TBD
+                                    ,"EmfRecordTypeBitBlt"                      : 76       ; TBD
+                                    ,"EmfRecordTypeStretchBlt"                  : 77       ; TBD
+                                    ,"EmfRecordTypeMaskBlt"                     : 78       ; TBD
+                                    ,"EmfRecordTypePlgBlt"                      : 79       ; TBD
+                                    ,"EmfRecordTypeSetDIBitsToDevice"           : 80       ; TBD
+                                    ,"EmfRecordTypeStretchDIBits"               : 81       ; TBD
+                                    ,"EmfRecordTypeExtCreateFontIndirect"       : 82       ; TBD
+                                    ,"EmfRecordTypeExtTextOutA"                 : 83       ; TBD
+                                    ,"EmfRecordTypeExtTextOutW"                 : 84       ; TBD
+                                    ,"EmfRecordTypePolyBezier16"                : 85       ; TBD
+                                    ,"EmfRecordTypePolygon16"                   : 86       ; TBD
+                                    ,"EmfRecordTypePolyline16"                  : 87       ; TBD
+                                    ,"EmfRecordTypePolyBezierTo16"              : 88       ; TBD
+                                    ,"EmfRecordTypePolylineTo16"                : 89       ; TBD
+                                    ,"EmfRecordTypePolyPolyline16"              : 90       ; TBD
+                                    ,"EmfRecordTypePolyPolygon16"               : 91       ; TBD
+                                    ,"EmfRecordTypePolyDraw16"                  : 92       ; TBD
+                                    ,"EmfRecordTypeCreateMonoBrush"             : 93       ; TBD
+                                    ,"EmfRecordTypeCreateDIBPatternBrushPt"     : 94       ; TBD
+                                    ,"EmfRecordTypeExtCreatePen"                : 95       ; TBD
+                                    ,"EmfRecordTypePolyTextOutA"                : 96       ; TBD
+                                    ,"EmfRecordTypePolyTextOutW"                : 97       ; TBD
+                                    ,"EmfRecordTypeSetICMMode"                  : 98       ; TBD
+                                    ,"EmfRecordTypeCreateColorSpace"            : 99       ; TBD
+                                    ,"EmfRecordTypeSetColorSpace"               : 100      ; TBD
+                                    ,"EmfRecordTypeDeleteColorSpace"            : 101      ; TBD
+                                    ,"EmfRecordTypeGLSRecord"                   : 102      ; TBD
+                                    ,"EmfRecordTypeGLSBoundedRecord"            : 103      ; TBD
+                                    ,"EmfRecordTypePixelFormat"                 : 104      ; TBD
+                                    ,"EmfRecordTypeDrawEscape"                  : 105      ; TBD
+                                    ,"EmfRecordTypeExtEscape"                   : 106      ; TBD
+                                    ,"EmfRecordTypeStartDoc"                    : 107      ; TBD
+                                    ,"EmfRecordTypeSmallTextOut"                : 108      ; TBD
+                                    ,"EmfRecordTypeForceUFIMapping"             : 109      ; TBD
+                                    ,"EmfRecordTypeNamedEscape"                 : 110      ; TBD
+                                    ,"EmfRecordTypeColorCorrectPalette"         : 111      ; TBD
+                                    ,"EmfRecordTypeSetICMProfileA"              : 112      ; TBD
+                                    ,"EmfRecordTypeSetICMProfileW"              : 113      ; TBD
+                                    ,"EmfRecordTypeAlphaBlend"                  : 114      ; TBD
+                                    ,"EmfRecordTypeSetLayout"                   : 115      ; TBD
+                                    ,"EmfRecordTypeTransparentBlt"              : 116      ; TBD
+                                    ,"EmfRecordTypeReserved_117"                : 117      ; TBD
+                                    ,"EmfRecordTypeGradientFill"                : 118      ; TBD
+                                    ,"EmfRecordTypeSetLinkedUFIs"               : 119      ; TBD
+                                    ,"EmfRecordTypeSetTextJustification"        : 120      ; TBD
+                                    ,"EmfRecordTypeColorMatchToTargetW"         : 121      ; TBD
+                                    ,"EmfRecordTypeCreateColorSpaceW"           : 122      ; TBD
+                                    ,"EmfRecordTypeMax"                         : 122      ; TBD
+                                    ,"EmfRecordTypeMin"                         : 1        ; TBD
+                                    ,"EmfPlusRecordTypeInvalid"                 : 0x4000   ; TBD
+                                    ,"EmfPlusRecordTypeHeader"                  : 0x4001   ; Identifies a record that is the EMF+ header.
+                                    ,"EmfPlusRecordTypeEndOfFile"               : 0x4002   ; Identifies a record that marks the last EMF+ record of a metafile.
+                                    ,"EmfPlusRecordTypeComment"                 : 0x4003   ; GDIP.Graphics.AddMetafileComment()
+                                    ,"EmfPlusRecordTypeGetDC"                   : 0x4004   ; GDIP.Graphics.GetHDC()
+                                    ,"EmfPlusRecordTypeMultiFormatStart"        : 0x4005   ; Identifies the start of a multiple-format block.
+                                    ,"EmfPlusRecordTypeMultiFormatSection"      : 0x4006   ; Identifies a section in a multiple-format block.
+                                    ,"EmfPlusRecordTypeMultiFormatEnd"          : 0x4007   ; Identifies the end of a multiple-format block.
+                                    ,"EmfPlusRecordTypeObject"                  : 0x4008   ; TBD
+                                    ,"EmfPlusRecordTypeClear"                   : 0x4009   ; GDIP.Graphics.Clear()
+                                    ,"EmfPlusRecordTypeFillRects"               : 0x4000   ; FillRectangles Methods
+                                    ,"EmfPlusRecordTypeDrawRects"               : 0x400A   ; DrawRectangles Methods
+                                    ,"EmfPlusRecordTypeFillPolygon"             : 0x400B   ; FillPolygon Methods
+                                    ,"EmfPlusRecordTypeDrawLines"               : 0x400C   ; DrawLines Methods
+                                    ,"EmfPlusRecordTypeFillEllipse"             : 0x400D   ; FillEllipse Methods
+                                    ,"EmfPlusRecordTypeDrawEllipse"             : 0x400E   ; DrawEllipse Methods
+                                    ,"EmfPlusRecordTypeFillPie"                 : 0x400F   ; FillPie Methods
+                                    ,"EmfPlusRecordTypeDrawPie"                 : 0x4010   ; DrawPie Methods
+                                    ,"EmfPlusRecordTypeDrawArc"                 : 0x4011   ; DrawArc Methods
+                                    ,"EmfPlusRecordTypeFillRegion"              : 0x4012   ; GDIP.Graphics.()
+                                    ,"EmfPlusRecordTypeFillPath"                : 0x4013   ; GDIP.Graphics.()
+                                    ,"EmfPlusRecordTypeDrawPath"                : 0x4014   ; GDIP.Graphics.()
+                                    ,"EmfPlusRecordTypeFillClosedCurve"         : 0x4015   ; FillClosedCurve Methods
+                                    ,"EmfPlusRecordTypeDrawClosedCurve"         : 0x4016   ; DrawClosedCurve Methods
+                                    ,"EmfPlusRecordTypeDrawCurve"               : 0x4017   ; DrawCurve Methods
+                                    ,"EmfPlusRecordTypeDrawBeziers"             : 0x4018   ; DrawBeziers Methods
+                                    ,"EmfPlusRecordTypeDrawImage"               : 0x4019   ; DrawImage Methods
+                                    ,"EmfPlusRecordTypeDrawImagePoints"         : 0x4010   ; DrawImage Methods (destination point arrays)
+                                    ,"EmfPlusRecordTypeDrawString"              : 0x401A   ; DrawString Methods
+                                    ,"EmfPlusRecordTypeSetRenderingOrigin"      : 0x401B   ; GDIP.Graphics.SetRenderingOrigin()
+                                    ,"EmfPlusRecordTypeSetAntiAliasMode"        : 0x401C   ; GDIP.Graphics.SetSmoothingMode()
+                                    ,"EmfPlusRecordTypeSetTextRenderingHint"    : 0x401D   ; GDIP.Graphics.SetTextRenderingHint()
+                                    ,"EmfPlusRecordTypeSetTextContrast"         : 0x401E   ; GDIP.Graphics.SetTextContrast()
+                                    ,"EmfPlusRecordTypeSetInterpolationMode"    : 0x401F   ; GDIP.Graphics.SetInterpolationMode()
+                                    ,"EmfPlusRecordTypeSetPixelOffsetMode"      : 0x4020   ; GDIP.Graphics.SetPixelOffsetMode()
+                                    ,"EmfPlusRecordTypeSetCompositingMode"      : 0x4021   ; GDIP.Graphics.SetCompositingMode()
+                                    ,"EmfPlusRecordTypeSetCompositingQuality"   : 0x4022   ; GDIP.Graphics.SetCompositingQuality()
+                                    ,"EmfPlusRecordTypeSave"                    : 0x4023   ; GDIP.Graphics.Save()
+                                    ,"EmfPlusRecordTypeRestore"                 : 0x4024   ; GDIP.Graphics.Restore()
+                                    ,"EmfPlusRecordTypeBeginContainer"          : 0x4025   ; GDIP.Graphics.BeginContainer()
+                                    ,"EmfPlusRecordTypeBeginContainerNoParams"  : 0x4026   ; GDIP.Graphics.BeginContainer()
+                                    ,"EmfPlusRecordTypeEndContainer"            : 0x4027   ; GDIP.Graphics.EndContainer()
+                                    ,"EmfPlusRecordTypeSetWorldTransform"       : 0x4028   ; GDIP.Graphics.SetTransform()
+                                    ,"EmfPlusRecordTypeResetWorldTransform"     : 0x4029   ; GDIP.Graphics.ResetTransform()
+                                    ,"EmfPlusRecordTypeMultiplyWorldTransform"  : 0x4020   ; GDIP.Graphics.MultiplyTransform()
+                                    ,"EmfPlusRecordTypeTranslateWorldTransform" : 0x402A   ; GDIP.Graphics.TranslateTransform()
+                                    ,"EmfPlusRecordTypeScaleWorldTransform"     : 0x402B   ; GDIP.Graphics.ScaleTransform()
+                                    ,"EmfPlusRecordTypeRotateWorldTransform"    : 0x402C   ; GDIP.Graphics.RotateTransform()
+                                    ,"EmfPlusRecordTypeSetPageTransform"        : 0x402D   ; GDIP.Graphics.SetPageScale() and GDIP.Graphics.SetPageUnit()
+                                    ,"EmfPlusRecordTypeResetClip"               : 0x402E   ; GDIP.Graphics.ResetClip()
+                                    ,"EmfPlusRecordTypeSetClipRect"             : 0x402F   ; GDIP.Graphics.SetClip()
+                                    ,"EmfPlusRecordTypeSetClipPath"             : 0x4030   ; GDIP.Graphics.SetClip()
+                                    ,"EmfPlusRecordTypeSetClipRegion"           : 0x4031   ; GDIP.Graphics.SetClip()
+                                    ,"EmfPlusRecordTypeOffsetClip"              : 0x4032   ; TranslateClip Methods
+                                    ,"EmfPlusRecordTypeDrawDriverString"        : 0x4033   ; GDIP.Graphics.DrawDriverString()
+                                    ,"EmfPlusRecordTypeStrokeFillPath"          : 0x4034   ; TBD
+                                    ,"EmfPlusRecordTypeSerializableObject"      : 0x4035   ; TBD
+                                    ,"EmfPlusRecordTypeSetTSGraphics"           : 0x4036   ; TBD
+                                    ,"EmfPlusRecordTypeSetTSClip"               : 0x4037   ; TBD
+                                    ,"EmfPlusRecordTotal"                       : 0x4038   ; TBD
+                                    ,"EmfPlusRecordTypeMax"                     : -1       ; TBD
+                                    ,"EmfPlusRecordTypeMin"                     : 0x4001 } ; TBD
         
         ; Specifies options for the GDIP.Metafile.EmfToWmfBits() method.
-        Static EmfToWmfBitsFlags := {0: "EmfToWmfBitsFlagsDefault"                  ; Default conversion.
-                                    ,1: "EmfToWmfBitsFlagsEmbedEmf"                 ; Source EMF metafile is embedded as a comment in the resulting WMF metafile.
-                                    ,2: "EmfToWmfBitsFlagsIncludePlaceable"         ; Resulting WMF metafile is in the placeable metafile format.
-                                    ,3: "EmfToWmfBitsFlagsNoXORClip" }              ; Clipping region is stored in the metafile in the traditional way. 
+        Static EmfToWmfBitsFlags := {"EmfToWmfBitsFlagsDefault"          : 0   ; Default conversion.
+                                    ,"EmfToWmfBitsFlagsEmbedEmf"         : 1   ; Source EMF metafile is embedded as a comment in the resulting WMF metafile.
+                                    ,"EmfToWmfBitsFlagsIncludePlaceable" : 2   ; Resulting WMF metafile is in the placeable metafile format.
+                                    ,"EmfToWmfBitsFlagsNoXORClip"        : 4 } ; Clipping region is stored in the metafile in the traditional way. 
         
         ; Specifies data types for image codec (encoder/decoder) parameters.
-        Static EncoderParameterValueType := {0: "EncoderParameterValueTypeByte"          ; Is an 8-bit unsigned integer.
-                                            ,1: "EncoderParameterValueTypeASCII"         ; Is a null-terminated character string.
-                                            ,2: "EncoderParameterValueTypeShort"         ; Is a 16-bit unsigned integer.
-                                            ,3: "EncoderParameterValueTypeLong"          ; Is a 32-bit unsigned integer.
-                                            ,4: "EncoderParameterValueTypeRational"      ; Is an array of two, 32-bit unsigned integers representing a fraction.
-                                            ,5: "EncoderParameterValueTypeLongRange"     ; Is an array of two, 32-bit unsigned integers representing a range.
-                                            ,6: "EncoderParameterValueTypeUndefined"     ; Is an array of bytes that can hold values of any type.
-                                            ,7: "EncoderParameterValueTypeRationalRange" ; Is an array of four, 32-bit unsigned integers representing a range of rational numbers.
-                                            ,8: "EncoderParameterValueTypePointer" }     ; Is a pointer to a block of custom metadata.
+        Static EncoderParameterValueType := {"EncoderParameterValueTypeByte"          : 1   ; Is an 8-bit unsigned integer.
+                                            ,"EncoderParameterValueTypeASCII"         : 2   ; Is a null-terminated character string.
+                                            ,"EncoderParameterValueTypeShort"         : 3   ; Is a 16-bit unsigned integer.
+                                            ,"EncoderParameterValueTypeLong"          : 4   ; Is a 32-bit unsigned integer.
+                                            ,"EncoderParameterValueTypeRational"      : 5   ; Is an array of two, 32-bit unsigned integers representing a fraction.
+                                            ,"EncoderParameterValueTypeLongRange"     : 6   ; Is an array of two, 32-bit unsigned integers representing a range.
+                                            ,"EncoderParameterValueTypeUndefined"     : 7   ; Is an array of bytes that can hold values of any type.
+                                            ,"EncoderParameterValueTypeRationalRange" : 8   ; Is an array of four, 32-bit unsigned integers representing a range of rational numbers.
+                                            ,"EncoderParameterValueTypePointer"       : 9 } ; Is a pointer to a block of custom metadata.
         
         ; Specifies values that can be passed as arguments to image encoders.
-        Static EncoderValue := { 0: "EncoderValueColorTypeCMYK"                     ; Not used in GDI+ version 1.0.
-                               , 1: "EncoderValueColorTypeYCCK"                     ; Not used in GDI+ version 1.0.
-                               , 2: "EncoderValueCompressionLZW"                    ; TIFF image, specifies the LZW compression method.
-                               , 3: "EncoderValueCompressionCCITT3"                 ; TIFF image, specifies the CCITT3 compression method.
-                               , 4: "EncoderValueCompressionCCITT4"                 ; TIFF image, specifies the CCITT4 compression method.
-                               , 5: "EncoderValueCompressionRle"                    ; TIFF image, specifies the RLE compression method.
-                               , 6: "EncoderValueCompressionNone"                   ; TIFF image, specifies no compression.
-                               , 7: "EncoderValueScanMethodInterlaced"              ; Not used in GDI+ version 1.0.
-                               , 8: "EncoderValueScanMethodNonInterlaced"           ; Not used in GDI+ version 1.0.
-                               , 9: "EncoderValueVersionGif87"                      ; Not used in GDI+ version 1.0.
-                               ,10: "EncoderValueVersionGif89"                      ; Not used in GDI+ version 1.0.
-                               ,11: "EncoderValueRenderProgressive"                 ; Not used in GDI+ version 1.0.
-                               ,12: "EncoderValueRenderNonProgressive"              ; Not used in GDI+ version 1.0.
-                               ,13: "EncoderValueTransformRotate90"                 ; JPEG image, specifies lossless 90-degree clockwise rotation.
-                               ,14: "EncoderValueTransformRotate180"                ; JPEG image, specifies lossless 180-degree clockwise rotation.
-                               ,15: "EncoderValueTransformRotate270"                ; JPEG image, specifies lossless 270-degree clockwise rotation.
-                               ,16: "EncoderValueTransformFlipHorizontal"           ; JPEG image, specifies a lossless horizontal flip.
-                               ,17: "EncoderValueTransformFlipVertical"             ; JPEG image, specifies a lossless vertical flip.
-                               ,18: "EncoderValueMultiFrame"                        ; Specifies multiple-frame encoding.
-                               ,19: "EncoderValueLastFrame"                         ; Specifies the last frame of a multiple-frame image.
-                               ,20: "EncoderValueFlush"                             ; Specifies that the encoder object is to be closed.
-                               ,21: "EncoderValueFrameDimensionTime"                ; Not used in GDI+ version 1.0.
-                               ,22: "EncoderValueFrameDimensionResolution"          ; Not used in GDI+ version 1.0.
-                               ,23: "EncoderValueFrameDimensionPage"                ; TIFF image, specifies the page frame dimension
-                               ,24: "EncoderValueColorTypeGray"                     ; Undefined
-                               ,25: "EncoderValueColorTypeRGB" }                    ; Undefined
+        Static EncoderValue := {"EncoderValueColorTypeCMYK"            : 0    ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueColorTypeYCCK"            : 1    ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueCompressionLZW"           : 2    ; TIFF image, specifies the LZW compression method.
+                               ,"EncoderValueCompressionCCITT3"        : 3    ; TIFF image, specifies the CCITT3 compression method.
+                               ,"EncoderValueCompressionCCITT4"        : 4    ; TIFF image, specifies the CCITT4 compression method.
+                               ,"EncoderValueCompressionRle"           : 5    ; TIFF image, specifies the RLE compression method.
+                               ,"EncoderValueCompressionNone"          : 6    ; TIFF image, specifies no compression.
+                               ,"EncoderValueScanMethodInterlaced"     : 7    ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueScanMethodNonInterlaced"  : 8    ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueVersionGif87"             : 9    ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueVersionGif89"             : 10   ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueRenderProgressive"        : 11   ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueRenderNonProgressive"     : 12   ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueTransformRotate90"        : 13   ; JPEG image, specifies lossless 90-degree clockwise rotation.
+                               ,"EncoderValueTransformRotate180"       : 14   ; JPEG image, specifies lossless 180-degree clockwise rotation.
+                               ,"EncoderValueTransformRotate270"       : 15   ; JPEG image, specifies lossless 270-degree clockwise rotation.
+                               ,"EncoderValueTransformFlipHorizontal"  : 16   ; JPEG image, specifies a lossless horizontal flip.
+                               ,"EncoderValueTransformFlipVertical"    : 17   ; JPEG image, specifies a lossless vertical flip.
+                               ,"EncoderValueMultiFrame"               : 18   ; Specifies multiple-frame encoding.
+                               ,"EncoderValueLastFrame"                : 19   ; Specifies the last frame of a multiple-frame image.
+                               ,"EncoderValueFlush"                    : 20   ; Specifies that the encoder object is to be closed.
+                               ,"EncoderValueFrameDimensionTime"       : 21   ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueFrameDimensionResolution" : 22   ; Not used in GDI+ version 1.0.
+                               ,"EncoderValueFrameDimensionPage"       : 23   ; TIFF image, specifies the page frame dimension
+                               ,"EncoderValueColorTypeGray"            : 24   ; Undefined
+                               ,"EncoderValueColorTypeRGB"             : 25 } ; Undefined
         
         ; Specifies how to fill areas that are formed when a path or curve intersects itself.
-        Static FillMode := {0: "FillModeAlternate"                                  ; Areas are filled according to the even-odd parity rule.
-                           ,1: "FillModeWinding" }                                  ; Areas are filled according to the nonzero winding rule.
+        Static FillMode := {"FillModeAlternate" : 0   ; Areas are filled according to the even-odd parity rule.
+                           ,"FillModeWinding"   : 1 } ; Areas are filled according to the nonzero winding rule.
         
         ; Specifies when to flush the queue of graphics operations.
-        Static FlushIntention := {0: "FlushIntentionFlush"                          ; Pending rendering operations are executed and Flush() is not synchronized.
-                                 ,1: "FlushIntentionSync" }                         ; Pending rendering operations are executed and Flush() is synchronized.
+        Static FlushIntention := {"FlushIntentionFlush" : 0   ; Pending rendering operations are executed and Flush() is not synchronized.
+                                 ,"FlushIntentionSync"  : 1 } ; Pending rendering operations are executed and Flush() is synchronized.
         
         ; Specifies the style of the typeface of a font.
-        Static FontStyle := {0: "FontStyleRegular"                                  ; Normal weight or thickness of the typeface.
-                            ,1: "FontStyleBold"                                     ; Bold typeface. Bold is a heavier weight or thickness.
-                            ,2: "FontStyleItalic"                                   ; Italic typeface, which produces a noticeable slant to the vertical stems of the characters.
-                            ,3: "FontStyleBoldItalic"                               ; Typeface is both bold and italic.
-                            ,4: "FontStyleUnderline"                                ; Underline, which displays a line underneath the baseline of the characters.
-                            ,5: "FontStyleStrikeout" }                              ; Strikeout, which displays a horizontal line drawn through the middle of the characters.
+        Static FontStyle := {"FontStyleRegular"    : 0   ; Normal weight or thickness of the typeface.
+                            ,"FontStyleBold"       : 1   ; Bold typeface. Bold is a heavier weight or thickness.
+                            ,"FontStyleItalic"     : 2   ; Italic typeface, which produces a noticeable slant to the vertical stems of the characters.
+                            ,"FontStyleBoldItalic" : 3   ; Typeface is both bold and italic.
+                            ,"FontStyleUnderline"  : 4   ; Underline, which displays a line underneath the baseline of the characters.
+                            ,"FontStyleStrikeout"  : 8 } ; Strikeout, which displays a horizontal line drawn through the middle of the characters.
         
-        ; 
-        Static HatchStyle := { 0: "HatchStyleHorizontal"                            ; Horizontal lines.
-                             , 1: "HatchStyleVertical"                              ; Vertical lines.                                                                                                                                                                                                                                         
-                             , 2: "HatchStyleForwardDiagonal"                       ; Diagonal lines that slant to the right from top points to bottom points.
-                             , 3: "HatchStyleBackwardDiagonal"                      ; Diagonal lines that slant to the left from top points to bottom points.
-                             , 4: "HatchStyleCross"                                 ; Horizontal and vertical lines that cross at 90-degree angles.
-                             , 5: "HatchStyleDiagonalCross"                         ; Forward diagonal and backward diagonal lines that cross at 90-degree angles.
-                             , 6: "HatchStyle05Percent"                             ;  5% hatch. The ratio of foreground color to background color is 5:100.
-                             , 7: "HatchStyle10Percent"                             ; 10% hatch. The ratio of foreground color to background color is 10:100.
-                             , 8: "HatchStyle20Percent"                             ; 20% hatch. The ratio of foreground color to background color is 20:100.
-                             , 9: "HatchStyle25Percent"                             ; 25% hatch. The ratio of foreground color to background color is 25:100.
-                             ,10: "HatchStyle30Percent"                             ; 30% hatch. The ratio of foreground color to background color is 30:100.
-                             ,11: "HatchStyle40Percent"                             ; 40% hatch. The ratio of foreground color to background color is 40:100.
-                             ,12: "HatchStyle50Percent"                             ; 50% hatch. The ratio of foreground color to background color is 50:100.
-                             ,13: "HatchStyle60Percent"                             ; 60% hatch. The ratio of foreground color to background color is 60:100.
-                             ,14: "HatchStyle70Percent"                             ; 70% hatch. The ratio of foreground color to background color is 70:100.
-                             ,15: "HatchStyle75Percent"                             ; 75% hatch. The ratio of foreground color to background color is 75:100.
-                             ,16: "HatchStyle80Percent"                             ; 80% hatch. The ratio of foreground color to background color is 80:100.
-                             ,17: "HatchStyle90Percent"                             ; 90% hatch. The ratio of foreground color to background color is 90:100.
-                             ,18: "HatchStyleLightDownwardDiagonal"                 ; Diagonal lines that slant to the right from top points to bottom points and are spaced 50 percent closer together than HatchStyleForwardDiagonal but are not antialiased.
-                             ,19: "HatchStyleLightUpwardDiagonal"                   ; Diagonal lines that slant to the left from top points to bottom points and are spaced 50 percent closer together than HatchStyleBackwardDiagonal but are not antialiased.
-                             ,20: "HatchStyleDarkDownwardDiagonal"                  ; Diagonal lines that slant to the right from top points to bottom points, are spaced 50 percent closer together than HatchStyleForwardDiagonal, and are twice the width of HatchStyleForwardDiagonal but are not antialiased.
-                             ,21: "HatchStyleDarkUpwardDiagonal"                    ; Diagonal lines that slant to the left from top points to bottom points, are spaced 50 percent closer together than HatchStyleBackwardDiagonal, and are twice the width of HatchStyleBackwardDiagonal but are not antialiased.
-                             ,22: "HatchStyleWideDownwardDiagonal"                  ; Diagonal lines that slant to the right from top points to bottom points, have the same spacing as HatchStyleForwardDiagonal, and are triple the width of HatchStyleForwardDiagonal but are not antialiased.
-                             ,23: "HatchStyleWideUpwardDiagonal"                    ; Diagonal lines that slant to the left from top points to bottom points, have the same spacing as HatchStyleBackwardDiagonal, and are triple the width of HatchStyleBackwardDiagonal but are not antialiased.
-                             ,24: "HatchStyleLightVertical"                         ; Vertical lines that are spaced 50 percent closer together than HatchStyleVertical.
-                             ,25: "HatchStyleLightHorizontal"                       ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal.
-                             ,26: "HatchStyleNarrowVertical"                        ; Vertical lines that are spaced 75 percent closer together than HatchStyleVertical (or 25 percent closer together than HatchStyleLightVertical).
-                             ,27: "HatchStyleNarrowHorizontal"                      ; Horizontal lines that are spaced 75 percent closer together than HatchStyleHorizontal ( or 25 percent closer together than HatchStyleLightHorizontal).
-                             ,28: "HatchStyleDarkVertical"                          ; Vertical lines that are spaced 50 percent closer together than HatchStyleVerical and are twice the width of HatchStyleVertical.
-                             ,29: "HatchStyleDarkHorizontal"                        ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal and are twice the width of HatchStyleHorizontal.
-                             ,30: "HatchStyleDashedDownwardDiagonal"                ; Horizontal lines that are composed of forward diagonals.
-                             ,31: "HatchStyleDashedUpwardDiagonal"                  ; Horizontal lines that are composed of backward diagonals.
-                             ,32: "HatchStyleDashedHorizontal"                      ; Horizontal dashed lines.
-                             ,33: "HatchStyleDashedVertical"                        ; Vertical dashed lines.
-                             ,34: "HatchStyleSmallConfetti"                         ; A hatch that has the appearance of confetti.
-                             ,35: "HatchStyleLargeConfetti"                         ; A hatch that has the appearance of confetti composed of larger pieces than HatchStyleSmallConfetti.
-                             ,36: "HatchStyleZigZag"                                ; Horizontal lines of zigzags.
-                             ,37: "HatchStyleWave"                                  ; Horizontal lines of tildes.
-                             ,38: "HatchStyleDiagonalBrick"                         ; A hatch that has the appearance of a wall of bricks laid in a backward diagonal direction.
-                             ,39: "HatchStyleHorizontalBrick"                       ; A hatch that has the appearance of a wall of bricks laid horizontally.
-                             ,40: "HatchStyleWeave"                                 ; A hatch that has the appearance of a woven material.
-                             ,41: "HatchStylePlaid"                                 ; A hatch that has the appearance of a plaid material.
-                             ,42: "HatchStyleDivot"                                 ; A hatch that has the appearance of divots.
-                             ,43: "HatchStyleDottedGrid"                            ; Horizontal and vertical dotted lines that cross at 90-degree angles.
-                             ,44: "HatchStyleDottedDiamond"                         ; Forward diagonal and backward diagonal dotted lines that cross at 90-degree angles.
-                             ,45: "HatchStyleShingle"                               ; A hatch that has the appearance of shingles laid in a forward diagonal direction.
-                             ,46: "HatchStyleTrellis"                               ; A hatch that has the appearance of a trellis.
-                             ,47: "HatchStyleSphere"                                ; A hatch that has the appearance of a checkerboard of spheres.
-                             ,48: "HatchStyleSmallGrid"                             ; Horizontal and vertical lines that cross at 90-degree angles and are spaced 50 percent closer together than HatchStyleCross.
-                             ,49: "HatchStyleSmallCheckerBoard"                     ; A hatch that has the appearance of a checkerboard.
-                             ,50: "HatchStyleLargeCheckerBoard"                     ; A hatch that has the appearance of a checkerboard with squares that are twice the size of HatchStyleSmallCheckerBoard.
-                             ,51: "HatchStyleOutlinedDiamond"                       ; Forward diagonal and backward diagonal lines that cross at 90-degree angles but are not antialiased.
-                             ,52: "HatchStyleSolidDiamond"                          ; A hatch that has the appearance of a checkerboard placed diagonally.
-                             ,53: "HatchStyleTotal"                                 ; No hatch thereby allowing the brush to be transparent.
-                             ,54: "HatchStyleLargeGrid"                             ; HatchStyleCross.
-                             ,55: "HatchStyleMin"                                   ; HatchStyleHorizonal.
-                             ,56: "HatchStyleMax" }                                 ; HatchStyleSolidDiamond.
+        ; Specifies the hatch pattern used by a brush of type HatchBrush.
+        Static HatchStyle := {"HatchStyleHorizontal"             : 0    ; Horizontal lines.
+                             ,"HatchStyleVertical"               : 1    ; Vertical lines.                                                                                                                                                                                                                                         
+                             ,"HatchStyleForwardDiagonal"        : 2    ; Diagonal lines that slant to the right from top points to bottom points.
+                             ,"HatchStyleBackwardDiagonal"       : 3    ; Diagonal lines that slant to the left from top points to bottom points.
+                             ,"HatchStyleCross"                  : 4    ; Horizontal and vertical lines that cross at 90-degree angles.
+                             ,"HatchStyleDiagonalCross"          : 5    ; Forward diagonal and backward diagonal lines that cross at 90-degree angles.
+                             ,"HatchStyle05Percent"              : 6    ;  5% hatch. The ratio of foreground color to background color is 5:100.
+                             ,"HatchStyle10Percent"              : 7    ; 10% hatch. The ratio of foreground color to background color is 10:100.
+                             ,"HatchStyle20Percent"              : 8    ; 20% hatch. The ratio of foreground color to background color is 20:100.
+                             ,"HatchStyle25Percent"              : 9    ; 25% hatch. The ratio of foreground color to background color is 25:100.
+                             ,"HatchStyle30Percent"              : 10   ; 30% hatch. The ratio of foreground color to background color is 30:100.
+                             ,"HatchStyle40Percent"              : 11   ; 40% hatch. The ratio of foreground color to background color is 40:100.
+                             ,"HatchStyle50Percent"              : 12   ; 50% hatch. The ratio of foreground color to background color is 50:100.
+                             ,"HatchStyle60Percent"              : 13   ; 60% hatch. The ratio of foreground color to background color is 60:100.
+                             ,"HatchStyle70Percent"              : 14   ; 70% hatch. The ratio of foreground color to background color is 70:100.
+                             ,"HatchStyle75Percent"              : 15   ; 75% hatch. The ratio of foreground color to background color is 75:100.
+                             ,"HatchStyle80Percent"              : 16   ; 80% hatch. The ratio of foreground color to background color is 80:100.
+                             ,"HatchStyle90Percent"              : 17   ; 90% hatch. The ratio of foreground color to background color is 90:100.
+                             ,"HatchStyleLightDownwardDiagonal"  : 18   ; Diagonal lines that slant to the right from top points to bottom points and are spaced 50 percent closer together than HatchStyleForwardDiagonal but are not antialiased.
+                             ,"HatchStyleLightUpwardDiagonal"    : 19   ; Diagonal lines that slant to the left from top points to bottom points and are spaced 50 percent closer together than HatchStyleBackwardDiagonal but are not antialiased.
+                             ,"HatchStyleDarkDownwardDiagonal"   : 20   ; Diagonal lines that slant to the right from top points to bottom points, are spaced 50 percent closer together than HatchStyleForwardDiagonal, and are twice the width of HatchStyleForwardDiagonal but are not antialiased.
+                             ,"HatchStyleDarkUpwardDiagonal"     : 21   ; Diagonal lines that slant to the left from top points to bottom points, are spaced 50 percent closer together than HatchStyleBackwardDiagonal, and are twice the width of HatchStyleBackwardDiagonal but are not antialiased.
+                             ,"HatchStyleWideDownwardDiagonal"   : 22   ; Diagonal lines that slant to the right from top points to bottom points, have the same spacing as HatchStyleForwardDiagonal, and are triple the width of HatchStyleForwardDiagonal but are not antialiased.
+                             ,"HatchStyleWideUpwardDiagonal"     : 23   ; Diagonal lines that slant to the left from top points to bottom points, have the same spacing as HatchStyleBackwardDiagonal, and are triple the width of HatchStyleBackwardDiagonal but are not antialiased.
+                             ,"HatchStyleLightVertical"          : 24   ; Vertical lines that are spaced 50 percent closer together than HatchStyleVertical.
+                             ,"HatchStyleLightHorizontal"        : 25   ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal.
+                             ,"HatchStyleNarrowVertical"         : 26   ; Vertical lines that are spaced 75 percent closer together than HatchStyleVertical (or 25 percent closer together than HatchStyleLightVertical).
+                             ,"HatchStyleNarrowHorizontal"       : 27   ; Horizontal lines that are spaced 75 percent closer together than HatchStyleHorizontal ( or 25 percent closer together than HatchStyleLightHorizontal).
+                             ,"HatchStyleDarkVertical"           : 28   ; Vertical lines that are spaced 50 percent closer together than HatchStyleVerical and are twice the width of HatchStyleVertical.
+                             ,"HatchStyleDarkHorizontal"         : 29   ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal and are twice the width of HatchStyleHorizontal.
+                             ,"HatchStyleDashedDownwardDiagonal" : 30   ; Horizontal lines that are composed of forward diagonals.
+                             ,"HatchStyleDashedUpwardDiagonal"   : 31   ; Horizontal lines that are composed of backward diagonals.
+                             ,"HatchStyleDashedHorizontal"       : 32   ; Horizontal dashed lines.
+                             ,"HatchStyleDashedVertical"         : 33   ; Vertical dashed lines.
+                             ,"HatchStyleSmallConfetti"          : 34   ; A hatch that has the appearance of confetti.
+                             ,"HatchStyleLargeConfetti"          : 35   ; A hatch that has the appearance of confetti composed of larger pieces than HatchStyleSmallConfetti.
+                             ,"HatchStyleZigZag"                 : 36   ; Horizontal lines of zigzags.
+                             ,"HatchStyleWave"                   : 37   ; Horizontal lines of tildes.
+                             ,"HatchStyleDiagonalBrick"          : 38   ; A hatch that has the appearance of a wall of bricks laid in a backward diagonal direction.
+                             ,"HatchStyleHorizontalBrick"        : 39   ; A hatch that has the appearance of a wall of bricks laid horizontally.
+                             ,"HatchStyleWeave"                  : 40   ; A hatch that has the appearance of a woven material.
+                             ,"HatchStylePlaid"                  : 41   ; A hatch that has the appearance of a plaid material.
+                             ,"HatchStyleDivot"                  : 42   ; A hatch that has the appearance of divots.
+                             ,"HatchStyleDottedGrid"             : 43   ; Horizontal and vertical dotted lines that cross at 90-degree angles.
+                             ,"HatchStyleDottedDiamond"          : 44   ; Forward diagonal and backward diagonal dotted lines that cross at 90-degree angles.
+                             ,"HatchStyleShingle"                : 45   ; A hatch that has the appearance of shingles laid in a forward diagonal direction.
+                             ,"HatchStyleTrellis"                : 46   ; A hatch that has the appearance of a trellis.
+                             ,"HatchStyleSphere"                 : 47   ; A hatch that has the appearance of a checkerboard of spheres.
+                             ,"HatchStyleSmallGrid"              : 48   ; Horizontal and vertical lines that cross at 90-degree angles and are spaced 50 percent closer together than HatchStyleCross.
+                             ,"HatchStyleSmallCheckerBoard"      : 49   ; A hatch that has the appearance of a checkerboard.
+                             ,"HatchStyleLargeCheckerBoard"      : 50   ; A hatch that has the appearance of a checkerboard with squares that are twice the size of HatchStyleSmallCheckerBoard.
+                             ,"HatchStyleOutlinedDiamond"        : 51   ; Forward diagonal and backward diagonal lines that cross at 90-degree angles but are not antialiased.
+                             ,"HatchStyleSolidDiamond"           : 52   ; A hatch that has the appearance of a checkerboard placed diagonally.
+                             ,"HatchStyleTotal"                  : 53   ; No hatch thereby allowing the brush to be transparent.
+                             ,"HatchStyleLargeGrid"              : 4    ; HatchStyleCross.
+                             ,"HatchStyleMin"                    : 39   ; HatchStyleHorizonal.
+                             ,"HatchStyleMax"                    : 52 } ; HatchStyleSolidDiamond.
         
         ; Specifies the number and type of histograms that represent the color channels of a bitmap.
-        Static HistogramFormat := {0: "HistogramFormatARGB"                            ; Returns four histograms: alpha, red, green, and blue channels.
-                                  ,1: "HistogramFormatPARGB"                           ; Returns four histograms: one each for the alpha, red, green, and blue channels.
-                                  ,2: "HistogramFormatRGB"                             ; Returns three histograms: one each for the red, green, and blue channels. 
-                                  ,3: "HistogramFormatGray"                            ; Each pixel is converted to a grayscale value and one histogram is returned.
-                                  ,4: "HistogramFormatB"                               ; Returns a histogram for the blue channel.
-                                  ,5: "HistogramFormatG"                               ; Returns a histogram for the green channel.
-                                  ,6: "HistogramFormatR"                               ; Returns a histogram for the red channel.
-                                  ,7: "HistogramFormatA" }                             ; Returns a histogram for the alpha channel.
+        Static HistogramFormat := {"HistogramFormatARGB"  : 0   ; Returns four histograms: alpha, red, green, and blue channels.
+                                  ,"HistogramFormatPARGB" : 1   ; Returns four histograms: one each for the alpha, red, green, and blue channels.
+                                  ,"HistogramFormatRGB"   : 2   ; Returns three histograms: one each for the red, green, and blue channels. 
+                                  ,"HistogramFormatGray"  : 3   ; Each pixel is converted to a grayscale value and one histogram is returned.
+                                  ,"HistogramFormatB"     : 4   ; Returns a histogram for the blue channel.
+                                  ,"HistogramFormatG"     : 5   ; Returns a histogram for the green channel.
+                                  ,"HistogramFormatR"     : 6   ; Returns a histogram for the red channel.
+                                  ,"HistogramFormatA"     : 7 } ; Returns a histogram for the alpha channel.
         
         ; Specifies how to display hot keys.
-        Static HotkeyPrefix := {0: "HotkeyPrefixNone"                                  ; No hot key processing occurs.
-                               ,1: "HotkeyPrefixShow"                                  ; Unicode text is scanned for ampersands (&), which are interpreted as hot key markers.
-                               ,2: "HotkeyPrefixHide" }                                ; Unicode text is scanned for ampersands (&), which are substituted and removed.
+        Static HotkeyPrefix := {"HotkeyPrefixNone" : 0   ; No hot key processing occurs.
+                               ,"HotkeyPrefixShow" : 1   ; Unicode text is scanned for ampersands (&), which are interpreted as hot key markers.
+                               ,"HotkeyPrefixHide" : 2 } ; Unicode text is scanned for ampersands (&), which are substituted and removed.
         
         ; Indicates attributes of an image codec.
-        Static ImageCodecFlags := {0: "ImageCodecFlagsEncoder"                      ; Codec supports encoding (saving).
-                                  ,1: "ImageCodecFlagsDecoder"                      ; Codec supports decoding (reading).
-                                  ,2: "ImageCodecFlagsSupportBitmap"                ; Codec supports raster images (bitmaps).
-                                  ,3: "ImageCodecFlagsSupportVector"                ; Codec supports vector images (metafiles).
-                                  ,4: "ImageCodecFlagsSeekableEncode"               ; Encoder requires a seekable output stream.
-                                  ,5: "ImageCodecFlagsBlockingDecode"               ; Decoder has blocking behavior during the decoding process.
-                                  ,6: "ImageCodecFlagsBuiltin"                      ; The codec is built in to GDI+.
-                                  ,7: "ImageCodecFlagsSystem"                       ; Not used in GDI+ version 1.0.
-                                  ,8: "ImageCodecFlagsUser" }                       ; Not used in GDI+ version 1.0.
+        Static ImageCodecFlags := {"ImageCodecFlagsEncoder"        : 1        ; Codec supports encoding (saving).
+                                  ,"ImageCodecFlagsDecoder"        : 2        ; Codec supports decoding (reading).
+                                  ,"ImageCodecFlagsSupportBitmap"  : 4        ; Codec supports raster images (bitmaps).
+                                  ,"ImageCodecFlagsSupportVector"  : 8        ; Codec supports vector images (metafiles).
+                                  ,"ImageCodecFlagsSeekableEncode" : 16       ; Encoder requires a seekable output stream.
+                                  ,"ImageCodecFlagsBlockingDecode" : 32       ; Decoder has blocking behavior during the decoding process.
+                                  ,"ImageCodecFlagsBuiltin"        : 65536    ; The codec is built in to GDI+.
+                                  ,"ImageCodecFlagsSystem"         : 131072   ; Not used in GDI+ version 1.0.
+                                  ,"ImageCodecFlagsUser"           : 262144 } ; Not used in GDI+ version 1.0.
         
+        ; DONE THROUGH HERE
         ; Specifies the attributes of the pixel data contained in an Image object.
-        Static ImageFlags := { 0: "ImageFlagsNone"                                  ; No format information.
-                             , 1: "ImageFlagsScalable"                              ; Image can be scaled.
-                             , 2: "ImageFlagsHasAlpha"                              ; Pixel data contains alpha values.
-                             , 3: "ImageFlagsHasTranslucent"                        ; Pixel data has alpha values other than 0 and 255.
-                             , 4: "ImageFlagsPartiallyScalable"                     ; Pixel data is partially scalable with some limitations.
-                             , 5: "ImageFlagsColorSpaceRGB"                         ; Image is stored using an RGB color space.
-                             , 6: "ImageFlagsColorSpaceCMYK"                        ; Image is stored using a CMYK color space.
-                             , 7: "ImageFlagsColorSpaceGRAY"                        ; Image is a grayscale image.
-                             , 8: "ImageFlagsColorSpaceYCBCR"                       ; Image is stored using a YCBCR color space.
-                             , 9: "ImageFlagsColorSpaceYCCK"                        ; Image is stored using a YCCK color space.
-                             ,10: "ImageFlagsHasRealDPI"                            ; Dots per inch information is stored in the image.
-                             ,11: "ImageFlagsHasRealPixelSize"                      ; Pixel size is stored in the image.
-                             ,12: "ImageFlagsReadOnly"                              ; Pixel data is read-only.
-                             ,13: "ImageFlagsCaching" }                             ; Pixel data can be cached for faster access.                                                 
+        Static ImageFlags := {"ImageFlagsNone"              : 0x0       ; No format information.
+                             ,"ImageFlagsScalable"          : 0x1       ; Image can be scaled.
+                             ,"ImageFlagsHasAlpha"          : 0x2       ; Pixel data contains alpha values.
+                             ,"ImageFlagsHasTranslucent"    : 0x4       ; Pixel data has alpha values other than 0 and 255.
+                             ,"ImageFlagsPartiallyScalable" : 0x8       ; Pixel data is partially scalable with some limitations.
+                             ,"ImageFlagsColorSpaceRGB"     : 0x10      ; Image is stored using an RGB color space.
+                             ,"ImageFlagsColorSpaceCMYK"    : 0x20      ; Image is stored using a CMYK color space.
+                             ,"ImageFlagsColorSpaceGRAY"    : 0x40      ; Image is a grayscale image.
+                             ,"ImageFlagsColorSpaceYCBCR"   : 0x80      ; Image is stored using a YCBCR color space.
+                             ,"ImageFlagsColorSpaceYCCK"    : 0x100     ; Image is stored using a YCCK color space.
+                             ,"ImageFlagsHasRealDPI"        : 0x1000    ; Dots per inch information is stored in the image.
+                             ,"ImageFlagsHasRealPixelSize"  : 0x2000    ; Pixel size is stored in the image.
+                             ,"ImageFlagsReadOnly"          : 0x10000   ; Pixel data is read-only.
+                             ,"ImageFlagsCaching"           : 0x20000 } ; Pixel data can be cached for faster access.                                                 
         
         ; Specifies flags that are passed to the flags parameter of the GDIP.Bitmap.LockBits() method. 
-        Static ImageLockMode := {0: "ImageLockModeRead"                             ; Portion of the image is locked for reading.
-                                ,1: "ImageLockModeWrite"                            ; Portion of the image is locked for writing.
-                                ,2: "ImageLockModeUserInputBuf" }                   ; Buffer used for reading or writing pixel data is allocated by the user.
+        Static ImageLockMode := {"ImageLockModeRead"         : 1   ; Portion of the image is locked for reading.
+                                ,"ImageLockModeWrite"        : 2   ; Portion of the image is locked for writing.
+                                ,"ImageLockModeUserInputBuf" : 4 } ; Buffer used for reading or writing pixel data is allocated by the user.
         
         ; Indicates whether an image is a bitmap or a metafile.
-        Static ImageType := {0: "ImageTypeUnknown"                                  ; Image type is not known.
-                            ,1: "ImageTypeBitmap"                                   ; Bitmap image.
-                            ,2: "ImageTypeMetafile" }                               ; Metafile image.
+        Static ImageType := {"ImageTypeUnknown"  : 0   ; Image type is not known.
+                            ,"ImageTypeBitmap"   : 1   ; Bitmap image.
+                            ,"ImageTypeMetafile" : 2 } ; Metafile image.
         
         ; Specifies the algorithm that is used when images are scaled or rotated.
-        Static InterpolationMode := {0: "InterpolationModeInvalid"                  ; Used internally.
-                                    ,1: "InterpolationModeDefault"                  ; Default interpolation mode.
-                                    ,2: "InterpolationModeLowQuality"               ; Low-quality mode.
-                                    ,3: "InterpolationModeHighQuality"              ; High-quality mode.
-                                    ,4: "InterpolationModeBilinear"                 ; Bilinear interpolation. Don't use to shirnk past 50% of original size.
-                                    ,5: "InterpolationModeBicubic"                  ; Bicubic interpolation. Don't use to shirnk past 25% of original size.
-                                    ,6: "InterpolationModeNearestNeighbor"          ; nearest-neighbor interpolation.
-                                    ,7: "InterpolationModeHighQualityBilinear"      ; high-quality, bilinear interpolation.
-                                    ,8: "InterpolationModeHighQualityBicubic" }     ; high-quality, bicubic interpolation.
+        Static InterpolationMode := {"InterpolationModeInvalid"             : -1   ; Used internally.
+                                    ,"InterpolationModeDefault"             :  0   ; Default interpolation mode.
+                                    ,"InterpolationModeLowQuality"          :  1   ; Low-quality mode.
+                                    ,"InterpolationModeHighQuality"         :  2   ; High-quality mode.
+                                    ,"InterpolationModeBilinear"            :  3   ; Bilinear interpolation. Don't use to shirnk past 50% of original size.
+                                    ,"InterpolationModeBicubic"             :  4   ; Bicubic interpolation. Don't use to shirnk past 25% of original size.
+                                    ,"InterpolationModeNearestNeighbor"     :  5   ; nearest-neighbor interpolation.
+                                    ,"InterpolationModeHighQualityBilinear" :  6   ; high-quality, bilinear interpolation.
+                                    ,"InterpolationModeHighQualityBicubic"  :  7 } ; high-quality, bicubic interpolation.
         
         ; Specify the location of custom metadata in an image file.
-        Static ItemDataPosition := {0: "ItemDataPositionAfterHeader"                ; Custom metadata is stored after the file header. Valid for JPEG, PNG, and GIF.
-                                   ,1: "ItemDataPositionAfterPalette"               ; Custom metadata is stored after the palette. Valid for PNG.
-                                   ,2: "ItemDataPositionAfterBits" }                ; Custom metadata is stored after the pixel data. Valid for GIF and PNG.
+        Static ItemDataPosition := {"ItemDataPositionAfterHeader"  : 0x0   ; Custom metadata is stored after the file header. Valid for JPEG, PNG, and GIF.
+                                   ,"ItemDataPositionAfterPalette" : 0x1   ; Custom metadata is stored after the palette. Valid for PNG.
+                                   ,"ItemDataPositionAfterBits"    : 0x2 } ; Custom metadata is stored after the pixel data. Valid for GIF and PNG.
         
         ; Specifies the direction in which the change of color occurs for a linear gradient brush.
-        Static LinearGradientMode := {0: "LinearGradientModeHorizontal"             ; Color to change in a horizontal direction from the left of the display to the right of the display.
-                                     ,1: "LinearGradientModeVertical"               ; Color to change in a vertical direction from the top of the display to the bottom of the display.
-                                     ,2: "LinearGradientModeForwardDiagonal"        ; Color to change in a forward diagonal direction from the upper-left corner to the lower-right corner of the display.
-                                     ,3: "LinearGradientModeBackwardDiagonal" }     ; Color to change in a backward diagonal direction from the upper-right corner to the lower-left corner of the display.
+        Static LinearGradientMode := {"LinearGradientModeHorizontal"       : 0   ; Color to change in a horizontal direction from the left of the display to the right of the display.
+                                     ,"LinearGradientModeVertical"         : 1   ; Color to change in a vertical direction from the top of the display to the bottom of the display.
+                                     ,"LinearGradientModeForwardDiagonal"  : 2   ; Color to change in a forward diagonal direction from the upper-left corner to the lower-right corner of the display.
+                                     ,"LinearGradientModeBackwardDiagonal" : 3 } ; Color to change in a backward diagonal direction from the upper-right corner to the lower-left corner of the display.
         
         ; Specifies the type of graphic shape to use on the end of a line drawn with a Windows GDI+ pen.
-        Static LineCap := { 0: "LineCapFlat"                                        ; Line ends at the last point. The end is squared off.
-                          , 1: "LineCapSquare"                                      ; Square cap. The center of the square is the last point in the line.
-                          , 2: "LineCapRound"                                       ; Circular cap. The center of the circle is the last point in the line.
-                          , 3: "LineCapTriangle"                                    ; Triangular cap. The base of the triangle is the last point in the line.
-                          , 4: "LineCapNoAnchor"                                    ; Line ends are not anchored.
-                          , 5: "LineCapSquareAnchor"                                ; Line ends are anchored with a square.
-                          , 6: "LineCapRoundAnchor"                                 ; Line ends are anchored with a circle.
-                          , 7: "LineCapDiamondAnchor"                               ; Line ends are anchored with a diamond.
-                          , 8: "LineCapArrowAnchor"                                 ; Line ends are anchored with arrowheads.
-                          , 9: "LineCapCustom"                                      ; Line ends are made from a CustomLineCap.
-                          ,10: "LineCapAnchorMask" }                                ; Undefined.
+        Static LineCap := {"LineCapFlat"          : 0x0    ; Line ends at the last point. The end is squared off.
+                          ,"LineCapSquare"        : 0x1    ; Square cap. The center of the square is the last point in the line.
+                          ,"LineCapRound"         : 0x2    ; Circular cap. The center of the circle is the last point in the line.
+                          ,"LineCapTriangle"      : 0x3    ; Triangular cap. The base of the triangle is the last point in the line.
+                          ,"LineCapNoAnchor"      : 0x10   ; Line ends are not anchored.
+                          ,"LineCapSquareAnchor"  : 0x11   ; Line ends are anchored with a square.
+                          ,"LineCapRoundAnchor"   : 0x12   ; Line ends are anchored with a circle.
+                          ,"LineCapDiamondAnchor" : 0x13   ; Line ends are anchored with a diamond.
+                          ,"LineCapArrowAnchor"   : 0x14   ; Line ends are anchored with arrowheads.
+                          ,"LineCapCustom"        : 0xFF   ; Line ends are made from a CustomLineCap.
+                          ,"LineCapAnchorMask"    : 0xF0 } ; Undefined.
         
         ; Specifies how to join two lines that are drawn by the same pen and whose ends meet. 
-        Static LineJoin := {0: "LineJoinMiter"                                      ; Mitered join. This produces a sharp corner or a clipped corner, depending on whether the length of the miter exceeds the miter limit.
-                           ,1: "LineJoinBevel"                                      ; Beveled join. This produces a diagonal corner.
-                           ,2: "LineJoinRound"                                      ; Circular join. This produces a smooth, circular arc between the lines.
-                           ,3: "LineJoinMiterClipped" }                             ; Mitered join. This produces a sharp corner or a beveled corner, depending on whether the length of the miter exceeds the miter limit.
+        Static LineJoin := {"LineJoinMiter"        : 0   ; Mitered join. This produces a sharp corner or a clipped corner, depending on whether the length of the miter exceeds the miter limit.
+                           ,"LineJoinBevel"        : 1   ; Beveled join. This produces a diagonal corner.
+                           ,"LineJoinRound"        : 2   ; Circular join. This produces a smooth, circular arc between the lines.
+                           ,"LineJoinMiterClipped" : 3 } ; Mitered join. This produces a sharp corner or a beveled corner, depending on whether the length of the miter exceeds the miter limit.
         
         ; Specifies the order of multiplication when a new matrix is multiplied by an existing matrix.
-        Static MatrixOrder := {0: "MatrixOrderPrepend"                              ; The new matrix is on the left and the existing matrix is on the right.
-                              ,1: "MatrixOrderAppend" }                             ; The existing matrix is on the left and the new matrix is on the right.
+        Static MatrixOrder := {"MatrixOrderPrepend" : 0   ; The new matrix is on the left and the existing matrix is on the right.
+                              ,"MatrixOrderAppend"  : 1 } ; The existing matrix is on the left and the new matrix is on the right.
         
         ; Specifies the unit of measure for a metafile frame rectangle.
-        Static MetafileFrameUnit := {0: "MetafileFrameUnitPixel"                    ; Unit is 1 pixel.
-                                    ,1: "MetafileFrameUnitPoint"                    ; Unit is 1 pixel.
-                                    ,2: "MetafileFrameUnitInch"                     ; Unit is 1 pixel.
-                                    ,3: "MetafileFrameUnitDocument"                 ; Unit is 1/300 inch.
-                                    ,4: "MetafileFrameUnitMillimeter"               ; Unit is 1 pixel.
-                                    ,5: "MetafileFrameUnitGdi" }                    ; Unit is 0.01 millimeter.
+        Static MetafileFrameUnit := {"MetafileFrameUnitPixel"      : 2   ; Unit is 1 pixel.
+                                    ,"MetafileFrameUnitPoint"      : 3   ; Unit is 1 pixel.
+                                    ,"MetafileFrameUnitInch"       : 4   ; Unit is 1 pixel.
+                                    ,"MetafileFrameUnitDocument"   : 5   ; Unit is 1/300 inch.
+                                    ,"MetafileFrameUnitMillimeter" : 6   ; Unit is 1 pixel.
+                                    ,"MetafileFrameUnitGdi"        : 7 } ; Unit is 0.01 millimeter.
         
         ; Specifies types of metafiles.
-        Static MetafileType := {0: "MetafileTypeInvalid"                            ; metafile format that is not recognized in GDI+.
-                               ,1: "MetafileTypeWmf"                                ; WMF file. Such a file contains only GDI records.
-                               ,2: "MetafileTypeWmfPlaceable"                       ; WMF file that has a placeable metafile header in front of it.
-                               ,3: "MetafileTypeEmf"                                ; EMF file. Such a file contains only GDI records.
-                               ,4: "MetafileTypeEmfPlusOnly"                        ; EMF+ file. Such a file contains only GDI+ records and must be displayed by using GDI+.
-                               ,5: "MetafileTypeEmfPlusDual" }                      ; EMF+ Dual file. Such a file contains GDI+ records along with alternative GDI records and can be displayed by using either GDI or GDI+.
+        Static MetafileType := {"MetafileTypeInvalid"      : 0   ; metafile format that is not recognized in GDI+.
+                               ,"MetafileTypeWmf"          : 1   ; WMF file. Such a file contains only GDI records.
+                               ,"MetafileTypeWmfPlaceable" : 2   ; WMF file that has a placeable metafile header in front of it.
+                               ,"MetafileTypeEmf"          : 3   ; EMF file. Such a file contains only GDI records.
+                               ,"MetafileTypeEmfPlusOnly"  : 4   ; EMF+ file. Such a file contains only GDI+ records and must be displayed by using GDI+.
+                               ,"MetafileTypeEmfPlusDual"  : 5 } ; EMF+ Dual file. Such a file contains GDI+ records along with alternative GDI records and can be displayed by using either GDI or GDI+.
         
         ; Indicates the object type value of an EMF+ record.
-        Static ObjectType := { 0: "ObjectTypeInvalid"                               ; Is invalid.
-                             , 1: "ObjectTypeBrush"                                 ; Is a brush.
-                             , 2: "ObjectTypePen"                                   ; Is a pen.
-                             , 3: "ObjectTypePath"                                  ; Is a path.
-                             , 4: "ObjectTypeRegion"                                ; Is a region.
-                             , 5: "ObjectTypeImage"                                 ; Is an image.
-                             , 6: "ObjectTypeFont"                                  ; Is a font.
-                             , 7: "ObjectTypeStringFormat"                          ; Is a string format.
-                             , 8: "ObjectTypeImageAttributes"                       ; Is an image attribute.
-                             , 9: "ObjectTypeCustomLineCap"                         ; Is a custom line cap.
-                             ,10: "ObjectTypeGraphics"                              ; Is graphics.
-                             ,11: "ObjectTypeMax"                                   ; Maximum enumeration value. Currently, ObjectTypeGraphics.
-                             ,12: "ObjectTypeMin" }                                 ; Minimum enumeration value. Currently, ObjectTypeBrush.
+        Static ObjectType := {"ObjectTypeInvalid"         : 0    ; Is invalid.
+                             ,"ObjectTypeBrush"           : 1    ; Is a brush.
+                             ,"ObjectTypePen"             : 2    ; Is a pen.
+                             ,"ObjectTypePath"            : 3    ; Is a path.
+                             ,"ObjectTypeRegion"          : 4    ; Is a region.
+                             ,"ObjectTypeImage"           : 5    ; Is an image.
+                             ,"ObjectTypeFont"            : 6    ; Is a font.
+                             ,"ObjectTypeStringFormat"    : 7    ; Is a string format.
+                             ,"ObjectTypeImageAttributes" : 8    ; Is an image attribute.
+                             ,"ObjectTypeCustomLineCap"   : 9    ; Is a custom line cap.
+                             ,"ObjectTypeGraphics"        : 10   ; Is graphics.
+                             ,"ObjectTypeMax"             : 11   ; Maximum enumeration value. Currently, ObjectTypeGraphics.
+                             ,"ObjectTypeMin"             : 12 } ; Minimum enumeration value. Currently, ObjectTypeBrush.
         
         ; Indicates attributes of the color data in a palette.
-        Static PaletteFlags := {"PaletteFlagsHasAlpha"                              ; One or more of the palette entries contains alpha (transparency) information.
-                               ,"PaletteFlagsGrayScale"                             ; Palette contains only grayscale entries.
-                               ,"PaletteFlagsHalftone" }                            ; Palette is the Windows halftone palette.
+        Static PaletteFlags := {"PaletteFlagsHasAlpha"  : 0   ; One or more of the palette entries contains alpha (transparency) information.
+                               ,"PaletteFlagsGrayScale" : 1   ; Palette contains only grayscale entries.
+                               ,"PaletteFlagsHalftone"  : 2 } ; Palette is the Windows halftone palette.
         
         ; The members of the enumeration identify several standard color palette formats.
-        Static PaletteType := {0: "PaletteTypeCustom"                               ; Arbitrary custom palette provided by the caller.
-                              ,1: "PaletteTypeOptimal"                              ; Palette of colors that are optimal for a particular bitmap.
-                              ,2: "PaletteTypeFixedBW"                              ; Palette that has two colors.
-                              ,3: "PaletteTypeFixedHalftone8"                       ; Palette based on two intensities each (off or full) for the red, green, and blue channels.
-                              ,4: "PaletteTypeFixedHalftone27"                      ; Palette based on three intensities each for the red, green, and blue channels.
-                              ,5: "PaletteTypeFixedHalftone64"                      ; Palette based on four intensities each for the red, green, and blue channels.
-                              ,6: "PaletteTypeFixedHalftone125"                     ; Palette based on five intensities each for the red, green, and blue channels.
-                              ,7: "PaletteTypeFixedHalftone216"                     ; Palette based on six intensities each for the red, green, and blue channels.
-                              ,8: "PaletteTypeFixedHalftone252"                     ; Palette based on 6 intensities of red, 7 intensities of green, and 6 intensities of blue.
-                              ,9: "PaletteTypeFixedHalftone256" }                   ; Palette based on 8 intensities of red, 8 intensities of green, and 4 intensities of blue.
+        Static PaletteType := {"PaletteTypeCustom"           : 0   ; Arbitrary custom palette provided by the caller.
+                              ,"PaletteTypeOptimal"          : 1   ; Palette of colors that are optimal for a particular bitmap.
+                              ,"PaletteTypeFixedBW"          : 2   ; Palette that has two colors.
+                              ,"PaletteTypeFixedHalftone8"   : 3   ; Palette based on two intensities each (off or full) for the red, green, and blue channels.
+                              ,"PaletteTypeFixedHalftone27"  : 4   ; Palette based on three intensities each for the red, green, and blue channels.
+                              ,"PaletteTypeFixedHalftone64"  : 5   ; Palette based on four intensities each for the red, green, and blue channels.
+                              ,"PaletteTypeFixedHalftone125" : 6   ; Palette based on five intensities each for the red, green, and blue channels.
+                              ,"PaletteTypeFixedHalftone216" : 7   ; Palette based on six intensities each for the red, green, and blue channels.
+                              ,"PaletteTypeFixedHalftone252" : 8   ; Palette based on 6 intensities of red, 7 intensities of green, and 6 intensities of blue.
+                              ,"PaletteTypeFixedHalftone256" : 9 } ; Palette based on 8 intensities of red, 8 intensities of green, and 4 intensities of blue.
         
         ; Indicates point types and flags for the data points in a path.
-        Static PathPointType := {0: "PathPointTypeStart"                            ; The point is the start of a figure.
-                                ,1: "PathPointTypeLine"                             ; The point is one of the two endpoints of a line.
-                                ,2: "PathPointTypeBezier"                           ; The point is an endpoint or control point of a cubic Bézier spline.
-                                ,3: "PathPointTypePathTypeMask"                     ; Masks all bits except for the three low-order bits, which indicate the point type.
-                                ,4: "PathPointTypeDashMode"                         ; Not used.
-                                ,5: "PathPointTypePathMarker"                       ; The point is a marker.
-                                ,6: "PathPointTypeCloseSubpath"                     ; The point is the last point in a closed subpath (figure).
-                                ,7: "PathPointTypeBezier3" }                        ; The point is an endpoint or control point of a cubic Bézier spline.
+        Static PathPointType := {"PathPointTypeStart"        : 0   ; The point is the start of a figure.
+                                ,"PathPointTypeLine"         : 1   ; The point is one of the two endpoints of a line.
+                                ,"PathPointTypeBezier"       : 3   ; The point is an endpoint or control point of a cubic Bézier spline.
+                                ,"PathPointTypePathTypeMask" : 7   ; Masks all bits except for the three low-order bits, which indicate the point type.
+                                ,"PathPointTypeDashMode"     : 16  ; Not used.
+                                ,"PathPointTypePathMarker"   : 32  ; The point is a marker.
+                                ,"PathPointTypeCloseSubpath" : 128 ; The point is the last point in a closed subpath (figure).
+                                ,"PathPointTypeBezier3"      : 3 } ; The point is an endpoint or control point of a cubic Bézier spline.
         
         ; Specifies the alignment of a pen relative to the stroke that is being drawn.
-        Static PenAlignment := {"PenAlignmentCenter"                                ; Pen is aligned on the center of the line that is drawn.
-                               ,"PenAlignmentInset" }                               ; If drawing a polygon, the pen is aligned on the inside edge of the polygon.
+        Static PenAlignment := {"PenAlignmentCenter" : 0   ; Pen is aligned on the center of the line that is drawn.
+                               ,"PenAlignmentInset"  : 1 } ; If drawing a polygon, the pen is aligned on the inside edge of the polygon.
         
         ; Indicates the type of pattern, texture, or gradient that a pen draws.
-        Static PenType := {0: "PenTypeSolidColor"                                   ; Pen draws with a solid color.
-                          ,1: "PenTypeHatchFill"                                    ; Pen draws with a hatch pattern that is specified by a HatchBrush object.
-                          ,2: "PenTypeTextureFill"                                  ; Pen draws with a texture that is specified by a TextureBrush object.
-                          ,3: "PenTypePathGradient"                                 ; Pen draws with a color gradient that is specified by a PathGradientBrush object.
-                          ,4: "PenTypeLinearGradient"                               ; Pen draws with a color gradient that is specified by a LinearGradientBrush object.
-                          ,5: "PenTypeUnknown" }                                    ; Pen type is unknown.
+        Static PenType := {"PenTypeSolidColor"     :  0   ; Pen draws with a solid color.
+                          ,"PenTypeHatchFill"      :  1   ; Pen draws with a hatch pattern that is specified by a HatchBrush object.
+                          ,"PenTypeTextureFill"    :  2   ; Pen draws with a texture that is specified by a TextureBrush object.
+                          ,"PenTypePathGradient"   :  3   ; Pen draws with a color gradient that is specified by a PathGradientBrush object.
+                          ,"PenTypeLinearGradient" :  4   ; Pen draws with a color gradient that is specified by a LinearGradientBrush object.
+                          ,"PenTypeUnknown"        : -1 } ; Pen type is unknown.
         
         ; Specifies the pixel offset mode of a Graphics object.
-        Static PixelOffsetMode := {0: "PixelOffsetModeInvalid"                      ; Used internally.
-                                  ,1: "PixelOffsetModeDefault"                      ; Equivalent to PixelOffsetModeNone.
-                                  ,2: "PixelOffsetModeHighSpeed"                    ; Equivalent to PixelOffsetModeNone.
-                                  ,3: "PixelOffsetModeHighQuality"                  ; Equivalent to PixelOffsetModeHalf.
-                                  ,4: "PixelOffsetModeNone"                         ; Indicates that pixel centers have integer coordinates.
-                                  ,5: "PixelOffsetModeHalf" }                       ; Indicates that pixel centers have coordinates that are half way between integer values.
+        Static PixelOffsetMode := {"PixelOffsetModeInvalid"     : -1   ; Used internally.
+                                  ,"PixelOffsetModeDefault"     :  0   ; Equivalent to PixelOffsetModeNone.
+                                  ,"PixelOffsetModeHighSpeed"   :  1   ; Equivalent to PixelOffsetModeNone.
+                                  ,"PixelOffsetModeHighQuality" :  2   ; Equivalent to PixelOffsetModeHalf.
+                                  ,"PixelOffsetModeNone"        :  3   ; Indicates that pixel centers have integer coordinates.
+                                  ,"PixelOffsetModeHalf"        :  4 } ; Indicates that pixel centers have coordinates that are half way between integer values.
         
         ; Specifies the direction of an image's rotation and the axis used to flip the image.
-        Static RotateFlipType := { 0: "RotateNoneFlipNone"                          ; No rotation and no flipping.
-                                 , 1: "Rotate90FlipNone"                            ; 90-degree rotation without flipping.
-                                 , 2: "Rotate180FlipNone"                           ; 180-degree rotation without flipping.
-                                 , 3: "Rotate270FlipNone"                           ; 270-degree rotation without flipping.
-                                 , 4: "RotateNoneFlipX"                             ; No rotation and a horizontal flip.
-                                 , 5: "Rotate90FlipX"                               ; 90-degree rotation followed by a horizontal flip.
-                                 , 6: "Rotate180FlipX"                              ; 180-degree rotation followed by a horizontal flip.
-                                 , 7: "Rotate270FlipX"                              ; 270-degree rotation followed by a horizontal flip.
-                                 , 8: "RotateNoneFlipY"                             ; No rotation and a vertical flip.
-                                 , 9: "Rotate90FlipY"                               ; 90-degree rotation followed by a vertical flip.
-                                 ,10: "Rotate180FlipY"                              ; 180-degree rotation followed by a vertical flip.
-                                 ,11: "Rotate270FlipY"                              ; 270-degree rotation followed by a vertical flip.
-                                 ,12: "RotateNoneFlipXY"                            ; No rotation, a horizontal flip, and then a vertical flip.
-                                 ,13: "Rotate90FlipXY"                              ; 90-degree rotation followed by a horizontal flip and then a vertical flip.
-                                 ,14: "Rotate180FlipXY"                             ; 180-degree rotation followed by a horizontal flip and then a vertical flip.
-                                 ,15: "Rotate270FlipXY" }                           ; 270-degree rotation followed by a horizontal flip and then a vertical flip.
+        Static RotateFlipType := {"RotateNoneFlipNone" : 0   ; No rotation and no flipping.
+                                 ,"Rotate90FlipNone"   : 1   ; 90-degree rotation without flipping.
+                                 ,"Rotate180FlipNone"  : 2   ; 180-degree rotation without flipping.
+                                 ,"Rotate270FlipNone"  : 3   ; 270-degree rotation without flipping.
+                                 ,"RotateNoneFlipX"    : 4   ; No rotation and a horizontal flip.
+                                 ,"Rotate90FlipX"      : 5   ; 90-degree rotation followed by a horizontal flip.
+                                 ,"Rotate180FlipX"     : 6   ; 180-degree rotation followed by a horizontal flip.
+                                 ,"Rotate270FlipX"     : 7   ; 270-degree rotation followed by a horizontal flip.
+                                 ,"RotateNoneFlipY"    : 6   ; No rotation and a vertical flip.
+                                 ,"Rotate90FlipY"      : 7   ; 90-degree rotation followed by a vertical flip.
+                                 ,"Rotate180FlipY"     : 4   ; 180-degree rotation followed by a vertical flip.
+                                 ,"Rotate270FlipY"     : 5   ; 270-degree rotation followed by a vertical flip.
+                                 ,"RotateNoneFlipXY"   : 2   ; No rotation, a horizontal flip, and then a vertical flip.
+                                 ,"Rotate90FlipXY"     : 3   ; 90-degree rotation followed by a horizontal flip and then a vertical flip.
+                                 ,"Rotate180FlipXY"    : 0   ; 180-degree rotation followed by a horizontal flip and then a vertical flip.
+                                 ,"Rotate270FlipXY"    : 1 } ; 270-degree rotation followed by a horizontal flip and then a vertical flip.
         
         ; Specifies the type of smoothing (antialiasing) that is applied to lines and curves.
-        Static SmoothingMode := {0: "SmoothingModeInvalid"                          ; Reserved.
-                                ,1: "SmoothingModeDefault"                          ; Smoothing is not applied.
-                                ,2: "SmoothingModeHighSpeed"                        ; Smoothing is not applied.
-                                ,3: "SmoothingModeHighQuality"                      ; Smoothing is applied using an 8 X 4 box filter.
-                                ,4: "SmoothingModeNone"                             ; Smoothing is not applied.
-                                ,5: "SmoothingModeAntiAlias"                        ; Smoothing is applied using an 8 X 4 box filter.
-                                ,6: "SmoothingModeAntiAlias8x4"                     ; Smoothing is applied using an 8 X 4 box filter.
-                                ,7: "SmoothingModeAntiAlias8x8" }                   ; Smoothing is applied using an 8 X 8 box filter.
+        Static SmoothingMode := {"SmoothingModeInvalid"      : -1   ; Reserved.
+                                ,"SmoothingModeDefault"      :  0   ; Smoothing is not applied.
+                                ,"SmoothingModeHighSpeed"    :  1   ; Smoothing is not applied.
+                                ,"SmoothingModeHighQuality"  :  2   ; Smoothing is applied using an 8 X 4 box filter.
+                                ,"SmoothingModeNone"         :  3   ; Smoothing is not applied.
+                                ,"SmoothingModeAntiAlias"    :  4   ; Smoothing is applied using an 8 X 4 box filter.
+                                ,"SmoothingModeAntiAlias8x4" :  5   ; Smoothing is applied using an 8 X 4 box filter.
+                                ,"SmoothingModeAntiAlias8x8" :  6 } ; Smoothing is applied using an 8 X 8 box filter.
         
         ; Indicates the result of a Windows GDI+ method call.
-        Static Status := { 0: "Ok"                                                  ; Method call was successful.
-                         , 1: "GenericError"                                        ; There was an error on the method call which is not defined elsewhere in this enumeration.
-                         , 2: "InvalidParameter"                                    ; One of the arguments passed to the method was not valid.
-                         , 3: "OutOfMemory"                                         ; Operating system is out of memory and could not allocate memory to process the method call. For an explanation of how constructors use the OutOfMemory status, see the Remarks section at the end of this topic.
-                         , 4: "ObjectBusy"                                          ; One of the arguments specified in the API call is already in use in another thread.
-                         , 5: "InsufficientBuffer"                                  ; A buffer specified as an argument in the API call is not large enough to hold the data to be received.
-                         , 6: "NotImplemented"                                      ; The method is not implemented.
-                         , 7: "Win32Error"                                          ; The method generated a Win32 error.
-                         , 8: "WrongState"                                          ; The object is in an invalid state to satisfy the API call.
-                         , 9: "Aborted"                                             ; The method was aborted.
-                         ,10: "FileNotFound"                                        ; The specified image file or metafile cannot be found.
-                         ,11: "ValueOverflow"                                       ; The method performed an arithmetic operation that produced a numeric overflow.
-                         ,12: "AccessDenied"                                        ; A write operation is not allowed on the specified file.
-                         ,13: "UnknownImageFormat"                                  ; The specified image file format is not known.
-                         ,14: "FontFamilyNotFound"                                  ; The specified font family is incorrect or the font family is not installed and cannot be found.
-                         ,15: "FontStyleNotFound"                                   ; The specified style is not available for the specified font family.
-                         ,16: "NotTrueTypeFont"                                     ; The font retrieved from an HDC or LOGFONT is not a TrueType font and cannot be used with GDI+.
-                         ,17: "UnsupportedGdiplusVersion"                           ; The version of GDI+ that is installed on the system is incompatible with the version with which the application was compiled.
-                         ,18: "GdiplusNotInitialized"                               ; The GDI+API is not in an initialized state. (This should never happen with this AHK library as the object initialize GDIPlus for you.)
-                         ,19: "PropertyNotFound"                                    ; The specified property does not exist in the image.
-                         ,20: "PropertyNotSupported"                                ; The specified property is not supported by the format of the image and, therefore, cannot be set.
-                         ,21: "ProfileNotFound" }                                   ; The color profile required to save an image in CMYK format was not found.
+        Static Status := {"Ok"                        : 0    ; Method call was successful.
+                         ,"GenericError"              : 1    ; There was an error on the method call which is not defined elsewhere in this enumeration.
+                         ,"InvalidParameter"          : 2    ; One of the arguments passed to the method was not valid.
+                         ,"OutOfMemory"               : 3    ; Operating system is out of memory and could not allocate memory to process the method call. For an explanation of how constructors use the OutOfMemory status, see the Remarks section at the end of this topic.
+                         ,"ObjectBusy"                : 4    ; One of the arguments specified in the API call is already in use in another thread.
+                         ,"InsufficientBuffer"        : 5    ; A buffer specified as an argument in the API call is not large enough to hold the data to be received.
+                         ,"NotImplemented"            : 6    ; The method is not implemented.
+                         ,"Win32Error"                : 7    ; The method generated a Win32 error.
+                         ,"WrongState"                : 8    ; The object is in an invalid state to satisfy the API call.
+                         ,"Aborted"                   : 9    ; The method was aborted.
+                         ,"FileNotFound"              : 10   ; The specified image file or metafile cannot be found.
+                         ,"ValueOverflow"             : 11   ; The method performed an arithmetic operation that produced a numeric overflow.
+                         ,"AccessDenied"              : 12   ; A write operation is not allowed on the specified file.
+                         ,"UnknownImageFormat"        : 13   ; The specified image file format is not known.
+                         ,"FontFamilyNotFound"        : 14   ; The specified font family is incorrect or the font family is not installed and cannot be found.
+                         ,"FontStyleNotFound"         : 15   ; The specified style is not available for the specified font family.
+                         ,"NotTrueTypeFont"           : 16   ; The font retrieved from an HDC or LOGFONT is not a TrueType font and cannot be used with GDI+.
+                         ,"UnsupportedGdiplusVersion" : 17   ; The version of GDI+ that is installed on the system is incompatible with the version with which the application was compiled.
+                         ,"GdiplusNotInitialized"     : 18   ; The GDI+API is not in an initialized state. (This should never happen with this AHK library as the object initialize GDIPlus for you.)
+                         ,"PropertyNotFound"          : 19   ; The specified property does not exist in the image.
+                         ,"PropertyNotSupported"      : 20   ; The specified property is not supported by the format of the image and, therefore, cannot be set.
+                         ,"ProfileNotFound"           : 21 } ; The color profile required to save an image in CMYK format was not found.
         
         ; Specifies how a string is aligned in reference to the bounding rectangle.
-        Static StringAlignment := {0: "StringAlignmentNear"                         ; Alignment is towards the origin of the bounding rectangle.
-                                  ,1: "StringAlignmentCenter"                       ; Alignment is centered between origin and extent (width) of the formatting rectangle.
-                                  ,2: "StringAlignmentFar" }                        ; Alignment is to the far extent (right side) of the formatting rectangle.
+        Static StringAlignment := {"StringAlignmentNear"   : 0   ; Alignment is towards the origin of the bounding rectangle.
+                                  ,"StringAlignmentCenter" : 1   ; Alignment is centered between origin and extent (width) of the formatting rectangle.
+                                  ,"StringAlignmentFar"    : 2 } ; Alignment is to the far extent (right side) of the formatting rectangle.
         
         ; Specifies how to substitute digits in a string according to a user's locale or language.
-        Static StringDigitSubstitute := {0: "StringDigitSubstituteUser"             ; User-defined substitution scheme.
-                                        ,1: "StringDigitSubstituteNone"             ; Disable substitutions.
-                                        ,2: "StringDigitSubstituteNational"         ; Substitution digits that correspond with the official national language of the user's locale.
-                                        ,3: "StringDigitSubstituteTraditional" }    ; Substitution digits that correspond with the user's native script or language
+        Static StringDigitSubstitute := {"StringDigitSubstituteUser"        : 0   ; User-defined substitution scheme.
+                                        ,"StringDigitSubstituteNone"        : 1   ; Disable substitutions.
+                                        ,"StringDigitSubstituteNational"    : 2   ; Substitution digits that correspond with the official national language of the user's locale.
+                                        ,"StringDigitSubstituteTraditional" : 3 } ; Substitution digits that correspond with the user's native script or language
         
         ; Specifies text layout information (such as orientation and clipping) and display manipulations
-        Static StringFormatFlags := {0: "StringFormatFlagsDirectionRightToLeft"     ; reading order is right to left.
-                                    ,1: "StringFormatFlagsDirectionVertical"        ; individual lines of text are drawn vertically on the display device.
-                                    ,2: "StringFormatFlagsNoFitBlackBox"            ; 
-                                    ,3: "StringFormatFlagsDisplayFormatControl"     ; 
-                                    ,4: "StringFormatFlagsNoFontFallback"           ; 
-                                    ,5: "StringFormatFlagsMeasureTrailingSpaces"    ; 
-                                    ,6: "StringFormatFlagsNoWrap"                   ; 
-                                    ,7: "StringFormatFlagsLineLimit"                ; 
-                                    ,8: "StringFormatFlagsNoClip"                   ; 
-                                    ,9: "StringFormatFlagsBypassGDI" }              ; 
+        Static StringFormatFlags := {"StringFormatFlagsDirectionRightToLeft"  : 0x1      ; Reading order is right to left.
+                                    ,"StringFormatFlagsDirectionVertical"     : 0x2      ; Individual lines of text are drawn vertically on the display device.
+                                    ,"StringFormatFlagsNoFitBlackBox"         : 0x4      ; Parts of characters are allowed to overhang the string's layout rectangle.
+                                    ,"StringFormatFlagsDisplayFormatControl"  : 0x20     ; Unicode layout control characters are displayed with a representative character.
+                                    ,"StringFormatFlagsNoFontFallback"        : 0x400    ; Alternate font is used for characters that are not supported in the requested font.
+                                    ,"StringFormatFlagsMeasureTrailingSpaces" : 0x800    ; Space at the end of each line is included in a string measurement.
+                                    ,"StringFormatFlagsNoWrap"                : 0x1000   ; Wrapping of text to the next line is disabled.
+                                    ,"StringFormatFlagsLineLimit"             : 0x2000   ; Only entire lines are laid out in the layout rectangle.
+                                    ,"StringFormatFlagsNoClip"                : 0x4000   ; Only entire lines are laid out in the layout rectangle.
+                                    ,"StringFormatFlagsBypassGDI"             : 0x8000 } ; Undefined.
         
-        ; 
-        Static StringTrimming := {0: "StringTrimmingNone"                           ; 
-                                 ,1: "StringTrimmingCharacter"                      ; 
-                                 ,2: "StringTrimmingWord"                           ; 
-                                 ,3: "StringTrimmingEllipsisCharacter"              ; 
-                                 ,4: "StringTrimmingEllipsisWord"                   ; 
-                                 ,5: "StringTrimmingEllipsisPath" }                 ; 
+        ; Specifies how to trim characters from a string so that the string fits into a layout rectangle.
+        Static StringTrimming := {"StringTrimmingNone"              : 0   ; No trimming is done.
+                                 ,"StringTrimmingCharacter"         : 1   ; String is broken at the boundary of the last character that is inside the layout rectangle.
+                                 ,"StringTrimmingWord"              : 2   ; String is broken at the boundary of the last word that is inside the layout rectangle.
+                                 ,"StringTrimmingEllipsisCharacter" : 3   ; String is broken at the boundary of the last character that is inside the layout rectangle and an ellipsis (...) is inserted after the character.
+                                 ,"StringTrimmingEllipsisWord"      : 4   ; String is broken at the boundary of the last word that is inside the layout rectangle and an ellipsis (...) is inserted after the word.
+                                 ,"StringTrimmingEllipsisPath"      : 5 } ; Center is removed from the string and replaced by an ellipsis. 
         
-        ; 
-        Static TextRenderingHint := {0: "TextRenderingHintSystemDefault"            ; 
-                                    ,1: "TextRenderingHintSingleBitPerPixelGridFit" ; 
-                                    ,2: "TextRenderingHintSingleBitPerPixel"        ; 
-                                    ,3: "TextRenderingHintAntiAliasGridFit"         ; 
-                                    ,4: "TextRenderingHintAntiAlias"                ; 
-                                    ,5: "TextRenderingHintClearTypeGridFit" }       ; 
+        ; Specifies the process used to render text. This affects text quality.
+        Static TextRenderingHint := {"TextRenderingHintSystemDefault"            : 0   ; Character is drawn using the currently selected system font smoothing mode (also called a rendering hint).
+                                    ,"TextRenderingHintSingleBitPerPixelGridFit" : 1   ; Character is drawn using its glyph bitmap and hinting to improve character appearance on stems and curvature.
+                                    ,"TextRenderingHintSingleBitPerPixel"        : 2   ; Character is drawn using its glyph bitmap and no hinting. Better performance at cost of quality.
+                                    ,"TextRenderingHintAntiAliasGridFit"         : 3   ; Character is drawn using its antialiased glyph bitmap and hinting. Better quality at cost of performance.
+                                    ,"TextRenderingHintAntiAlias"                : 4   ; Character is drawn using its antialiased glyph bitmap and no hinting.
+                                    ,"TextRenderingHintClearTypeGridFit"         : 5 } ; Character is drawn using its glyph ClearType bitmap and hinting.
         
-        ; 
-        Static Unit := {0: "UnitWorld"                                              ; 
-                       ,1: "UnitDisplay"                                            ; 
-                       ,2: "UnitPixel"                                              ; 
-                       ,3: "UnitPoint"                                              ; 
-                       ,4: "UnitInch"                                               ; 
-                       ,5: "UnitDocument"                                           ; 
-                       ,6: "UnitMillimeter"                                         ; 
-                       ,7: "UnitAbsolute" }                                         ; 
+        ; Specifies the unit of measure for a given data type.
+        Static Unit := {"UnitWorld"      : 0   ; World coordinates, a nonphysical unit.
+                       ,"UnitDisplay"    : 1   ; Display specific units.
+                       ,"UnitPixel"      : 2   ; Unit is 1 pixel.
+                       ,"UnitPoint"      : 3   ; Unit is 1 point or 1/72 inch.
+                       ,"UnitInch"       : 4   ; Unit is 1 inch.
+                       ,"UnitDocument"   : 5   ; Unit is 1/300 inch.
+                       ,"UnitMillimeter" : 6   ; Unit is 1 millimeter.
+                       ,"UnitAbsolute"   : 7 } ; Unit is memetic and of type easter egg.
         
-        ; 
-        Static WarpMode := {0: "WarpModePerspective"                                ; 
-                           ,1: "WarpModeBilinear" }                                 ; 
+        ; Specifies warp modes that can be used to transform images.
+        Static WarpMode := {"WarpModePerspective" : 0   ; Perspective warp mode.
+                           ,"WarpModeBilinear"    : 1 } ; Bilinear warp mode.
         
-        ; 
-        Static WrapMode := {0: "WrapModeTile"                                       ; 
-                           ,1: "WrapModeTileFlipX"                                  ; 
-                           ,2: "WrapModeTileFlipY"                                  ; 
-                           ,3: "WrapModeTileFlipXY"                                 ; 
-                           ,4: "WrapModeClamp" }                                    ; 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        ; Identify's an image's main type
-        Static  ImageType   := {"ImageTypeUnknown"  : 0
-                               ,"ImageTypeBitmap"   : 1
-                               ,"ImageTypeMetafile" : 2 }
-        
-        ; GDIP status error codes
-        Static  Status      := {0   :"Ok"                           ; Method call was successful.
-                               ,1   :"GenericError"                 ; Error on method call that is not covered by anything else in this list.
-                               ,2   :"InvalidParameter"             ; One of the method arguments passed was not valid.
-                               ,3   :"OutOfMemory"                  ; Operating system is out of memory / could not allocate memory.
-                               ,4   :"ObjectBusy"                   ; One of the arguments specified in the API call is already in use.
-                               ,5   :"InsufficientBuffer"           ; A buffer passed in the API call is not large enough for the data.
-                               ,6   :"NotImplemented"               ; Method is not implemented.
-                               ,7   :"Win32Error"                   ; Method generated a Win32 error.
-                               ,8   :"WrongState"                   ; An object state is invalid for the API call.
-                               ,9   :"Aborted"                      ; Method was aborted.
-                               ,10  :"FileNotFound"                 ; Specified image file or metafile cannot be found.
-                               ,11  :"ValueOverflow"                ; An arithmetic operation produced a numeric overflow.
-                               ,12  :"AccessDenied"                 ; Writing is not allowed to the specified file.
-                               ,13  :"UnknownImageFormat"           ; Specified image file format is not known.
-                               ,14  :"FontFamilyNotFound"           ; Specified font family not found. Either not installed or spelled incorrectly.
-                               ,15  :"FontStyleNotFound"            ; Specified style not available for this font family.
-                               ,16  :"NotTrueTypeFont"              ; Font retrieved from HDC or LOGFONT is not TrueType and cannot be used.
-                               ,17  :"UnsupportedGdiplusVersion"    ; Installed GDI+ version not compatible with the application's compiled version.
-                               ,18  :"GdiplusNotInitialized"        ; GDI+ API not initialized.
-                               ,19  :"PropertyNotFound"             ; Specified property does not exist in the image.
-                               ,20  :"PropertyNotSupported"         ; Specified property not supported by image format and cannot be set.
-                               ,21  :"ProfileNotFound" }            ; Color profile required to save in CMYK image format was not found.
-        
-        Static  Unit        := {0   :"UnitWorld",
-                               ,1   :"UnitDisplay"
-                               ,2   :"UnitPixel"
-                               ,3   :"UnitPoint"
-                               ,4   :"UnitInch"
-                               ,5   :"UnitDocument"
-                               ,6   :"UnitMillimeter"
-                               ,7   :"UnitAbsolute"}
+        ; Specifies how repeated copies of an image are used to tile an area.
+        Static WrapMode := {"WrapModeTile"       : 0   ; Tiling without flipping.
+                           ,"WrapModeTileFlipX"  : 1   ; Tiles are flipped horizontally as you move from one tile to the next in a row.
+                           ,"WrapModeTileFlipY"  : 2   ; Tiles are flipped vertically as you move from one tile to the next in a column.
+                           ,"WrapModeTileFlipXY" : 3   ; Tiles are flipped horizontally as you move along a row and flipped vertically as you move along a column.
+                           ,"WrapModeClamp"      : 4 } ; No tiling takes place.
     }
     
     ;####################################################################################################################
@@ -4537,5 +4456,4 @@ GdipDrawImagePointsRect(graphicP, imoP, GDIPCONST GpPointF *points, INT count, R
 ; OTHER
 ; Draws a portion of an image after applying a specified effect.
 GdipDrawImageFX(graphicP, imoP, GpRectF *source, GpMatrix *xForm, CGpEffect *effect, GpImageAttributes *imageAttributes, GpUnit srcUnit)
-
 
