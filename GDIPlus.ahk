@@ -48,10 +48,17 @@
         Updated the Gui class and the layered window method
         Started working with the Graphics class
     20210809
-        
+        Finished Enumerations
+    20210810
+        Started working on graphics class and image class
+    20210811
+        Lots of reading the .h file of GDIPlus
+    20210812
+        Redid the Rect/RectF classes after finding an error.
+            Improved Rect/RectF Code
 */
 
-GDIP.__New()
+GDIP.Startup()
 
 Class GDIP
 {
@@ -99,16 +106,6 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     __New()
     {
-        ; A_PtrSize = size of pointer (bytes) depending on script bit type.
-        this.Ptr        := (A_PtrSize = 4) ? "UPtr"     ; Set pointer type. 32-bit uses UPtrs
-                        :  (A_PtrSize = 8) ? "Ptr"      ; There is no UPtr for 64-bit, only Ptr
-                        :                    "UInt"     ; Default to UInt
-        this.PtrA       := this.Ptr . "*"               ; Set pointer address type
-        OnExit(this._method("ExitGDIP"))                ; Ensure shutdown runs at script exit
-        estat           := this.Startup()               ; Run GDIP startup and get token
-        ;this.generate_colorName()                      ; Generate color object
-        ;add other generators here
-        Return estat
     }
     
     ExitGDIP()
@@ -126,26 +123,34 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Startup()
     {
-        If (this.gdip_token != "")
-            Return -1
+        ; A_PtrSize = size of pointer (bytes) depending on script bit type.
+        this.Ptr        := (A_PtrSize = 4) ? "UPtr"     ; Set pointer type. 32-bit uses UPtrs
+                        :  (A_PtrSize = 8) ? "Ptr"      ; There is no UPtr for 64-bit, only Ptr
+                        :                    "UInt"     ; Default to UInt
+        this.PtrA       := this.Ptr . "*"               ; Set pointer address type
+        OnExit(this._method("ExitGDIP"))                ; Ensure shutdown runs at script exit
         
-        DllCall("GetModuleHandle", "str", "gdiplus") ? ""   ; Check if GDIPlus is loaded
-            : DllCall("LoadLibrary", "str", "gdiplus")      ; 
+        ; Start up GDIPlus
+        If (this.gdip_token = "")
+            DllCall("GetModuleHandle", "str", "gdiplus")    ; Check if GDIPlus is loaded
+                ? "" : DllCall("LoadLibrary", "str", "gdiplus")
+            ,VarSetCapacity(token, A_PtrSize)
+            ,VarSetCapacity(gdip_si, (A_PtrSize = 8) ? 24 : 16, 0)
+            ,NumPut(1, gdip_si)
+            ,estat := DllCall("gdiplus\GdiplusStartup"
+                            , this.PtrA , token         ; Pointer to GDIP token
+                            , this.Ptr  , &gdip_si      ; Startup Input
+                            , this.Ptr  , 0)            ; Startup Output 0 = null
+            ,this.gdip_token := token
         
-        VarSetCapacity(token, A_PtrSize)
-        ,VarSetCapacity(gdip_si, (A_PtrSize = 8) ? 24 : 16, 0)
-        ,NumPut(1, gdip_si)
-        ,estat := DllCall("gdiplus\GdiplusStartup"
-                         ,this.PtrA , token         ; Pointer to GDIP token
-                         ,this.Ptr  , &gdip_si      ; Startup Input
-                         ,this.Ptr  , 0)            ; Startup Output 0 = null
-        
-        (estat > 0)
-            ? this.error_log(A_ThisFunc, "Startup has failed.", "Enum Status: " this.enum.status[estat])
+        (estat > 0)                                     ; Error checking
+            ? this.error_log(A_ThisFunc, "Startup has failed.", "Estat Error: " estat , {estat:estat, })
             : ""
         
-        this.gdip_token := token
-        
+        GDIP.TypeDef._Create()                          ; Create typedefs
+        GDIP.DEFINE._Create()                           ; Create defined values
+        GDIP.generate_colorName()                       ; Generate color object
+        ;add other generators here
         Return estat
     }
     
@@ -158,13 +163,10 @@ Class GDIP
     Shutdown()
     {
         DllCall("gdiplus\GdiplusShutdown", "UInt", this.gdip_token)
-        Return
     }
-
-    
     
     ;####################################################################################################################
-    ;  Regular Class Methods                                                                                            |
+    ;  Custom AHK Class Methods                                                                                            |
     ;####################################################################################################################
     ; Quick boundfuncs
     _method(method_name, params := "")
@@ -257,18 +259,34 @@ Class GDIP
         Return "err"
     }
     
-    is_supported_file_type(type)
+    ;####################################################################################################################
+    ;  TYPEDEF CLASS                                                                                                    |
+    ;####################################################################################################################
+    ; Responsible for tracking all the different var types there are in GDIPlus
+    Class TypeDef
     {
-        Static  file_types:= {"BMP"   : 1
-                             ,"ICON"  : 1
-                             ,"GIF"   : 1
-                             ,"JPEG"  : 1
-                             ,"Exif"  : 1
-                             ,"PNG"   : 1
-                             ,"TIFF"  : 1
-                             ,"WMF"   : 1
-                             ,"EMF"   : 1 }
-        Return (file_types[type] ? 1 : 0)
+        _Create()
+        {
+            this.GraphicsState     := "UInt"
+            this.GraphicsContainer := "UInt"
+            this.REAL              := "Float"
+            
+            Return
+        }
+    }
+    
+    ;####################################################################################################################
+    ;  DEFINED CLASS                                                                                                    |
+    ;####################################################################################################################
+    ; Responsible for tracking all the different var types there are in GDIPlus
+    Class DEFINE
+    {
+        _Create()
+        {
+            this.GDIP_EMFPLUS_RECORD_BASE   := 0x4000
+            this.GDIP_WMF_RECORD_BASE       := 0x10000
+            Return
+        }
     }
     
     ;####################################################################################################################
@@ -687,12 +705,29 @@ Class GDIP
             Return gp
         }
         
+        ; Description       Record any non-OK status and return status
+        SetStatus(status)
+        {
+            Return (status = "Ok")
+                ? status
+                : (this.lastResult = status)
+        }
+        
         ; ## DESTRUCTOR ##
         __Delete()
         {
             DllCall("GdipDeleteGraphics", this.Ptr, this.nativeGraphics)
         }
         
+        ; ## METHODS ##
+        
+        ; Flush
+        Flush(intention=0)
+        {
+            DllCall("gdiplus\GdipFlush"
+                   , this.Ptr   , this.nativeGraphics
+                   , "Uint"     , intention)
+        }
         
         ; Adds a text comment to an existing metafile
         ; text      The text to add
@@ -1545,11 +1580,14 @@ Class GDIP
         
         ;~ The Graphics::GetHalftonePalette method gets a Windows halftone palette.
         
-        ;~ GetHDC()
-        ;~ {
-            ;~ DllCall(""
-                   ;~ , type      , value)
-        ;~ }
+        GetHDC()
+        {
+            VarSetCapacity(HDC, A_PtrSize, 0)
+            last SetStatus(DllExports::GdipGetDC(nativeGraphics, &hdc));
+            DllCall(""
+                   , type      , value)
+            return HDC
+        }
         
         ;~ The Graphics::GetHDC method gets a handle to the device context associated with this Graphics object.
         
@@ -2156,6 +2194,12 @@ Class GDIP
                                ,"CurveChannelGreen" : 2   ; Specifies that the color adjustment applies only to the green channel.
                                ,"CurveChannelBlue"  : 3 } ; Specifies that the color adjustment applies only to the blue channel.
         
+        ; 
+        Static CustomLineCapType := {"CustomLineCapTypeDefault"         : 0   ; 
+                                    ,"CustomLineCapTypeAdjustableArrow" : 1 } ;
+        };
+        
+        
         ; Specifies the type of graphic shape to use on both ends of each dash in a dashed line.
         Static DashCap := {"DashCapFlat"     : 0   ; Square cap that squares off both ends of each dash.
                           ,"DashCapRound"    : 2   ; Circular cap that rounds off both ends of each dash.
@@ -2188,7 +2232,7 @@ Class GDIP
                                       ,"DriverStringOptionsRealizedAdvance" : 4   ; Glyph positions are calculated from the position of the first glyph. 
                                       ,"DriverStringOptionsLimitSubpixel"   : 8 } ; Less memory should be used for cache of antialiased glyphs.
         
-        ; 
+        ; Identifies metafile record types used in Windows Metafile Format (WMF), Enhanced Metafile (EMF), and EMF+ files. 
         Static EmfPlusRecordType := {"WmfRecordTypeSetBkColor"                  : (0x201|0x4000) ; TBD
                                     ,"WmfRecordTypeSetBkMode"                   : (0x102|0x4000) ; TBD
                                     ,"WmfRecordTypeSetMapMode"                  : (0x103|0x4000) ; TBD
@@ -2268,198 +2312,203 @@ Class GDIP
                                     ,"WmfRecordTypeCreateBitmapIndirect"        : (0x2FD|0x4000) ; TBD
                                     ,"WmfRecordTypeCreateBitmap"                : (0x6FE|0x4000) ; TBD
                                     ,"WmfRecordTypeCreateRegion"                : (0x6FF|0x4000) ; TBD
-                                    ,"EmfRecordTypeHeader"                      : 1        ; TBD
-                                    ,"EmfRecordTypePolyBezier"                  : 2        ; TBD
-                                    ,"EmfRecordTypePolygon"                     : 3        ; TBD
-                                    ,"EmfRecordTypePolyline"                    : 4        ; TBD
-                                    ,"EmfRecordTypePolyBezierTo"                : 5        ; TBD
-                                    ,"EmfRecordTypePolyLineTo"                  : 6        ; TBD
-                                    ,"EmfRecordTypePolyPolyline"                : 7        ; TBD
-                                    ,"EmfRecordTypePolyPolygon"                 : 8        ; TBD
-                                    ,"EmfRecordTypeSetWindowExtEx"              : 9        ; TBD
-                                    ,"EmfRecordTypeSetWindowOrgEx"              : 10       ; TBD
-                                    ,"EmfRecordTypeSetViewportExtEx"            : 11       ; TBD
-                                    ,"EmfRecordTypeSetViewportOrgEx"            : 12       ; TBD
-                                    ,"EmfRecordTypeSetBrushOrgEx"               : 13       ; TBD
-                                    ,"EmfRecordTypeEOF"                         : 14       ; TBD
-                                    ,"EmfRecordTypeSetPixelV"                   : 15       ; TBD
-                                    ,"EmfRecordTypeSetMapperFlags"              : 16       ; TBD
-                                    ,"EmfRecordTypeSetMapMode"                  : 17       ; TBD
-                                    ,"EmfRecordTypeSetBkMode"                   : 18       ; TBD
-                                    ,"EmfRecordTypeSetPolyFillMode"             : 19       ; TBD
-                                    ,"EmfRecordTypeSetROP2"                     : 20       ; TBD
-                                    ,"EmfRecordTypeSetStretchBltMode"           : 21       ; TBD
-                                    ,"EmfRecordTypeSetTextAlign"                : 22       ; TBD
-                                    ,"EmfRecordTypeSetColorAdjustment"          : 23       ; TBD
-                                    ,"EmfRecordTypeSetTextColor"                : 24       ; TBD
-                                    ,"EmfRecordTypeSetBkColor"                  : 25       ; TBD
-                                    ,"EmfRecordTypeOffsetClipRgn"               : 26       ; TBD
-                                    ,"EmfRecordTypeMoveToEx"                    : 27       ; TBD
-                                    ,"EmfRecordTypeSetMetaRgn"                  : 28       ; TBD
-                                    ,"EmfRecordTypeExcludeClipRect"             : 29       ; TBD
-                                    ,"EmfRecordTypeIntersectClipRect"           : 30       ; TBD
-                                    ,"EmfRecordTypeScaleViewportExtEx"          : 31       ; TBD
-                                    ,"EmfRecordTypeScaleWindowExtEx"            : 32       ; TBD
-                                    ,"EmfRecordTypeSaveDC"                      : 33       ; TBD
-                                    ,"EmfRecordTypeRestoreDC"                   : 34       ; TBD
-                                    ,"EmfRecordTypeSetWorldTransform"           : 35       ; TBD
-                                    ,"EmfRecordTypeModifyWorldTransform"        : 36       ; TBD
-                                    ,"EmfRecordTypeSelectObject"                : 37       ; TBD
-                                    ,"EmfRecordTypeCreatePen"                   : 38       ; TBD
-                                    ,"EmfRecordTypeCreateBrushIndirect"         : 39       ; TBD
-                                    ,"EmfRecordTypeDeleteObject"                : 40       ; TBD
-                                    ,"EmfRecordTypeAngleArc"                    : 41       ; TBD
-                                    ,"EmfRecordTypeEllipse"                     : 42       ; TBD
-                                    ,"EmfRecordTypeRectangle"                   : 43       ; TBD
-                                    ,"EmfRecordTypeRoundRect"                   : 44       ; TBD
-                                    ,"EmfRecordTypeArc"                         : 45       ; TBD
-                                    ,"EmfRecordTypeChord"                       : 46       ; TBD
-                                    ,"EmfRecordTypePie"                         : 47       ; TBD
-                                    ,"EmfRecordTypeSelectPalette"               : 48       ; TBD
-                                    ,"EmfRecordTypeCreatePalette"               : 49       ; TBD
-                                    ,"EmfRecordTypeSetPaletteEntries"           : 50       ; TBD
-                                    ,"EmfRecordTypeResizePalette"               : 51       ; TBD
-                                    ,"EmfRecordTypeRealizePalette"              : 52       ; TBD
-                                    ,"EmfRecordTypeExtFloodFill"                : 53       ; TBD
-                                    ,"EmfRecordTypeLineTo"                      : 54       ; TBD
-                                    ,"EmfRecordTypeArcTo"                       : 55       ; TBD
-                                    ,"EmfRecordTypePolyDraw"                    : 56       ; TBD
-                                    ,"EmfRecordTypeSetArcDirection"             : 57       ; TBD
-                                    ,"EmfRecordTypeSetMiterLimit"               : 58       ; TBD
-                                    ,"EmfRecordTypeBeginPath"                   : 59       ; TBD
-                                    ,"EmfRecordTypeEndPath"                     : 60       ; TBD
-                                    ,"EmfRecordTypeCloseFigure"                 : 61       ; TBD
-                                    ,"EmfRecordTypeFillPath"                    : 62       ; TBD
-                                    ,"EmfRecordTypeStrokeAndFillPath"           : 63       ; TBD
-                                    ,"EmfRecordTypeStrokePath"                  : 64       ; TBD
-                                    ,"EmfRecordTypeFlattenPath"                 : 65       ; TBD
-                                    ,"EmfRecordTypeWidenPath"                   : 66       ; TBD
-                                    ,"EmfRecordTypeSelectClipPath"              : 67       ; TBD
-                                    ,"EmfRecordTypeAbortPath"                   : 68       ; TBD
-                                    ,"EmfRecordTypeReserved_069"                : 69       ; TBD
-                                    ,"EmfRecordTypeGdiComment"                  : 70       ; TBD
-                                    ,"EmfRecordTypeFillRgn"                     : 71       ; TBD
-                                    ,"EmfRecordTypeFrameRgn"                    : 72       ; TBD
-                                    ,"EmfRecordTypeInvertRgn"                   : 73       ; TBD
-                                    ,"EmfRecordTypePaintRgn"                    : 74       ; TBD
-                                    ,"EmfRecordTypeExtSelectClipRgn"            : 75       ; TBD
-                                    ,"EmfRecordTypeBitBlt"                      : 76       ; TBD
-                                    ,"EmfRecordTypeStretchBlt"                  : 77       ; TBD
-                                    ,"EmfRecordTypeMaskBlt"                     : 78       ; TBD
-                                    ,"EmfRecordTypePlgBlt"                      : 79       ; TBD
-                                    ,"EmfRecordTypeSetDIBitsToDevice"           : 80       ; TBD
-                                    ,"EmfRecordTypeStretchDIBits"               : 81       ; TBD
-                                    ,"EmfRecordTypeExtCreateFontIndirect"       : 82       ; TBD
-                                    ,"EmfRecordTypeExtTextOutA"                 : 83       ; TBD
-                                    ,"EmfRecordTypeExtTextOutW"                 : 84       ; TBD
-                                    ,"EmfRecordTypePolyBezier16"                : 85       ; TBD
-                                    ,"EmfRecordTypePolygon16"                   : 86       ; TBD
-                                    ,"EmfRecordTypePolyline16"                  : 87       ; TBD
-                                    ,"EmfRecordTypePolyBezierTo16"              : 88       ; TBD
-                                    ,"EmfRecordTypePolylineTo16"                : 89       ; TBD
-                                    ,"EmfRecordTypePolyPolyline16"              : 90       ; TBD
-                                    ,"EmfRecordTypePolyPolygon16"               : 91       ; TBD
-                                    ,"EmfRecordTypePolyDraw16"                  : 92       ; TBD
-                                    ,"EmfRecordTypeCreateMonoBrush"             : 93       ; TBD
-                                    ,"EmfRecordTypeCreateDIBPatternBrushPt"     : 94       ; TBD
-                                    ,"EmfRecordTypeExtCreatePen"                : 95       ; TBD
-                                    ,"EmfRecordTypePolyTextOutA"                : 96       ; TBD
-                                    ,"EmfRecordTypePolyTextOutW"                : 97       ; TBD
-                                    ,"EmfRecordTypeSetICMMode"                  : 98       ; TBD
-                                    ,"EmfRecordTypeCreateColorSpace"            : 99       ; TBD
-                                    ,"EmfRecordTypeSetColorSpace"               : 100      ; TBD
-                                    ,"EmfRecordTypeDeleteColorSpace"            : 101      ; TBD
-                                    ,"EmfRecordTypeGLSRecord"                   : 102      ; TBD
-                                    ,"EmfRecordTypeGLSBoundedRecord"            : 103      ; TBD
-                                    ,"EmfRecordTypePixelFormat"                 : 104      ; TBD
-                                    ,"EmfRecordTypeDrawEscape"                  : 105      ; TBD
-                                    ,"EmfRecordTypeExtEscape"                   : 106      ; TBD
-                                    ,"EmfRecordTypeStartDoc"                    : 107      ; TBD
-                                    ,"EmfRecordTypeSmallTextOut"                : 108      ; TBD
-                                    ,"EmfRecordTypeForceUFIMapping"             : 109      ; TBD
-                                    ,"EmfRecordTypeNamedEscape"                 : 110      ; TBD
-                                    ,"EmfRecordTypeColorCorrectPalette"         : 111      ; TBD
-                                    ,"EmfRecordTypeSetICMProfileA"              : 112      ; TBD
-                                    ,"EmfRecordTypeSetICMProfileW"              : 113      ; TBD
-                                    ,"EmfRecordTypeAlphaBlend"                  : 114      ; TBD
-                                    ,"EmfRecordTypeSetLayout"                   : 115      ; TBD
-                                    ,"EmfRecordTypeTransparentBlt"              : 116      ; TBD
-                                    ,"EmfRecordTypeReserved_117"                : 117      ; TBD
-                                    ,"EmfRecordTypeGradientFill"                : 118      ; TBD
-                                    ,"EmfRecordTypeSetLinkedUFIs"               : 119      ; TBD
-                                    ,"EmfRecordTypeSetTextJustification"        : 120      ; TBD
-                                    ,"EmfRecordTypeColorMatchToTargetW"         : 121      ; TBD
-                                    ,"EmfRecordTypeCreateColorSpaceW"           : 122      ; TBD
-                                    ,"EmfRecordTypeMax"                         : 122      ; TBD
-                                    ,"EmfRecordTypeMin"                         : 1        ; TBD
-                                    ,"EmfPlusRecordTypeInvalid"                 : 0x4000   ; TBD
-                                    ,"EmfPlusRecordTypeHeader"                  : 0x4001   ; Identifies a record that is the EMF+ header.
-                                    ,"EmfPlusRecordTypeEndOfFile"               : 0x4002   ; Identifies a record that marks the last EMF+ record of a metafile.
-                                    ,"EmfPlusRecordTypeComment"                 : 0x4003   ; GDIP.Graphics.AddMetafileComment()
-                                    ,"EmfPlusRecordTypeGetDC"                   : 0x4004   ; GDIP.Graphics.GetHDC()
-                                    ,"EmfPlusRecordTypeMultiFormatStart"        : 0x4005   ; Identifies the start of a multiple-format block.
-                                    ,"EmfPlusRecordTypeMultiFormatSection"      : 0x4006   ; Identifies a section in a multiple-format block.
-                                    ,"EmfPlusRecordTypeMultiFormatEnd"          : 0x4007   ; Identifies the end of a multiple-format block.
-                                    ,"EmfPlusRecordTypeObject"                  : 0x4008   ; TBD
-                                    ,"EmfPlusRecordTypeClear"                   : 0x4009   ; GDIP.Graphics.Clear()
-                                    ,"EmfPlusRecordTypeFillRects"               : 0x4000   ; FillRectangles Methods
-                                    ,"EmfPlusRecordTypeDrawRects"               : 0x400A   ; DrawRectangles Methods
-                                    ,"EmfPlusRecordTypeFillPolygon"             : 0x400B   ; FillPolygon Methods
-                                    ,"EmfPlusRecordTypeDrawLines"               : 0x400C   ; DrawLines Methods
-                                    ,"EmfPlusRecordTypeFillEllipse"             : 0x400D   ; FillEllipse Methods
-                                    ,"EmfPlusRecordTypeDrawEllipse"             : 0x400E   ; DrawEllipse Methods
-                                    ,"EmfPlusRecordTypeFillPie"                 : 0x400F   ; FillPie Methods
-                                    ,"EmfPlusRecordTypeDrawPie"                 : 0x4010   ; DrawPie Methods
-                                    ,"EmfPlusRecordTypeDrawArc"                 : 0x4011   ; DrawArc Methods
-                                    ,"EmfPlusRecordTypeFillRegion"              : 0x4012   ; GDIP.Graphics.()
-                                    ,"EmfPlusRecordTypeFillPath"                : 0x4013   ; GDIP.Graphics.()
-                                    ,"EmfPlusRecordTypeDrawPath"                : 0x4014   ; GDIP.Graphics.()
-                                    ,"EmfPlusRecordTypeFillClosedCurve"         : 0x4015   ; FillClosedCurve Methods
-                                    ,"EmfPlusRecordTypeDrawClosedCurve"         : 0x4016   ; DrawClosedCurve Methods
-                                    ,"EmfPlusRecordTypeDrawCurve"               : 0x4017   ; DrawCurve Methods
-                                    ,"EmfPlusRecordTypeDrawBeziers"             : 0x4018   ; DrawBeziers Methods
-                                    ,"EmfPlusRecordTypeDrawImage"               : 0x4019   ; DrawImage Methods
-                                    ,"EmfPlusRecordTypeDrawImagePoints"         : 0x4010   ; DrawImage Methods (destination point arrays)
-                                    ,"EmfPlusRecordTypeDrawString"              : 0x401A   ; DrawString Methods
-                                    ,"EmfPlusRecordTypeSetRenderingOrigin"      : 0x401B   ; GDIP.Graphics.SetRenderingOrigin()
-                                    ,"EmfPlusRecordTypeSetAntiAliasMode"        : 0x401C   ; GDIP.Graphics.SetSmoothingMode()
-                                    ,"EmfPlusRecordTypeSetTextRenderingHint"    : 0x401D   ; GDIP.Graphics.SetTextRenderingHint()
-                                    ,"EmfPlusRecordTypeSetTextContrast"         : 0x401E   ; GDIP.Graphics.SetTextContrast()
-                                    ,"EmfPlusRecordTypeSetInterpolationMode"    : 0x401F   ; GDIP.Graphics.SetInterpolationMode()
-                                    ,"EmfPlusRecordTypeSetPixelOffsetMode"      : 0x4020   ; GDIP.Graphics.SetPixelOffsetMode()
-                                    ,"EmfPlusRecordTypeSetCompositingMode"      : 0x4021   ; GDIP.Graphics.SetCompositingMode()
-                                    ,"EmfPlusRecordTypeSetCompositingQuality"   : 0x4022   ; GDIP.Graphics.SetCompositingQuality()
-                                    ,"EmfPlusRecordTypeSave"                    : 0x4023   ; GDIP.Graphics.Save()
-                                    ,"EmfPlusRecordTypeRestore"                 : 0x4024   ; GDIP.Graphics.Restore()
-                                    ,"EmfPlusRecordTypeBeginContainer"          : 0x4025   ; GDIP.Graphics.BeginContainer()
-                                    ,"EmfPlusRecordTypeBeginContainerNoParams"  : 0x4026   ; GDIP.Graphics.BeginContainer()
-                                    ,"EmfPlusRecordTypeEndContainer"            : 0x4027   ; GDIP.Graphics.EndContainer()
-                                    ,"EmfPlusRecordTypeSetWorldTransform"       : 0x4028   ; GDIP.Graphics.SetTransform()
-                                    ,"EmfPlusRecordTypeResetWorldTransform"     : 0x4029   ; GDIP.Graphics.ResetTransform()
-                                    ,"EmfPlusRecordTypeMultiplyWorldTransform"  : 0x4020   ; GDIP.Graphics.MultiplyTransform()
-                                    ,"EmfPlusRecordTypeTranslateWorldTransform" : 0x402A   ; GDIP.Graphics.TranslateTransform()
-                                    ,"EmfPlusRecordTypeScaleWorldTransform"     : 0x402B   ; GDIP.Graphics.ScaleTransform()
-                                    ,"EmfPlusRecordTypeRotateWorldTransform"    : 0x402C   ; GDIP.Graphics.RotateTransform()
-                                    ,"EmfPlusRecordTypeSetPageTransform"        : 0x402D   ; GDIP.Graphics.SetPageScale() and GDIP.Graphics.SetPageUnit()
-                                    ,"EmfPlusRecordTypeResetClip"               : 0x402E   ; GDIP.Graphics.ResetClip()
-                                    ,"EmfPlusRecordTypeSetClipRect"             : 0x402F   ; GDIP.Graphics.SetClip()
-                                    ,"EmfPlusRecordTypeSetClipPath"             : 0x4030   ; GDIP.Graphics.SetClip()
-                                    ,"EmfPlusRecordTypeSetClipRegion"           : 0x4031   ; GDIP.Graphics.SetClip()
-                                    ,"EmfPlusRecordTypeOffsetClip"              : 0x4032   ; TranslateClip Methods
-                                    ,"EmfPlusRecordTypeDrawDriverString"        : 0x4033   ; GDIP.Graphics.DrawDriverString()
-                                    ,"EmfPlusRecordTypeStrokeFillPath"          : 0x4034   ; TBD
-                                    ,"EmfPlusRecordTypeSerializableObject"      : 0x4035   ; TBD
-                                    ,"EmfPlusRecordTypeSetTSGraphics"           : 0x4036   ; TBD
-                                    ,"EmfPlusRecordTypeSetTSClip"               : 0x4037   ; TBD
-                                    ,"EmfPlusRecordTotal"                       : 0x4038   ; TBD
-                                    ,"EmfPlusRecordTypeMax"                     : -1       ; TBD
-                                    ,"EmfPlusRecordTypeMin"                     : 0x4001 } ; TBD
+                                    ,"EmfRecordTypeHeader"                      : 1       ; TBD
+                                    ,"EmfRecordTypePolyBezier"                  : 2       ; TBD
+                                    ,"EmfRecordTypePolygon"                     : 3       ; TBD
+                                    ,"EmfRecordTypePolyline"                    : 4       ; TBD
+                                    ,"EmfRecordTypePolyBezierTo"                : 5       ; TBD
+                                    ,"EmfRecordTypePolyLineTo"                  : 6       ; TBD
+                                    ,"EmfRecordTypePolyPolyline"                : 7       ; TBD
+                                    ,"EmfRecordTypePolyPolygon"                 : 8       ; TBD
+                                    ,"EmfRecordTypeSetWindowExtEx"              : 9       ; TBD
+                                    ,"EmfRecordTypeSetWindowOrgEx"              : 10      ; TBD
+                                    ,"EmfRecordTypeSetViewportExtEx"            : 11      ; TBD
+                                    ,"EmfRecordTypeSetViewportOrgEx"            : 12      ; TBD
+                                    ,"EmfRecordTypeSetBrushOrgEx"               : 13      ; TBD
+                                    ,"EmfRecordTypeEOF"                         : 14      ; TBD
+                                    ,"EmfRecordTypeSetPixelV"                   : 15      ; TBD
+                                    ,"EmfRecordTypeSetMapperFlags"              : 16      ; TBD
+                                    ,"EmfRecordTypeSetMapMode"                  : 17      ; TBD
+                                    ,"EmfRecordTypeSetBkMode"                   : 18      ; TBD
+                                    ,"EmfRecordTypeSetPolyFillMode"             : 19      ; TBD
+                                    ,"EmfRecordTypeSetROP2"                     : 20      ; TBD
+                                    ,"EmfRecordTypeSetStretchBltMode"           : 21      ; TBD
+                                    ,"EmfRecordTypeSetTextAlign"                : 22      ; TBD
+                                    ,"EmfRecordTypeSetColorAdjustment"          : 23      ; TBD
+                                    ,"EmfRecordTypeSetTextColor"                : 24      ; TBD
+                                    ,"EmfRecordTypeSetBkColor"                  : 25      ; TBD
+                                    ,"EmfRecordTypeOffsetClipRgn"               : 26      ; TBD
+                                    ,"EmfRecordTypeMoveToEx"                    : 27      ; TBD
+                                    ,"EmfRecordTypeSetMetaRgn"                  : 28      ; TBD
+                                    ,"EmfRecordTypeExcludeClipRect"             : 29      ; TBD
+                                    ,"EmfRecordTypeIntersectClipRect"           : 30      ; TBD
+                                    ,"EmfRecordTypeScaleViewportExtEx"          : 31      ; TBD
+                                    ,"EmfRecordTypeScaleWindowExtEx"            : 32      ; TBD
+                                    ,"EmfRecordTypeSaveDC"                      : 33      ; TBD
+                                    ,"EmfRecordTypeRestoreDC"                   : 34      ; TBD
+                                    ,"EmfRecordTypeSetWorldTransform"           : 35      ; TBD
+                                    ,"EmfRecordTypeModifyWorldTransform"        : 36      ; TBD
+                                    ,"EmfRecordTypeSelectObject"                : 37      ; TBD
+                                    ,"EmfRecordTypeCreatePen"                   : 38      ; TBD
+                                    ,"EmfRecordTypeCreateBrushIndirect"         : 39      ; TBD
+                                    ,"EmfRecordTypeDeleteObject"                : 40      ; TBD
+                                    ,"EmfRecordTypeAngleArc"                    : 41      ; TBD
+                                    ,"EmfRecordTypeEllipse"                     : 42      ; TBD
+                                    ,"EmfRecordTypeRectangle"                   : 43      ; TBD
+                                    ,"EmfRecordTypeRoundRect"                   : 44      ; TBD
+                                    ,"EmfRecordTypeArc"                         : 45      ; TBD
+                                    ,"EmfRecordTypeChord"                       : 46      ; TBD
+                                    ,"EmfRecordTypePie"                         : 47      ; TBD
+                                    ,"EmfRecordTypeSelectPalette"               : 48      ; TBD
+                                    ,"EmfRecordTypeCreatePalette"               : 49      ; TBD
+                                    ,"EmfRecordTypeSetPaletteEntries"           : 50      ; TBD
+                                    ,"EmfRecordTypeResizePalette"               : 51      ; TBD
+                                    ,"EmfRecordTypeRealizePalette"              : 52      ; TBD
+                                    ,"EmfRecordTypeExtFloodFill"                : 53      ; TBD
+                                    ,"EmfRecordTypeLineTo"                      : 54      ; TBD
+                                    ,"EmfRecordTypeArcTo"                       : 55      ; TBD
+                                    ,"EmfRecordTypePolyDraw"                    : 56      ; TBD
+                                    ,"EmfRecordTypeSetArcDirection"             : 57      ; TBD
+                                    ,"EmfRecordTypeSetMiterLimit"               : 58      ; TBD
+                                    ,"EmfRecordTypeBeginPath"                   : 59      ; TBD
+                                    ,"EmfRecordTypeEndPath"                     : 60      ; TBD
+                                    ,"EmfRecordTypeCloseFigure"                 : 61      ; TBD
+                                    ,"EmfRecordTypeFillPath"                    : 62      ; TBD
+                                    ,"EmfRecordTypeStrokeAndFillPath"           : 63      ; TBD
+                                    ,"EmfRecordTypeStrokePath"                  : 64      ; TBD
+                                    ,"EmfRecordTypeFlattenPath"                 : 65      ; TBD
+                                    ,"EmfRecordTypeWidenPath"                   : 66      ; TBD
+                                    ,"EmfRecordTypeSelectClipPath"              : 67      ; TBD
+                                    ,"EmfRecordTypeAbortPath"                   : 68      ; TBD
+                                    ,"EmfRecordTypeReserved_069"                : 69      ; TBD
+                                    ,"EmfRecordTypeGdiComment"                  : 70      ; TBD
+                                    ,"EmfRecordTypeFillRgn"                     : 71      ; TBD
+                                    ,"EmfRecordTypeFrameRgn"                    : 72      ; TBD
+                                    ,"EmfRecordTypeInvertRgn"                   : 73      ; TBD
+                                    ,"EmfRecordTypePaintRgn"                    : 74      ; TBD
+                                    ,"EmfRecordTypeExtSelectClipRgn"            : 75      ; TBD
+                                    ,"EmfRecordTypeBitBlt"                      : 76      ; TBD
+                                    ,"EmfRecordTypeStretchBlt"                  : 77      ; TBD
+                                    ,"EmfRecordTypeMaskBlt"                     : 78      ; TBD
+                                    ,"EmfRecordTypePlgBlt"                      : 79      ; TBD
+                                    ,"EmfRecordTypeSetDIBitsToDevice"           : 80      ; TBD
+                                    ,"EmfRecordTypeStretchDIBits"               : 81      ; TBD
+                                    ,"EmfRecordTypeExtCreateFontIndirect"       : 82      ; TBD
+                                    ,"EmfRecordTypeExtTextOutA"                 : 83      ; TBD
+                                    ,"EmfRecordTypeExtTextOutW"                 : 84      ; TBD
+                                    ,"EmfRecordTypePolyBezier16"                : 85      ; TBD
+                                    ,"EmfRecordTypePolygon16"                   : 86      ; TBD
+                                    ,"EmfRecordTypePolyline16"                  : 87      ; TBD
+                                    ,"EmfRecordTypePolyBezierTo16"              : 88      ; TBD
+                                    ,"EmfRecordTypePolylineTo16"                : 89      ; TBD
+                                    ,"EmfRecordTypePolyPolyline16"              : 90      ; TBD
+                                    ,"EmfRecordTypePolyPolygon16"               : 91      ; TBD
+                                    ,"EmfRecordTypePolyDraw16"                  : 92      ; TBD
+                                    ,"EmfRecordTypeCreateMonoBrush"             : 93      ; TBD
+                                    ,"EmfRecordTypeCreateDIBPatternBrushPt"     : 94      ; TBD
+                                    ,"EmfRecordTypeExtCreatePen"                : 95      ; TBD
+                                    ,"EmfRecordTypePolyTextOutA"                : 96      ; TBD
+                                    ,"EmfRecordTypePolyTextOutW"                : 97      ; TBD
+                                    ,"EmfRecordTypeSetICMMode"                  : 98      ; TBD
+                                    ,"EmfRecordTypeCreateColorSpace"            : 99      ; TBD
+                                    ,"EmfRecordTypeSetColorSpace"               : 100     ; TBD
+                                    ,"EmfRecordTypeDeleteColorSpace"            : 101     ; TBD
+                                    ,"EmfRecordTypeGLSRecord"                   : 102     ; TBD
+                                    ,"EmfRecordTypeGLSBoundedRecord"            : 103     ; TBD
+                                    ,"EmfRecordTypePixelFormat"                 : 104     ; TBD
+                                    ,"EmfRecordTypeDrawEscape"                  : 105     ; TBD
+                                    ,"EmfRecordTypeExtEscape"                   : 106     ; TBD
+                                    ,"EmfRecordTypeStartDoc"                    : 107     ; TBD
+                                    ,"EmfRecordTypeSmallTextOut"                : 108     ; TBD
+                                    ,"EmfRecordTypeForceUFIMapping"             : 109     ; TBD
+                                    ,"EmfRecordTypeNamedEscape"                 : 110     ; TBD
+                                    ,"EmfRecordTypeColorCorrectPalette"         : 111     ; TBD
+                                    ,"EmfRecordTypeSetICMProfileA"              : 112     ; TBD
+                                    ,"EmfRecordTypeSetICMProfileW"              : 113     ; TBD
+                                    ,"EmfRecordTypeAlphaBlend"                  : 114     ; TBD
+                                    ,"EmfRecordTypeSetLayout"                   : 115     ; TBD
+                                    ,"EmfRecordTypeTransparentBlt"              : 116     ; TBD
+                                    ,"EmfRecordTypeReserved_117"                : 117     ; TBD
+                                    ,"EmfRecordTypeGradientFill"                : 118     ; TBD
+                                    ,"EmfRecordTypeSetLinkedUFIs"               : 119     ; TBD
+                                    ,"EmfRecordTypeSetTextJustification"        : 120     ; TBD
+                                    ,"EmfRecordTypeColorMatchToTargetW"         : 121     ; TBD
+                                    ,"EmfRecordTypeCreateColorSpaceW"           : 122     ; TBD
+                                    ,"EmfRecordTypeMax"                         : 122     ; TBD
+                                    ,"EmfRecordTypeMin"                         : 1       ; TBD
+                                    ,"EmfPlusRecordTypeInvalid"                 : 16384   ; TBD
+                                    ,"EmfPlusRecordTypeHeader"                  : 16385   ; Identifies a record that is the EMF+ header.
+                                    ,"EmfPlusRecordTypeEndOfFile"               : 16386   ; Identifies a record that marks the last EMF+ record of a metafile.
+                                    ,"EmfPlusRecordTypeComment"                 : 16387   ; GDIP.Graphics.AddMetafileComment()
+                                    ,"EmfPlusRecordTypeGetDC"                   : 16388   ; GDIP.Graphics.GetHDC()
+                                    ,"EmfPlusRecordTypeMultiFormatStart"        : 16389   ; Identifies the start of a multiple-format block.
+                                    ,"EmfPlusRecordTypeMultiFormatSection"      : 16390   ; Identifies a section in a multiple-format block.
+                                    ,"EmfPlusRecordTypeMultiFormatEnd"          : 16391   ; Identifies the end of a multiple-format block.
+                                    ,"EmfPlusRecordTypeObject"                  : 16392   ; TBD
+                                    ,"EmfPlusRecordTypeClear"                   : 16393   ; GDIP.Graphics.Clear()
+                                    ,"EmfPlusRecordTypeFillRects"               : 16394   ; FillRectangles Methods
+                                    ,"EmfPlusRecordTypeDrawRects"               : 16395   ; DrawRectangles Methods
+                                    ,"EmfPlusRecordTypeFillPolygon"             : 16396   ; FillPolygon Methods
+                                    ,"EmfPlusRecordTypeDrawLines"               : 16397   ; DrawLines Methods
+                                    ,"EmfPlusRecordTypeFillEllipse"             : 16398   ; FillEllipse Methods
+                                    ,"EmfPlusRecordTypeDrawEllipse"             : 16399   ; DrawEllipse Methods
+                                    ,"EmfPlusRecordTypeFillPie"                 : 16400   ; FillPie Methods
+                                    ,"EmfPlusRecordTypeDrawPie"                 : 16401   ; DrawPie Methods
+                                    ,"EmfPlusRecordTypeDrawArc"                 : 16402   ; DrawArc Methods
+                                    ,"EmfPlusRecordTypeFillRegion"              : 16403   ; GDIP.Graphics.()
+                                    ,"EmfPlusRecordTypeFillPath"                : 16404   ; GDIP.Graphics.()
+                                    ,"EmfPlusRecordTypeDrawPath"                : 16405   ; GDIP.Graphics.()
+                                    ,"EmfPlusRecordTypeFillClosedCurve"         : 16406   ; FillClosedCurve Methods
+                                    ,"EmfPlusRecordTypeDrawClosedCurve"         : 16407   ; DrawClosedCurve Methods
+                                    ,"EmfPlusRecordTypeDrawCurve"               : 16408   ; DrawCurve Methods
+                                    ,"EmfPlusRecordTypeDrawBeziers"             : 16409   ; DrawBeziers Methods
+                                    ,"EmfPlusRecordTypeDrawImage"               : 16410   ; DrawImage Methods
+                                    ,"EmfPlusRecordTypeDrawImagePoints"         : 16411   ; DrawImage Methods (destination point arrays)
+                                    ,"EmfPlusRecordTypeDrawString"              : 16412   ; DrawString Methods
+                                    ,"EmfPlusRecordTypeSetRenderingOrigin"      : 16413   ; GDIP.Graphics.SetRenderingOrigin()
+                                    ,"EmfPlusRecordTypeSetAntiAliasMode"        : 16414   ; GDIP.Graphics.SetSmoothingMode()
+                                    ,"EmfPlusRecordTypeSetTextRenderingHint"    : 16415   ; GDIP.Graphics.SetTextRenderingHint()
+                                    ,"EmfPlusRecordTypeSetTextContrast"         : 16416   ; GDIP.Graphics.SetTextContrast()
+                                    ,"EmfPlusRecordTypeSetInterpolationMode"    : 16417   ; GDIP.Graphics.SetInterpolationMode()
+                                    ,"EmfPlusRecordTypeSetPixelOffsetMode"      : 16418   ; GDIP.Graphics.SetPixelOffsetMode()
+                                    ,"EmfPlusRecordTypeSetCompositingMode"      : 16419   ; GDIP.Graphics.SetCompositingMode()
+                                    ,"EmfPlusRecordTypeSetCompositingQuality"   : 16420   ; GDIP.Graphics.SetCompositingQuality()
+                                    ,"EmfPlusRecordTypeSave"                    : 16421   ; GDIP.Graphics.Save()
+                                    ,"EmfPlusRecordTypeRestore"                 : 16422   ; GDIP.Graphics.Restore()
+                                    ,"EmfPlusRecordTypeBeginContainer"          : 16423   ; GDIP.Graphics.BeginContainer()
+                                    ,"EmfPlusRecordTypeBeginContainerNoParams"  : 16424   ; GDIP.Graphics.BeginContainer()
+                                    ,"EmfPlusRecordTypeEndContainer"            : 16425   ; GDIP.Graphics.EndContainer()
+                                    ,"EmfPlusRecordTypeSetWorldTransform"       : 16426   ; GDIP.Graphics.SetTransform()
+                                    ,"EmfPlusRecordTypeResetWorldTransform"     : 16427   ; GDIP.Graphics.ResetTransform()
+                                    ,"EmfPlusRecordTypeMultiplyWorldTransform"  : 16428   ; GDIP.Graphics.MultiplyTransform()
+                                    ,"EmfPlusRecordTypeTranslateWorldTransform" : 16429   ; GDIP.Graphics.TranslateTransform()
+                                    ,"EmfPlusRecordTypeScaleWorldTransform"     : 16430   ; GDIP.Graphics.ScaleTransform()
+                                    ,"EmfPlusRecordTypeRotateWorldTransform"    : 16431   ; GDIP.Graphics.RotateTransform()
+                                    ,"EmfPlusRecordTypeSetPageTransform"        : 16432   ; GDIP.Graphics.SetPageScale() and GDIP.Graphics.SetPageUnit()
+                                    ,"EmfPlusRecordTypeResetClip"               : 16433   ; GDIP.Graphics.ResetClip()
+                                    ,"EmfPlusRecordTypeSetClipRect"             : 16434   ; GDIP.Graphics.SetClip()
+                                    ,"EmfPlusRecordTypeSetClipPath"             : 16435   ; GDIP.Graphics.SetClip()
+                                    ,"EmfPlusRecordTypeSetClipRegion"           : 16436   ; GDIP.Graphics.SetClip()
+                                    ,"EmfPlusRecordTypeOffsetClip"              : 16437   ; TranslateClip Methods
+                                    ,"EmfPlusRecordTypeDrawDriverString"        : 16438   ; GDIP.Graphics.DrawDriverString()
+                                    ,"EmfPlusRecordTypeStrokeFillPath"          : 16439   ; TBD
+                                    ,"EmfPlusRecordTypeSerializableObject"      : 16440   ; TBD
+                                    ,"EmfPlusRecordTypeSetTSGraphics"           : 16441   ; TBD
+                                    ,"EmfPlusRecordTypeSetTSClip"               : 16442   ; TBD
+                                    ,"EmfPlusRecordTotal"                       : 16443   ; TBD
+                                    ,"EmfPlusRecordTypeMax"                     : -1      ; TBD
+                                    ,"EmfPlusRecordTypeMin"                     : 16385 } ; TBD
         
         ; Specifies options for the GDIP.Metafile.EmfToWmfBits() method.
         Static EmfToWmfBitsFlags := {"EmfToWmfBitsFlagsDefault"          : 0   ; Default conversion.
                                     ,"EmfToWmfBitsFlagsEmbedEmf"         : 1   ; Source EMF metafile is embedded as a comment in the resulting WMF metafile.
                                     ,"EmfToWmfBitsFlagsIncludePlaceable" : 2   ; Resulting WMF metafile is in the placeable metafile format.
                                     ,"EmfToWmfBitsFlagsNoXORClip"        : 4 } ; Clipping region is stored in the metafile in the traditional way. 
+        
+        ;
+        Static EmfType := {"EmfTypeEmfOnly"     : 3   ; Only EMF
+                          ,"EmfTypeEmfPlusOnly" : 4   ; Only EMF+
+                          ,"EmfTypeEmfPlusDual" : 5 } ; Both EMF and EMF+
         
         ; Specifies data types for image codec (encoder/decoder) parameters.
         Static EncoderParameterValueType := {"EncoderParameterValueTypeByte"          : 1   ; Is an 8-bit unsigned integer.
@@ -2515,6 +2564,16 @@ Class GDIP
                             ,"FontStyleBoldItalic" : 3   ; Typeface is both bold and italic.
                             ,"FontStyleUnderline"  : 4   ; Underline, which displays a line underneath the baseline of the characters.
                             ,"FontStyleStrikeout"  : 8 } ; Strikeout, which displays a horizontal line drawn through the middle of the characters.
+        
+        ; 
+        Static GenericFontFamily := {"GenericFontFamilySerif"     : 0   ; 
+                                    ,"GenericFontFamilySansSerif" : 1   ; 
+                                    ,"GenericFontFamilyMonospace" : 2 } ; 
+        
+        ; 
+        Static GpTestControlEnum := {"TestControlForceBilinear"  : 0
+                                    ,"TestControlNoICM"          : 1
+                                    ,"TestControlGetBuildNumber" : 2 }
         
         ; Specifies the hatch pattern used by a brush of type HatchBrush.
         Static HatchStyle := {"HatchStyleHorizontal"             : 0    ; Horizontal lines.
@@ -2701,8 +2760,8 @@ Class GDIP
                              ,"ObjectTypeImageAttributes" : 8    ; Is an image attribute.
                              ,"ObjectTypeCustomLineCap"   : 9    ; Is a custom line cap.
                              ,"ObjectTypeGraphics"        : 10   ; Is graphics.
-                             ,"ObjectTypeMax"             : 11   ; Maximum enumeration value. Currently, ObjectTypeGraphics.
-                             ,"ObjectTypeMin"             : 12 } ; Minimum enumeration value. Currently, ObjectTypeBrush.
+                             ,"ObjectTypeMax"             : 10   ; Maximum enumeration value. Currently, ObjectTypeGraphics.
+                             ,"ObjectTypeMin"             : 1  } ; Minimum enumeration value. Currently, ObjectTypeBrush.
         
         ; Indicates attributes of the color data in a palette.
         Static PaletteFlags := {"PaletteFlagsHasAlpha"  : 0   ; One or more of the palette entries contains alpha (transparency) information.
@@ -2722,14 +2781,14 @@ Class GDIP
                               ,"PaletteTypeFixedHalftone256" : 9 } ; Palette based on 8 intensities of red, 8 intensities of green, and 4 intensities of blue.
         
         ; Indicates point types and flags for the data points in a path.
-        Static PathPointType := {"PathPointTypeStart"        : 0   ; The point is the start of a figure.
-                                ,"PathPointTypeLine"         : 1   ; The point is one of the two endpoints of a line.
-                                ,"PathPointTypeBezier"       : 3   ; The point is an endpoint or control point of a cubic Bézier spline.
-                                ,"PathPointTypePathTypeMask" : 7   ; Masks all bits except for the three low-order bits, which indicate the point type.
-                                ,"PathPointTypeDashMode"     : 16  ; Not used.
-                                ,"PathPointTypePathMarker"   : 32  ; The point is a marker.
-                                ,"PathPointTypeCloseSubpath" : 128 ; The point is the last point in a closed subpath (figure).
-                                ,"PathPointTypeBezier3"      : 3 } ; The point is an endpoint or control point of a cubic Bézier spline.
+        Static PathPointType := {"PathPointTypeStart"        : 0x00   ; The point is the start of a figure.
+                                ,"PathPointTypeLine"         : 0x01   ; The point is one of the two endpoints of a line.
+                                ,"PathPointTypeBezier"       : 0x03   ; The point is an endpoint or control point of a cubic Bézier spline.
+                                ,"PathPointTypePathTypeMask" : 0x07   ; Masks all bits except for the three low-order bits, which indicate the point type.
+                                ,"PathPointTypeDashMode"     : 0x10   ; Not used.
+                                ,"PathPointTypePathMarker"   : 0x20   ; The point is a marker.
+                                ,"PathPointTypeCloseSubpath" : 0x80   ; The point is the last point in a closed subpath (figure).
+                                ,"PathPointTypeBezier3"      : 0x03 } ; The point is an endpoint or control point of a cubic Bézier spline.
         
         ; Specifies the alignment of a pen relative to the stroke that is being drawn.
         Static PenAlignment := {"PenAlignmentCenter" : 0   ; Pen is aligned on the center of the line that is drawn.
@@ -2776,8 +2835,8 @@ Class GDIP
                                 ,"SmoothingModeHighQuality"  :  2   ; Smoothing is applied using an 8 X 4 box filter.
                                 ,"SmoothingModeNone"         :  3   ; Smoothing is not applied.
                                 ,"SmoothingModeAntiAlias"    :  4   ; Smoothing is applied using an 8 X 4 box filter.
-                                ,"SmoothingModeAntiAlias8x4" :  5   ; Smoothing is applied using an 8 X 4 box filter.
-                                ,"SmoothingModeAntiAlias8x8" :  6 } ; Smoothing is applied using an 8 X 8 box filter.
+                                ,"SmoothingModeAntiAlias8x4" :  4   ; Smoothing is applied using an 8 X 4 box filter.
+                                ,"SmoothingModeAntiAlias8x8" :  5 } ; Smoothing is applied using an 8 X 8 box filter.
         
         ; Indicates the result of a Windows GDI+ method call.
         Static Status := {"Ok"                        : 0    ; Method call was successful.
@@ -2815,16 +2874,16 @@ Class GDIP
                                         ,"StringDigitSubstituteTraditional" : 3 } ; Substitution digits that correspond with the user's native script or language
         
         ; Specifies text layout information (such as orientation and clipping) and display manipulations
-        Static StringFormatFlags := {"StringFormatFlagsDirectionRightToLeft"  : 0x1      ; Reading order is right to left.
-                                    ,"StringFormatFlagsDirectionVertical"     : 0x2      ; Individual lines of text are drawn vertically on the display device.
-                                    ,"StringFormatFlagsNoFitBlackBox"         : 0x4      ; Parts of characters are allowed to overhang the string's layout rectangle.
-                                    ,"StringFormatFlagsDisplayFormatControl"  : 0x20     ; Unicode layout control characters are displayed with a representative character.
-                                    ,"StringFormatFlagsNoFontFallback"        : 0x400    ; Alternate font is used for characters that are not supported in the requested font.
-                                    ,"StringFormatFlagsMeasureTrailingSpaces" : 0x800    ; Space at the end of each line is included in a string measurement.
-                                    ,"StringFormatFlagsNoWrap"                : 0x1000   ; Wrapping of text to the next line is disabled.
-                                    ,"StringFormatFlagsLineLimit"             : 0x2000   ; Only entire lines are laid out in the layout rectangle.
-                                    ,"StringFormatFlagsNoClip"                : 0x4000   ; Only entire lines are laid out in the layout rectangle.
-                                    ,"StringFormatFlagsBypassGDI"             : 0x8000 } ; Undefined.
+        Static StringFormatFlags := {"StringFormatFlagsDirectionRightToLeft"  : 0x1          ; Reading order is right to left.
+                                    ,"StringFormatFlagsDirectionVertical"     : 0x2          ; Individual lines of text are drawn vertically on the display device.
+                                    ,"StringFormatFlagsNoFitBlackBox"         : 0x4          ; Parts of characters are allowed to overhang the string's layout rectangle.
+                                    ,"StringFormatFlagsDisplayFormatControl"  : 0x20         ; Unicode layout control characters are displayed with a representative character.
+                                    ,"StringFormatFlagsNoFontFallback"        : 0x400        ; Alternate font is used for characters that are not supported in the requested font.
+                                    ,"StringFormatFlagsMeasureTrailingSpaces" : 0x800        ; Space at the end of each line is included in a string measurement.
+                                    ,"StringFormatFlagsNoWrap"                : 0x1000       ; Wrapping of text to the next line is disabled.
+                                    ,"StringFormatFlagsLineLimit"             : 0x2000       ; Only entire lines are laid out in the layout rectangle.
+                                    ,"StringFormatFlagsNoClip"                : 0x4000       ; Only entire lines are laid out in the layout rectangle.
+                                    ,"StringFormatFlagsBypassGDI"             : 0x80000000 } ; Undefined.
         
         ; Specifies how to trim characters from a string so that the string fits into a layout rectangle.
         Static StringTrimming := {"StringTrimmingNone"              : 0   ; No trimming is done.
