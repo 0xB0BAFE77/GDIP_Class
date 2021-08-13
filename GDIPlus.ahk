@@ -54,8 +54,13 @@
     20210811
         Lots of reading the .h file of GDIPlus
     20210812
-        Redid the Rect/RectF classes after finding an error.
-            Improved Rect/RectF Code
+        Redid entire Rect/Point/Size classes
+            Removed float variants and added .Struct(type) method
+                type can be whatever type you need. Int, Float, Etc.
+        Finished Color Class (ARBG)
+        Collected MetaHeader 
+        Started on gdiplusimaging
+        
 */
 
 GDIP.Startup()
@@ -144,11 +149,10 @@ Class GDIP
             ,this.gdip_token := token
         
         (estat > 0)                                     ; Error checking
-            ? this.error_log(A_ThisFunc, "Startup has failed.", "Estat Error: " estat , {estat:estat, })
+            ? GDIP.error_log(A_ThisFunc, "Startup has failed.", "Estat Error: " estat , {estat:estat})
             : ""
         
         GDIP.TypeDef._Create()                          ; Create typedefs
-        GDIP.DEFINE._Create()                           ; Create defined values
         GDIP.generate_colorName()                       ; Generate color object
         ;add other generators here
         Return estat
@@ -255,7 +259,7 @@ Class GDIP
         bytes := dt[type]
         If (bytes != "")
             Return bytes
-        this.error_log(A_ThisFunc, "No valid datatype found.", type, "See 'data_type_size' function for list of data types.")
+        GDIP.error_log(A_ThisFunc, "No valid datatype found.", type, "See 'data_type_size' function for list of data types.")
         Return "err"
     }
     
@@ -265,14 +269,9 @@ Class GDIP
     ; Responsible for tracking all the different var types there are in GDIPlus
     Class TypeDef
     {
-        _Create()
-        {
-            this.GraphicsState     := "UInt"
-            this.GraphicsContainer := "UInt"
-            this.REAL              := "Float"
-            
-            Return
-        }
+        Static GraphicsState     := "UInt"
+        Static GraphicsContainer := "UInt"
+        Static REAL              := "Float"
     }
     
     ;####################################################################################################################
@@ -281,12 +280,9 @@ Class GDIP
     ; Responsible for tracking all the different var types there are in GDIPlus
     Class DEFINE
     {
-        _Create()
-        {
-            this.GDIP_EMFPLUS_RECORD_BASE   := 0x4000
-            this.GDIP_WMF_RECORD_BASE       := 0x10000
-            Return
-        }
+        Static GDIP_EMFPLUS_RECORD_BASE  := 0x4000
+        Static GDIP_WMF_RECORD_BASE      := 0x10000
+        Static GDIP_EMFPLUSFLAGS_DISPLAY := 0x1
     }
     
     ;####################################################################################################################
@@ -320,7 +316,7 @@ Class GDIP
             estat := DllCall("gdip\GdipCloneImage"
                             ,this.Ptr   , &image_p
                             ,this.PtrA  , clone_p)
-            estat ? this.error_log(A_ThisFunc, "Enum Status", estat) : ""
+            estat ? GDIP.error_log(A_ThisFunc, "Enum Status", estat) : ""
             MsgBox, % "imop: " imop "`nclone_p: " clone_p "`nestat: " estat 
             Return clone_p
         }
@@ -351,7 +347,7 @@ Class GDIP
                             ,this.Ptr     , &filename
                             ,this.PtrA    , imoP)
             (estat)
-                ? this.error_log(A_ThisFunc, "Error opening an image from file.", "Valid filename" 
+                ? GDIP.error_log(A_ThisFunc, "Error opening an image from file.", "Valid filename" 
                     , {filename:filename, status_enum:estat, img_obj_ptr:imoP}) : ""
             Return imoP
         }
@@ -676,7 +672,7 @@ Class GDIP
                 ? this.lastResult = DllCall("gdiplus\GdipGetImageGraphicsContext"
                                            , this.Ptr  , (this.image.nativeImage := image)
                                            , this.PtrA , &gp)
-                : this.error_log(A_ThisFunc, "A pointer to an image object was required"
+                : GDIP.error_log(A_ThisFunc, "A pointer to an image object was required"
                                 ,"", {image_pointer:image})
             this.nativeGraphics := gp
         }
@@ -1582,11 +1578,11 @@ Class GDIP
         
         GetHDC()
         {
-            VarSetCapacity(HDC, A_PtrSize, 0)
-            last SetStatus(DllExports::GdipGetDC(nativeGraphics, &hdc));
-            DllCall(""
-                   , type      , value)
-            return HDC
+            ;VarSetCapacity(HDC, A_PtrSize, 0)
+            ;last SetStatus(DllExports::GdipGetDC(nativeGraphics, &hdc));
+            ;DllCall(""
+            ;       , type      , value)
+            ;return HDC
         }
         
         ;~ The Graphics::GetHDC method gets a handle to the device context associated with this Graphics object.
@@ -2123,804 +2119,846 @@ Class GDIP
     ;####################################################################################################################
     ;  Enumerations (Enum)                                                                                              |
     ;####################################################################################################################
-    Class enum
+    Class Enum
     {
-        ; Indicates one of five brush types
-        Static BrushType := {"BrushTypeSolidColor"     : 0   ; Paints a single, constant color that can be opaque or transparent.
-                            ,"BrushTypeHatchFill"      : 1   ; Paints a background and paints, over that background, a pattern of lines, dots, dashes, squares, crosshatch, or some variation of these.
-                            ,"BrushTypeTextureFill"    : 2   ; Paints an image.
-                            ,"BrushTypePathGradient"   : 3   ; Paints a color gradient in which the color changes from a center point outward to a boundary that is defined by a closed curve or path.
-                            ,"BrushTypeLinearGradient" : 4 } ; Paints a color gradient in which the color changes evenly from the starting boundary line of the linear gradient brush to the ending boundary line of the linear gradient brush.
+        Class ColorChannelFlags {              ; Specifies individual channels in the CMYK (cyan, magenta, yellow, black) color space.
+            Static ColorChannelFlagsC    = 0   ; Cyan
+                 , ColorChannelFlagsM    = 1   ; Magenta
+                 , ColorChannelFlagsY    = 2   ; Yellow
+                 , ColorChannelFlagsK    = 3   ; Black
+                 , ColorChannelFlagsLast = 4   ; Undefined
+        }
         
-        ; Specifies which GDI+ objects use color-adjustment information.
-        Static ColorAdjustType := {"ColorAdjustTypeDefault" : 0   ; Applies to all categories that do not have adjustment settings of their own.
-                                  ,"ColorAdjustTypeBitmap"  : 1   ; Applies to bitmapped images.
-                                  ,"ColorAdjustTypeBrush"   : 2   ; Applies to brush operations in metafiles.
-                                  ,"ColorAdjustTypePen"     : 3   ; Applies to pen operations in metafiles.
-                                  ,"ColorAdjustTypeText"    : 4   ; Applies to text drawn in metafiles.
-                                  ,"ColorAdjustTypeCount"   : 5   ; Used internally to record the number of color adjustment types.
-                                  ,"ColorAdjustTypeAny"     : 6 } ; Reserved
+        Class ColorMode {                ; 
+            Static ColorModeARGB32 = 0   ;
+                 , ColorModeARGB64 = 1   ;
+        }
         
-        ; Specifies individual channels in the CMYK (cyan, magenta, yellow, black) color space.
-        Static ColorChannelFlags := {"ColorChannelFlagsC"    : 0   ; Cyan
-                                    ,"ColorChannelFlagsM"    : 1   ; Magenta
-                                    ,"ColorChannelFlagsY"    : 2   ; Yellow
-                                    ,"ColorChannelFlagsK"    : 3   ; Black
-                                    ,"ColorChannelFlagsLast" : 4 } ; Undefined
+        Class ColorMatrixFlags {                   ; Specifies the types of images and colors that will be affected by the color and grayscale adjustment settings of an ImageAttributes object.
+            Static ColorMatrixFlagsDefault   = 0   ; All color values (including grays) are adjusted by the same color-adjustment matrix.
+                 , ColorMatrixFlagsSkipGrays = 1   ; Colors are adjusted but gray shades are not adjusted.
+                 , ColorMatrixFlagsAltGray   = 2   ; Colors are adjusted by one matrix and gray shades are adjusted by another matrix.
+        }
         
-        ; Specifies the types of images and colors that will be affected by the color and grayscale adjustment settings of an ImageAttributes object.
-        Static ColorMatrixFlags := {"ColorMatrixFlagsDefault"   : 0   ; All color values (including grays) are adjusted by the same color-adjustment matrix.
-                                   ,"ColorMatrixFlagsSkipGrays" : 1   ; Colors are adjusted but gray shades are not adjusted.
-                                   ,"ColorMatrixFlagsAltGray"   : 2 } ; Colors are adjusted by one matrix and gray shades are adjusted by another matrix.
+        Class CombineMode {                    ; Specifies how a new region is combined with an existing region.
+            Static CombineModeReplace    = 0   ; Replaced by the new region.
+                 , CombineModeIntersect  = 1   ; Replaced by the intersection of itself and the new region.
+                 , CombineModeUnion      = 2   ; Replaced by the union of itself and the new region.
+                 , CombineModeXor        = 3   ; Replaced by the result of performing an XOR on the two regions.
+                 , CombineModeExclude    = 4   ; Replaced by the portion of itself that is outside of the new region.
+                 , CombineModeComplement = 5   ; Replaced by the portion of the new region that is outside of the existing region.
+        }
         
-        ; Specifies how a new region is combined with an existing region.
-        Static CombineMode := {"CombineModeReplace"    : 0   ; Replaced by the new region.
-                              ,"CombineModeIntersect"  : 1   ; Replaced by the intersection of itself and the new region.
-                              ,"CombineModeUnion"      : 2   ; Replaced by the union of itself and the new region.
-                              ,"CombineModeXor"        : 3   ; Replaced by the result of performing an XOR on the two regions.
-                              ,"CombineModeExclude"    : 4   ; Replaced by the portion of itself that is outside of the new region.
-                              ,"CombineModeComplement" : 5 } ; Replaced by the portion of the new region that is outside of the existing region.
+        Class CompositingMode {                    ; Specifies how rendered colors are combined with background colors.
+            Static CompositingModeSourceOver = 0   ; when a color is rendered, it is blended with the background color.
+                 , CompositingModeSourceCopy = 1   ; when a color is rendered, it overwrites the background color.
+        }
         
-        ; Specifies how rendered colors are combined with background colors.
-        Static CompositingMode := {"CompositingModeSourceOver" : 0   ; when a color is rendered, it is blended with the background color.
-                                  ,"CompositingModeSourceCopy" : 1 } ; when a color is rendered, it overwrites the background color.
+        Class CompositingQuality {                        ; Specifies whether gamma correction is applied when colors are blended with background colors.
+            Static CompositingQualityInvalid        = -1  ; Invalid
+                 , CompositingQualityDefault        = 0   ; Gamma correction is not applied.
+                 , CompositingQualityHighSpeed      = 1   ; Gamma correction is not applied.
+                 , CompositingQualityHighQuality    = 2   ; Gamma correction is applied.
+                 , CompositingQualityGammaCorrected = 3   ; Gamma correction is applied.
+                 , CompositingQualityAssumeLinear   = 4   ; Gamma correction is not applied.
+        }
         
-        ; Specifies whether gamma correction is applied when colors are blended with background colors.
-        Static CompositingQuality := {"CompositingQualityInvalid"        : -1  ; Invalid
-                                     ,"CompositingQualityDefault"        : 0   ; Gamma correction is not applied.
-                                     ,"CompositingQualityHighSpeed"      : 1   ; Gamma correction is not applied.
-                                     ,"CompositingQualityHighQuality"    : 2   ; Gamma correction is applied.
-                                     ,"CompositingQualityGammaCorrected" : 3   ; Gamma correction is applied.
-                                     ,"CompositingQualityAssumeLinear"   : 4 } ; Gamma correction is not applied.
+        Class CoordinateSpace {                ; Specifies coordinate spaces.
+            Static CoordinateSpaceWorld  = 0   ; Specify world space
+                 , CoordinateSpacePage   = 1   ; Specify page space
+                 , CoordinateSpaceDevice = 2   ; Specify device space
+        }
         
-        ; Specifies coordinate spaces.
-        Static CoordinateSpace := {"CoordinateSpaceWorld"  : 0   ; Specify world space
-                                  ,"CoordinateSpacePage"   : 1   ; Specify page space
-                                  ,"CoordinateSpaceDevice" : 2 } ; Specify device space
+        Class CurveAdjustments {               ; Encompasses the eight bitmap adjustments listed in the CurveAdjustments enumeration.
+            Static AdjustExposure        = 0   ; Simulates increasing or decreasing the exposure of a photograph.
+                 , AdjustDensity         = 1   ; Simulates increasing or decreasing the film density of a photograph.
+                 , AdjustContrast        = 2   ; Increases or decreases the contrast of a bitmap.
+                 , AdjustHighlight       = 3   ; Increases or decreases the value of a color channel if that channel already has a value that is above half intensity. 
+                 , AdjustShadow          = 4   ; Increases or decreases the value of a color channel if that channel already has a value that is below half intensity.
+                 , AdjustMidtone         = 5   ; Lightens or darkens an image.
+                 , AdjustWhiteSaturation = 6   ; Set the adjustment member of a ColorCurveParams object.
+                 , AdjustBlackSaturation = 7   ; Set the adjustment member of a ColorCurveParams object.
+        }
         
-        ; Encompasses the eight bitmap adjustments listed in the CurveAdjustments enumeration.
-        Static CurveAdjustments := {"AdjustExposure"        : 0   ; Simulates increasing or decreasing the exposure of a photograph.
-                                   ,"AdjustDensity"         : 1   ; Simulates increasing or decreasing the film density of a photograph.
-                                   ,"AdjustContrast"        : 2   ; Increases or decreases the contrast of a bitmap.
-                                   ,"AdjustHighlight"       : 3   ; Increases or decreases the value of a color channel if that channel already has a value that is above half intensity. 
-                                   ,"AdjustShadow"          : 4   ; Increases or decreases the value of a color channel if that channel already has a value that is below half intensity.
-                                   ,"AdjustMidtone"         : 5   ; Lightens or darkens an image.
-                                   ,"AdjustWhiteSaturation" : 6   ; Set the adjustment member of a ColorCurveParams object.
-                                   ,"AdjustBlackSaturation" : 7 } ; Set the adjustment member of a ColorCurveParams object.
+        Class CurveChannel {               ; Specifies which color channels are affected by a ColorCurve bitmap adjustment.
+            Static CurveChannelAll   = 0   ; Specifies that the color adjustment applies to all channels.
+                 , CurveChannelRed   = 1   ; Specifies that the color adjustment applies only to the red channel.
+                 , CurveChannelGreen = 2   ; Specifies that the color adjustment applies only to the green channel.
+                 , CurveChannelBlue  = 3   ; Specifies that the color adjustment applies only to the blue channel.
+        }
         
-        ; Specifies which color channels are affected by a ColorCurve bitmap adjustment.
-        Static CurveChannel := {"CurveChannelAll"   : 0   ; Specifies that the color adjustment applies to all channels.
-                               ,"CurveChannelRed"   : 1   ; Specifies that the color adjustment applies only to the red channel.
-                               ,"CurveChannelGreen" : 2   ; Specifies that the color adjustment applies only to the green channel.
-                               ,"CurveChannelBlue"  : 3 } ; Specifies that the color adjustment applies only to the blue channel.
+        Class CustomLineCapType {                         ;
+            Static CustomLineCapTypeDefault         = 0   ; 
+                 , CustomLineCapTypeAdjustableArrow = 1   ;
+        }
         
-        ; 
-        Static CustomLineCapType := {"CustomLineCapTypeDefault"         : 0   ; 
-                                    ,"CustomLineCapTypeAdjustableArrow" : 1 } ;
-        };
+        Class DashCap {                  ; Specifies the type of graphic shape to use on both ends of each dash in a dashed line.
+            Static DashCapFlat     = 0   ; Square cap that squares off both ends of each dash.
+                 , DashCapRound    = 2   ; Circular cap that rounds off both ends of each dash.
+                 , DashCapTriangle = 3   ; Triangular cap that points both ends of each dash.
+        }
         
+        Class DashStyle {                    ; Specifies the line style of a line drawn with a Windows GDI+ pen.
+            Static DashStyleSolid      = 0   ; Solid line.
+                 , DashStyleDash       = 1   ; Dashed line.
+                 , DashStyleDot        = 2   ; Dotted line.
+                 , DashStyleDashDot    = 3   ; Alternating dash-dot line.
+                 , DashStyleDashDotDot = 4   ; Alternated dash-dot-dot line.
+                 , DashStyleCustom     = 5   ; User-Defined, custom dashed line.
+        }
         
-        ; Specifies the type of graphic shape to use on both ends of each dash in a dashed line.
-        Static DashCap := {"DashCapFlat"     : 0   ; Square cap that squares off both ends of each dash.
-                          ,"DashCapRound"    : 2   ; Circular cap that rounds off both ends of each dash.
-                          ,"DashCapTriangle" : 3 } ; Triangular cap that points both ends of each dash.
+        Class DitherType {                         ; Identifies the available algorithms for dithering when a bitmap is converted.
+            Static DitherTypeNone           = 0    ; No dithering is performed.
+                 , DitherTypeSolid          = 1    ; No dithering is performed.
+                 , DitherTypeOrdered4x4     = 2    ; perform dithering based on the colors in one of the standard fixed palettes.
+                 , DitherTypeOrdered8x8     = 3    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                 , DitherTypeOrdered16x16   = 4    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                 , DitherTypeSpiral4x4      = 5    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                 , DitherTypeSpiral8x8      = 6    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                 , DitherTypeDualSpiral4x4  = 7    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                 , DitherTypeDualSpiral8x8  = 8    ; Dithering is performed using the colors in one of the standard fixed palettes.
+                 , DitherTypeErrorDiffusion = 9    ; Dithering is performed based on the palette specified by the palette parameter of the this.Bitmap.ConvertFormat() method. 
+                 , DitherTypeMax            = 10   ; TBD
+        }
         
-        ; Specifies the line style of a line drawn with a Windows GDI+ pen.
-        Static DashStyle := {"DashStyleSolid"      : 0   ; Solid line.
-                            ,"DashStyleDash"       : 1   ; Dashed line.
-                            ,"DashStyleDot"        : 2   ; Dotted line.
-                            ,"DashStyleDashDot"    : 3   ; Alternating dash-dot line.
-                            ,"DashStyleDashDotDot" : 4   ; Alternated dash-dot-dot line.
-                            ,"DashStyleCustom"     : 5 } ; User-Defined, custom dashed line.
+        Class DriverStringOptions {                         ; Specifies the spacing, orientation, and quality of the rendering for driver strings.
+            Static DriverStringOptionsCmapLookup      = 1   ; String array contains Unicode character values.
+                 , DriverStringOptionsVertical        = 2   ; String is displayed vertically.
+                 , DriverStringOptionsRealizedAdvance = 4   ; Glyph positions are calculated from the position of the first glyph. 
+                 , DriverStringOptionsLimitSubpixel   = 8   ; Less memory should be used for cache of antialiased glyphs.
+        }
         
-        ; Identifies the available algorithms for dithering when a bitmap is converted.
-        Static DitherType := {"DitherTypeNone"           : 0    ; No dithering is performed.
-                             ,"DitherTypeSolid"          : 1    ; No dithering is performed.
-                             ,"DitherTypeOrdered4x4"     : 2    ; perform dithering based on the colors in one of the standard fixed palettes.
-                             ,"DitherTypeOrdered8x8"     : 3    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             ,"DitherTypeOrdered16x16"   : 4    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             ,"DitherTypeSpiral4x4"      : 5    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             ,"DitherTypeSpiral8x8"      : 6    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             ,"DitherTypeDualSpiral4x4"  : 7    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             ,"DitherTypeDualSpiral8x8"  : 8    ; Dithering is performed using the colors in one of the standard fixed palettes.
-                             ,"DitherTypeErrorDiffusion" : 9    ; Dithering is performed based on the palette specified by the palette parameter of the Bitmap::ConvertFormat method. 
-                             ,"DitherTypeMax"            : 10 } ; TBD
+        Class EmfPlusRecordType {                                    ; Identifies metafile record types used in Windows Metafile Format (WMF), Enhanced Metafile (EMF), and EMF+ files. 
+            Static WmfRecordTypeSetBkColor                  = 16897  ; TBD
+                 , WmfRecordTypeSetBkMode                   = 16642  ; TBD
+                 , WmfRecordTypeSetMapMode                  = 16643  ; TBD
+                 , WmfRecordTypeSetROP2                     = 16644  ; TBD
+                 , WmfRecordTypeSetRelAbs                   = 16645  ; TBD
+                 , WmfRecordTypeSetPolyFillMode             = 16646  ; TBD
+                 , WmfRecordTypeSetStretchBltMode           = 16647  ; TBD
+                 , WmfRecordTypeSetTextCharExtra            = 16648  ; TBD
+                 , WmfRecordTypeSetTextColor                = 16905  ; TBD
+                 , WmfRecordTypeSetTextJustification        = 16906  ; TBD
+                 , WmfRecordTypeSetWindowOrg                = 16907  ; TBD
+                 , WmfRecordTypeSetWindowExt                = 16908  ; TBD
+                 , WmfRecordTypeSetViewportOrg              = 16909  ; TBD
+                 , WmfRecordTypeSetViewportExt              = 16910  ; TBD
+                 , WmfRecordTypeOffsetWindowOrg             = 16911  ; TBD
+                 , WmfRecordTypeScaleWindowExt              = 17424  ; TBD
+                 , WmfRecordTypeOffsetViewportOrg           = 16913  ; TBD
+                 , WmfRecordTypeScaleViewportExt            = 17426  ; TBD
+                 , WmfRecordTypeLineTo                      = 16915  ; TBD
+                 , WmfRecordTypeMoveTo                      = 16916  ; TBD
+                 , WmfRecordTypeExcludeClipRect             = 17429  ; TBD
+                 , WmfRecordTypeIntersectClipRect           = 17430  ; TBD
+                 , WmfRecordTypeArc                         = 18455  ; TBD
+                 , WmfRecordTypeEllipse                     = 17432  ; TBD
+                 , WmfRecordTypeFloodFill                   = 17433  ; TBD
+                 , WmfRecordTypePie                         = 18458  ; TBD
+                 , WmfRecordTypeRectangle                   = 17435  ; TBD
+                 , WmfRecordTypeRoundRect                   = 17948  ; TBD
+                 , WmfRecordTypePatBlt                      = 17949  ; TBD
+                 , WmfRecordTypeSaveDC                      = 16414  ; TBD
+                 , WmfRecordTypeSetPixel                    = 17439  ; TBD
+                 , WmfRecordTypeOffsetClipRgn               = 16928  ; TBD
+                 , WmfRecordTypeTextOut                     = 17697  ; TBD
+                 , WmfRecordTypeBitBlt                      = 18722  ; TBD
+                 , WmfRecordTypeStretchBlt                  = 19235  ; TBD
+                 , WmfRecordTypePolygon                     = 17188  ; TBD
+                 , WmfRecordTypePolyline                    = 17189  ; TBD
+                 , WmfRecordTypeEscape                      = 17958  ; TBD
+                 , WmfRecordTypeRestoreDC                   = 16679  ; TBD
+                 , WmfRecordTypeFillRegion                  = 16936  ; TBD
+                 , WmfRecordTypeFrameRegion                 = 17449  ; TBD
+                 , WmfRecordTypeInvertRegion                = 16682  ; TBD
+                 , WmfRecordTypePaintRegion                 = 16683  ; TBD
+                 , WmfRecordTypeSelectClipRegion            = 16684  ; TBD
+                 , WmfRecordTypeSelectObject                = 16685  ; TBD
+                 , WmfRecordTypeSetTextAlign                = 16686  ; TBD
+                 , WmfRecordTypeDrawText                    = 17967  ; TBD
+                 , WmfRecordTypeChord                       = 18480  ; TBD
+                 , WmfRecordTypeSetMapperFlags              = 16945  ; TBD
+                 , WmfRecordTypeExtTextOut                  = 18994  ; TBD
+            Static WmfRecordTypeSetDIBToDev                 = 19763  ; TBD
+                 , WmfRecordTypeSelectPalette               = 16948  ; TBD
+                 , WmfRecordTypeRealizePalette              = 16437  ; TBD
+                 , WmfRecordTypeAnimatePalette              = 17462  ; TBD
+                 , WmfRecordTypeSetPalEntries               = 16439  ; TBD
+                 , WmfRecordTypePolyPolygon                 = 17720  ; TBD
+                 , WmfRecordTypeResizePalette               = 16697  ; TBD
+                 , WmfRecordTypeDIBBitBlt                   = 18752  ; TBD
+                 , WmfRecordTypeDIBStretchBlt               = 19265  ; TBD
+                 , WmfRecordTypeDIBCreatePatternBrush       = 16706  ; TBD
+                 , WmfRecordTypeStretchDIB                  = 20291  ; TBD
+                 , WmfRecordTypeExtFloodFill                = 17736  ; TBD
+                 , WmfRecordTypeSetLayout                   = 16713  ; TBD
+                 , WmfRecordTypeResetDC                     = 16716  ; TBD
+                 , WmfRecordTypeStartDoc                    = 16717  ; TBD
+                 , WmfRecordTypeStartPage                   = 16463  ; TBD
+                 , WmfRecordTypeEndPage                     = 16464  ; TBD
+                 , WmfRecordTypeAbortDoc                    = 16466  ; TBD
+                 , WmfRecordTypeEndDoc                      = 16478  ; TBD
+                 , WmfRecordTypeDeleteObject                = 16880  ; TBD
+                 , WmfRecordTypeCreatePalette               = 16631  ; TBD
+                 , WmfRecordTypeCreateBrush                 = 16632  ; TBD
+                 , WmfRecordTypeCreatePatternBrush          = 16889  ; TBD
+                 , WmfRecordTypeCreatePenIndirect           = 17146  ; TBD
+                 , WmfRecordTypeCreateFontIndirect          = 17147  ; TBD
+                 , WmfRecordTypeCreateBrushIndirect         = 17148  ; TBD
+                 , WmfRecordTypeCreateBitmapIndirect        = 17149  ; TBD
+                 , WmfRecordTypeCreateBitmap                = 18174  ; TBD
+                 , WmfRecordTypeCreateRegion                = 18175  ; TBD
+                 , EmfRecordTypeHeader                      = 1      ; TBD
+                 , EmfRecordTypePolyBezier                  = 2      ; TBD
+                 , EmfRecordTypePolygon                     = 3      ; TBD
+                 , EmfRecordTypePolyline                    = 4      ; TBD
+                 , EmfRecordTypePolyBezierTo                = 5      ; TBD
+                 , EmfRecordTypePolyLineTo                  = 6      ; TBD
+                 , EmfRecordTypePolyPolyline                = 7      ; TBD
+                 , EmfRecordTypePolyPolygon                 = 8      ; TBD
+                 , EmfRecordTypeSetWindowExtEx              = 9      ; TBD
+                 , EmfRecordTypeSetWindowOrgEx              = 10     ; TBD
+                 , EmfRecordTypeSetViewportExtEx            = 11     ; TBD
+                 , EmfRecordTypeSetViewportOrgEx            = 12     ; TBD
+                 , EmfRecordTypeSetBrushOrgEx               = 13     ; TBD
+                 , EmfRecordTypeEOF                         = 14     ; TBD
+                 , EmfRecordTypeSetPixelV                   = 15     ; TBD
+                 , EmfRecordTypeSetMapperFlags              = 16     ; TBD
+                 , EmfRecordTypeSetMapMode                  = 17     ; TBD
+                 , EmfRecordTypeSetBkMode                   = 18     ; TBD
+                 , EmfRecordTypeSetPolyFillMode             = 19     ; TBD
+                 , EmfRecordTypeSetROP2                     = 20     ; TBD
+                 , EmfRecordTypeSetStretchBltMode           = 21     ; TBD
+            Static EmfRecordTypeSetTextAlign                = 22     ; TBD
+                 , EmfRecordTypeSetColorAdjustment          = 23     ; TBD
+                 , EmfRecordTypeSetTextColor                = 24     ; TBD
+                 , EmfRecordTypeSetBkColor                  = 25     ; TBD
+                 , EmfRecordTypeOffsetClipRgn               = 26     ; TBD
+                 , EmfRecordTypeMoveToEx                    = 27     ; TBD
+                 , EmfRecordTypeSetMetaRgn                  = 28     ; TBD
+                 , EmfRecordTypeExcludeClipRect             = 29     ; TBD
+                 , EmfRecordTypeIntersectClipRect           = 30     ; TBD
+                 , EmfRecordTypeScaleViewportExtEx          = 31     ; TBD
+                 , EmfRecordTypeScaleWindowExtEx            = 32     ; TBD
+                 , EmfRecordTypeSaveDC                      = 33     ; TBD
+                 , EmfRecordTypeRestoreDC                   = 34     ; TBD
+                 , EmfRecordTypeSetWorldTransform           = 35     ; TBD
+                 , EmfRecordTypeModifyWorldTransform        = 36     ; TBD
+                 , EmfRecordTypeSelectObject                = 37     ; TBD
+                 , EmfRecordTypeCreatePen                   = 38     ; TBD
+                 , EmfRecordTypeCreateBrushIndirect         = 39     ; TBD
+                 , EmfRecordTypeDeleteObject                = 40     ; TBD
+                 , EmfRecordTypeAngleArc                    = 41     ; TBD
+                 , EmfRecordTypeEllipse                     = 42     ; TBD
+                 , EmfRecordTypeRectangle                   = 43     ; TBD
+                 , EmfRecordTypeRoundRect                   = 44     ; TBD
+                 , EmfRecordTypeArc                         = 45     ; TBD
+                 , EmfRecordTypeChord                       = 46     ; TBD
+                 , EmfRecordTypePie                         = 47     ; TBD
+                 , EmfRecordTypeSelectPalette               = 48     ; TBD
+                 , EmfRecordTypeCreatePalette               = 49     ; TBD
+                 , EmfRecordTypeSetPaletteEntries           = 50     ; TBD
+                 , EmfRecordTypeResizePalette               = 51     ; TBD
+                 , EmfRecordTypeRealizePalette              = 52     ; TBD
+                 , EmfRecordTypeExtFloodFill                = 53     ; TBD
+                 , EmfRecordTypeLineTo                      = 54     ; TBD
+                 , EmfRecordTypeArcTo                       = 55     ; TBD
+                 , EmfRecordTypePolyDraw                    = 56     ; TBD
+                 , EmfRecordTypeSetArcDirection             = 57     ; TBD
+                 , EmfRecordTypeSetMiterLimit               = 58     ; TBD
+                 , EmfRecordTypeBeginPath                   = 59     ; TBD
+                 , EmfRecordTypeEndPath                     = 60     ; TBD
+                 , EmfRecordTypeCloseFigure                 = 61     ; TBD
+                 , EmfRecordTypeFillPath                    = 62     ; TBD
+                 , EmfRecordTypeStrokeAndFillPath           = 63     ; TBD
+                 , EmfRecordTypeStrokePath                  = 64     ; TBD
+                 , EmfRecordTypeFlattenPath                 = 65     ; TBD
+                 , EmfRecordTypeWidenPath                   = 66     ; TBD
+                 , EmfRecordTypeSelectClipPath              = 67     ; TBD
+                 , EmfRecordTypeAbortPath                   = 68     ; TBD
+                 , EmfRecordTypeReserved_069                = 69     ; TBD
+                 , EmfRecordTypeGdiComment                  = 70     ; TBD
+                 , EmfRecordTypeFillRgn                     = 71     ; TBD
+            Static EmfRecordTypeFrameRgn                    = 72     ; TBD
+                 , EmfRecordTypeInvertRgn                   = 73     ; TBD
+                 , EmfRecordTypePaintRgn                    = 74     ; TBD
+                 , EmfRecordTypeExtSelectClipRgn            = 75     ; TBD
+                 , EmfRecordTypeBitBlt                      = 76     ; TBD
+                 , EmfRecordTypeStretchBlt                  = 77     ; TBD
+                 , EmfRecordTypeMaskBlt                     = 78     ; TBD
+                 , EmfRecordTypePlgBlt                      = 79     ; TBD
+                 , EmfRecordTypeSetDIBitsToDevice           = 80     ; TBD
+                 , EmfRecordTypeStretchDIBits               = 81     ; TBD
+                 , EmfRecordTypeExtCreateFontIndirect       = 82     ; TBD
+                 , EmfRecordTypeExtTextOutA                 = 83     ; TBD
+                 , EmfRecordTypeExtTextOutW                 = 84     ; TBD
+                 , EmfRecordTypePolyBezier16                = 85     ; TBD
+                 , EmfRecordTypePolygon16                   = 86     ; TBD
+                 , EmfRecordTypePolyline16                  = 87     ; TBD
+                 , EmfRecordTypePolyBezierTo16              = 88     ; TBD
+                 , EmfRecordTypePolylineTo16                = 89     ; TBD
+                 , EmfRecordTypePolyPolyline16              = 90     ; TBD
+                 , EmfRecordTypePolyPolygon16               = 91     ; TBD
+                 , EmfRecordTypePolyDraw16                  = 92     ; TBD
+                 , EmfRecordTypeCreateMonoBrush             = 93     ; TBD
+                 , EmfRecordTypeCreateDIBPatternBrushPt     = 94     ; TBD
+                 , EmfRecordTypeExtCreatePen                = 95     ; TBD
+                 , EmfRecordTypePolyTextOutA                = 96     ; TBD
+                 , EmfRecordTypePolyTextOutW                = 97     ; TBD
+                 , EmfRecordTypeSetICMMode                  = 98     ; TBD
+                 , EmfRecordTypeCreateColorSpace            = 99     ; TBD
+                 , EmfRecordTypeSetColorSpace               = 100    ; TBD
+                 , EmfRecordTypeDeleteColorSpace            = 101    ; TBD
+                 , EmfRecordTypeGLSRecord                   = 102    ; TBD
+                 , EmfRecordTypeGLSBoundedRecord            = 103    ; TBD
+                 , EmfRecordTypePixelFormat                 = 104    ; TBD
+                 , EmfRecordTypeDrawEscape                  = 105    ; TBD
+                 , EmfRecordTypeExtEscape                   = 106    ; TBD
+                 , EmfRecordTypeStartDoc                    = 107    ; TBD
+                 , EmfRecordTypeSmallTextOut                = 108    ; TBD
+                 , EmfRecordTypeForceUFIMapping             = 109    ; TBD
+                 , EmfRecordTypeNamedEscape                 = 110    ; TBD
+                 , EmfRecordTypeColorCorrectPalette         = 111    ; TBD
+                 , EmfRecordTypeSetICMProfileA              = 112    ; TBD
+                 , EmfRecordTypeSetICMProfileW              = 113    ; TBD
+                 , EmfRecordTypeAlphaBlend                  = 114    ; TBD
+                 , EmfRecordTypeSetLayout                   = 115    ; TBD
+                 , EmfRecordTypeTransparentBlt              = 116    ; TBD
+                 , EmfRecordTypeReserved_117                = 117    ; TBD
+                 , EmfRecordTypeGradientFill                = 118    ; TBD
+                 , EmfRecordTypeSetLinkedUFIs               = 119    ; TBD
+                 , EmfRecordTypeSetTextJustification        = 120    ; TBD
+                 , EmfRecordTypeColorMatchToTargetW         = 121    ; TBD
+            Static EmfRecordTypeCreateColorSpaceW           = 122    ; TBD
+                 , EmfRecordTypeMax                         = 122    ; TBD
+                 , EmfRecordTypeMin                         = 1      ; TBD
+                 , EmfPlusRecordTypeInvalid                 = 16384  ; TBD
+                 , EmfPlusRecordTypeHeader                  = 16385  ; Identifies a record that is the EMF+ header.
+                 , EmfPlusRecordTypeEndOfFile               = 16386  ; Identifies a record that marks the last EMF+ record of a metafile.
+                 , EmfPlusRecordTypeComment                 = 16387  ; this.Graphics.AddMetafileComment()
+                 , EmfPlusRecordTypeGetDC                   = 16388  ; this.Graphics.GetHDC()
+                 , EmfPlusRecordTypeMultiFormatStart        = 16389  ; Identifies the start of a multiple-format block.
+                 , EmfPlusRecordTypeMultiFormatSection      = 16390  ; Identifies a section in a multiple-format block.
+                 , EmfPlusRecordTypeMultiFormatEnd          = 16391  ; Identifies the end of a multiple-format block.
+                 , EmfPlusRecordTypeObject                  = 16392  ; TBD
+                 , EmfPlusRecordTypeClear                   = 16393  ; this.Graphics.Clear()
+                 , EmfPlusRecordTypeFillRects               = 16394  ; FillRectangles Methods
+                 , EmfPlusRecordTypeDrawRects               = 16395  ; DrawRectangles Methods
+                 , EmfPlusRecordTypeFillPolygon             = 16396  ; FillPolygon Methods
+                 , EmfPlusRecordTypeDrawLines               = 16397  ; DrawLines Methods
+                 , EmfPlusRecordTypeFillEllipse             = 16398  ; FillEllipse Methods
+                 , EmfPlusRecordTypeDrawEllipse             = 16399  ; DrawEllipse Methods
+                 , EmfPlusRecordTypeFillPie                 = 16400  ; FillPie Methods
+                 , EmfPlusRecordTypeDrawPie                 = 16401  ; DrawPie Methods
+                 , EmfPlusRecordTypeDrawArc                 = 16402  ; DrawArc Methods
+                 , EmfPlusRecordTypeFillRegion              = 16403  ; this.Graphics.()
+                 , EmfPlusRecordTypeFillPath                = 16404  ; this.Graphics.()
+                 , EmfPlusRecordTypeDrawPath                = 16405  ; this.Graphics.()
+                 , EmfPlusRecordTypeFillClosedCurve         = 16406  ; FillClosedCurve Methods
+                 , EmfPlusRecordTypeDrawClosedCurve         = 16407  ; DrawClosedCurve Methods
+                 , EmfPlusRecordTypeDrawCurve               = 16408  ; DrawCurve Methods
+                 , EmfPlusRecordTypeDrawBeziers             = 16409  ; DrawBeziers Methods
+                 , EmfPlusRecordTypeDrawImage               = 16410  ; DrawImage Methods
+                 , EmfPlusRecordTypeDrawImagePoints         = 16411  ; DrawImage Methods (destination point arrays)
+                 , EmfPlusRecordTypeDrawString              = 16412  ; DrawString Methods
+                 , EmfPlusRecordTypeSetRenderingOrigin      = 16413  ; this.Graphics.SetRenderingOrigin()
+                 , EmfPlusRecordTypeSetAntiAliasMode        = 16414  ; this.Graphics.SetSmoothingMode()
+                 , EmfPlusRecordTypeSetTextRenderingHint    = 16415  ; this.Graphics.SetTextRenderingHint()
+                 , EmfPlusRecordTypeSetTextContrast         = 16416  ; this.Graphics.SetTextContrast()
+                 , EmfPlusRecordTypeSetInterpolationMode    = 16417  ; this.Graphics.SetInterpolationMode()
+                 , EmfPlusRecordTypeSetPixelOffsetMode      = 16418  ; this.Graphics.SetPixelOffsetMode()
+                 , EmfPlusRecordTypeSetCompositingMode      = 16419  ; this.Graphics.SetCompositingMode()
+                 , EmfPlusRecordTypeSetCompositingQuality   = 16420  ; this.Graphics.SetCompositingQuality()
+                 , EmfPlusRecordTypeSave                    = 16421  ; this.Graphics.Save()
+                 , EmfPlusRecordTypeRestore                 = 16422  ; this.Graphics.Restore()
+                 , EmfPlusRecordTypeBeginContainer          = 16423  ; this.Graphics.BeginContainer()
+                 , EmfPlusRecordTypeBeginContainerNoParams  = 16424  ; this.Graphics.BeginContainer()
+                 , EmfPlusRecordTypeEndContainer            = 16425  ; this.Graphics.EndContainer()
+                 , EmfPlusRecordTypeSetWorldTransform       = 16426  ; this.Graphics.SetTransform()
+                 , EmfPlusRecordTypeResetWorldTransform     = 16427  ; this.Graphics.ResetTransform()
+                 , EmfPlusRecordTypeMultiplyWorldTransform  = 16428  ; this.Graphics.MultiplyTransform()
+                 , EmfPlusRecordTypeTranslateWorldTransform = 16429  ; this.Graphics.TranslateTransform()
+                 , EmfPlusRecordTypeScaleWorldTransform     = 16430  ; this.Graphics.ScaleTransform()
+            Static EmfPlusRecordTypeRotateWorldTransform    = 16431  ; this.Graphics.RotateTransform()
+                 , EmfPlusRecordTypeSetPageTransform        = 16432  ; this.Graphics.SetPageScale() and this.Graphics.SetPageUnit()
+                 , EmfPlusRecordTypeResetClip               = 16433  ; this.Graphics.ResetClip()
+                 , EmfPlusRecordTypeSetClipRect             = 16434  ; this.Graphics.SetClip()
+                 , EmfPlusRecordTypeSetClipPath             = 16435  ; this.Graphics.SetClip()
+                 , EmfPlusRecordTypeSetClipRegion           = 16436  ; this.Graphics.SetClip()
+                 , EmfPlusRecordTypeOffsetClip              = 16437  ; TranslateClip Methods
+                 , EmfPlusRecordTypeDrawDriverString        = 16438  ; this.Graphics.DrawDriverString()
+                 , EmfPlusRecordTypeStrokeFillPath          = 16439  ; TBD
+                 , EmfPlusRecordTypeSerializableObject      = 16440  ; TBD
+                 , EmfPlusRecordTypeSetTSGraphics           = 16441  ; TBD
+                 , EmfPlusRecordTypeSetTSClip               = 16442  ; TBD
+                 , EmfPlusRecordTotal                       = 16443  ; TBD
+                 , EmfPlusRecordTypeMax                     = -1     ; TBD
+                 , EmfPlusRecordTypeMin                     = 16385  ; TBD
+        }
         
-        ; Specifies the spacing, orientation, and quality of the rendering for driver strings.
-        Static DriverStringOptions := {"DriverStringOptionsCmapLookup"      : 1   ; String array contains Unicode character values.
-                                      ,"DriverStringOptionsVertical"        : 2   ; String is displayed vertically.
-                                      ,"DriverStringOptionsRealizedAdvance" : 4   ; Glyph positions are calculated from the position of the first glyph. 
-                                      ,"DriverStringOptionsLimitSubpixel"   : 8 } ; Less memory should be used for cache of antialiased glyphs.
+        Class EmfToWmfBitsFlags {                          ; Specifies options for the this.Metafile.EmfToWmfBits() method.
+            Static EmfToWmfBitsFlagsDefault          = 0   ; Default conversion.
+                 , EmfToWmfBitsFlagsEmbedEmf         = 1   ; Source EMF metafile is embedded as a comment in the resulting WMF metafile.
+                 , EmfToWmfBitsFlagsIncludePlaceable = 2   ; Resulting WMF metafile is in the placeable metafile format.
+                 , EmfToWmfBitsFlagsNoXORClip        = 4   ; Clipping region is stored in the metafile in the traditional way. 
+        }
         
-        ; Identifies metafile record types used in Windows Metafile Format (WMF), Enhanced Metafile (EMF), and EMF+ files. 
-        Static EmfPlusRecordType := {"WmfRecordTypeSetBkColor"                  : (0x201|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetBkMode"                   : (0x102|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetMapMode"                  : (0x103|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetROP2"                     : (0x104|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetRelAbs"                   : (0x105|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetPolyFillMode"             : (0x106|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetStretchBltMode"           : (0x107|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetTextCharExtra"            : (0x108|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetTextColor"                : (0x209|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetTextJustification"        : (0x20A|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetWindowOrg"                : (0x20B|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetWindowExt"                : (0x20C|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetViewportOrg"              : (0x20D|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetViewportExt"              : (0x20E|0x4000) ; TBD
-                                    ,"WmfRecordTypeOffsetWindowOrg"             : (0x20F|0x4000) ; TBD
-                                    ,"WmfRecordTypeScaleWindowExt"              : (0x410|0x4000) ; TBD
-                                    ,"WmfRecordTypeOffsetViewportOrg"           : (0x211|0x4000) ; TBD
-                                    ,"WmfRecordTypeScaleViewportExt"            : (0x412|0x4000) ; TBD
-                                    ,"WmfRecordTypeLineTo"                      : (0x213|0x4000) ; TBD
-                                    ,"WmfRecordTypeMoveTo"                      : (0x214|0x4000) ; TBD
-                                    ,"WmfRecordTypeExcludeClipRect"             : (0x415|0x4000) ; TBD
-                                    ,"WmfRecordTypeIntersectClipRect"           : (0x416|0x4000) ; TBD
-                                    ,"WmfRecordTypeArc"                         : (0x817|0x4000) ; TBD
-                                    ,"WmfRecordTypeEllipse"                     : (0x418|0x4000) ; TBD
-                                    ,"WmfRecordTypeFloodFill"                   : (0x419|0x4000) ; TBD
-                                    ,"WmfRecordTypePie"                         : (0x81A|0x4000) ; TBD
-                                    ,"WmfRecordTypeRectangle"                   : (0x41B|0x4000) ; TBD
-                                    ,"WmfRecordTypeRoundRect"                   : (0x61C|0x4000) ; TBD
-                                    ,"WmfRecordTypePatBlt"                      : (0x61D|0x4000) ; TBD
-                                    ,"WmfRecordTypeSaveDC"                      : (0x01E|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetPixel"                    : (0x41F|0x4000) ; TBD
-                                    ,"WmfRecordTypeOffsetClipRgn"               : (0x220|0x4000) ; TBD
-                                    ,"WmfRecordTypeTextOut"                     : (0x521|0x4000) ; TBD
-                                    ,"WmfRecordTypeBitBlt"                      : (0x922|0x4000) ; TBD
-                                    ,"WmfRecordTypeStretchBlt"                  : (0xB23|0x4000) ; TBD
-                                    ,"WmfRecordTypePolygon"                     : (0x324|0x4000) ; TBD
-                                    ,"WmfRecordTypePolyline"                    : (0x325|0x4000) ; TBD
-                                    ,"WmfRecordTypeEscape"                      : (0x626|0x4000) ; TBD
-                                    ,"WmfRecordTypeRestoreDC"                   : (0x127|0x4000) ; TBD
-                                    ,"WmfRecordTypeFillRegion"                  : (0x228|0x4000) ; TBD
-                                    ,"WmfRecordTypeFrameRegion"                 : (0x429|0x4000) ; TBD
-                                    ,"WmfRecordTypeInvertRegion"                : (0x12A|0x4000) ; TBD
-                                    ,"WmfRecordTypePaintRegion"                 : (0x12B|0x4000) ; TBD
-                                    ,"WmfRecordTypeSelectClipRegion"            : (0x12C|0x4000) ; TBD
-                                    ,"WmfRecordTypeSelectObject"                : (0x12D|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetTextAlign"                : (0x12E|0x4000) ; TBD
-                                    ,"WmfRecordTypeDrawText"                    : (0x62F|0x4000) ; TBD
-                                    ,"WmfRecordTypeChord"                       : (0x830|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetMapperFlags"              : (0x231|0x4000) ; TBD
-                                    ,"WmfRecordTypeExtTextOut"                  : (0xA32|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetDIBToDev"                 : (0xD33|0x4000) ; TBD
-                                    ,"WmfRecordTypeSelectPalette"               : (0x234|0x4000) ; TBD
-                                    ,"WmfRecordTypeRealizePalette"              : (0x035|0x4000) ; TBD
-                                    ,"WmfRecordTypeAnimatePalette"              : (0x436|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetPalEntries"               : (0x037|0x4000) ; TBD
-                                    ,"WmfRecordTypePolyPolygon"                 : (0x538|0x4000) ; TBD
-                                    ,"WmfRecordTypeResizePalette"               : (0x139|0x4000) ; TBD
-                                    ,"WmfRecordTypeDIBBitBlt"                   : (0x940|0x4000) ; TBD
-                                    ,"WmfRecordTypeDIBStretchBlt"               : (0xB41|0x4000) ; TBD
-                                    ,"WmfRecordTypeDIBCreatePatternBrush"       : (0x142|0x4000) ; TBD
-                                    ,"WmfRecordTypeStretchDIB"                  : (0xF43|0x4000) ; TBD
-                                    ,"WmfRecordTypeExtFloodFill"                : (0x548|0x4000) ; TBD
-                                    ,"WmfRecordTypeSetLayout"                   : (0x149|0x4000) ; TBD
-                                    ,"WmfRecordTypeResetDC"                     : (0x14C|0x4000) ; TBD
-                                    ,"WmfRecordTypeStartDoc"                    : (0x14D|0x4000) ; TBD
-                                    ,"WmfRecordTypeStartPage"                   : (0x04F|0x4000) ; TBD
-                                    ,"WmfRecordTypeEndPage"                     : (0x050|0x4000) ; TBD
-                                    ,"WmfRecordTypeAbortDoc"                    : (0x052|0x4000) ; TBD
-                                    ,"WmfRecordTypeEndDoc"                      : (0x05E|0x4000) ; TBD
-                                    ,"WmfRecordTypeDeleteObject"                : (0x1F0|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreatePalette"               : (0x0F7|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreateBrush"                 : (0x0F8|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreatePatternBrush"          : (0x1F9|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreatePenIndirect"           : (0x2FA|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreateFontIndirect"          : (0x2FB|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreateBrushIndirect"         : (0x2FC|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreateBitmapIndirect"        : (0x2FD|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreateBitmap"                : (0x6FE|0x4000) ; TBD
-                                    ,"WmfRecordTypeCreateRegion"                : (0x6FF|0x4000) ; TBD
-                                    ,"EmfRecordTypeHeader"                      : 1       ; TBD
-                                    ,"EmfRecordTypePolyBezier"                  : 2       ; TBD
-                                    ,"EmfRecordTypePolygon"                     : 3       ; TBD
-                                    ,"EmfRecordTypePolyline"                    : 4       ; TBD
-                                    ,"EmfRecordTypePolyBezierTo"                : 5       ; TBD
-                                    ,"EmfRecordTypePolyLineTo"                  : 6       ; TBD
-                                    ,"EmfRecordTypePolyPolyline"                : 7       ; TBD
-                                    ,"EmfRecordTypePolyPolygon"                 : 8       ; TBD
-                                    ,"EmfRecordTypeSetWindowExtEx"              : 9       ; TBD
-                                    ,"EmfRecordTypeSetWindowOrgEx"              : 10      ; TBD
-                                    ,"EmfRecordTypeSetViewportExtEx"            : 11      ; TBD
-                                    ,"EmfRecordTypeSetViewportOrgEx"            : 12      ; TBD
-                                    ,"EmfRecordTypeSetBrushOrgEx"               : 13      ; TBD
-                                    ,"EmfRecordTypeEOF"                         : 14      ; TBD
-                                    ,"EmfRecordTypeSetPixelV"                   : 15      ; TBD
-                                    ,"EmfRecordTypeSetMapperFlags"              : 16      ; TBD
-                                    ,"EmfRecordTypeSetMapMode"                  : 17      ; TBD
-                                    ,"EmfRecordTypeSetBkMode"                   : 18      ; TBD
-                                    ,"EmfRecordTypeSetPolyFillMode"             : 19      ; TBD
-                                    ,"EmfRecordTypeSetROP2"                     : 20      ; TBD
-                                    ,"EmfRecordTypeSetStretchBltMode"           : 21      ; TBD
-                                    ,"EmfRecordTypeSetTextAlign"                : 22      ; TBD
-                                    ,"EmfRecordTypeSetColorAdjustment"          : 23      ; TBD
-                                    ,"EmfRecordTypeSetTextColor"                : 24      ; TBD
-                                    ,"EmfRecordTypeSetBkColor"                  : 25      ; TBD
-                                    ,"EmfRecordTypeOffsetClipRgn"               : 26      ; TBD
-                                    ,"EmfRecordTypeMoveToEx"                    : 27      ; TBD
-                                    ,"EmfRecordTypeSetMetaRgn"                  : 28      ; TBD
-                                    ,"EmfRecordTypeExcludeClipRect"             : 29      ; TBD
-                                    ,"EmfRecordTypeIntersectClipRect"           : 30      ; TBD
-                                    ,"EmfRecordTypeScaleViewportExtEx"          : 31      ; TBD
-                                    ,"EmfRecordTypeScaleWindowExtEx"            : 32      ; TBD
-                                    ,"EmfRecordTypeSaveDC"                      : 33      ; TBD
-                                    ,"EmfRecordTypeRestoreDC"                   : 34      ; TBD
-                                    ,"EmfRecordTypeSetWorldTransform"           : 35      ; TBD
-                                    ,"EmfRecordTypeModifyWorldTransform"        : 36      ; TBD
-                                    ,"EmfRecordTypeSelectObject"                : 37      ; TBD
-                                    ,"EmfRecordTypeCreatePen"                   : 38      ; TBD
-                                    ,"EmfRecordTypeCreateBrushIndirect"         : 39      ; TBD
-                                    ,"EmfRecordTypeDeleteObject"                : 40      ; TBD
-                                    ,"EmfRecordTypeAngleArc"                    : 41      ; TBD
-                                    ,"EmfRecordTypeEllipse"                     : 42      ; TBD
-                                    ,"EmfRecordTypeRectangle"                   : 43      ; TBD
-                                    ,"EmfRecordTypeRoundRect"                   : 44      ; TBD
-                                    ,"EmfRecordTypeArc"                         : 45      ; TBD
-                                    ,"EmfRecordTypeChord"                       : 46      ; TBD
-                                    ,"EmfRecordTypePie"                         : 47      ; TBD
-                                    ,"EmfRecordTypeSelectPalette"               : 48      ; TBD
-                                    ,"EmfRecordTypeCreatePalette"               : 49      ; TBD
-                                    ,"EmfRecordTypeSetPaletteEntries"           : 50      ; TBD
-                                    ,"EmfRecordTypeResizePalette"               : 51      ; TBD
-                                    ,"EmfRecordTypeRealizePalette"              : 52      ; TBD
-                                    ,"EmfRecordTypeExtFloodFill"                : 53      ; TBD
-                                    ,"EmfRecordTypeLineTo"                      : 54      ; TBD
-                                    ,"EmfRecordTypeArcTo"                       : 55      ; TBD
-                                    ,"EmfRecordTypePolyDraw"                    : 56      ; TBD
-                                    ,"EmfRecordTypeSetArcDirection"             : 57      ; TBD
-                                    ,"EmfRecordTypeSetMiterLimit"               : 58      ; TBD
-                                    ,"EmfRecordTypeBeginPath"                   : 59      ; TBD
-                                    ,"EmfRecordTypeEndPath"                     : 60      ; TBD
-                                    ,"EmfRecordTypeCloseFigure"                 : 61      ; TBD
-                                    ,"EmfRecordTypeFillPath"                    : 62      ; TBD
-                                    ,"EmfRecordTypeStrokeAndFillPath"           : 63      ; TBD
-                                    ,"EmfRecordTypeStrokePath"                  : 64      ; TBD
-                                    ,"EmfRecordTypeFlattenPath"                 : 65      ; TBD
-                                    ,"EmfRecordTypeWidenPath"                   : 66      ; TBD
-                                    ,"EmfRecordTypeSelectClipPath"              : 67      ; TBD
-                                    ,"EmfRecordTypeAbortPath"                   : 68      ; TBD
-                                    ,"EmfRecordTypeReserved_069"                : 69      ; TBD
-                                    ,"EmfRecordTypeGdiComment"                  : 70      ; TBD
-                                    ,"EmfRecordTypeFillRgn"                     : 71      ; TBD
-                                    ,"EmfRecordTypeFrameRgn"                    : 72      ; TBD
-                                    ,"EmfRecordTypeInvertRgn"                   : 73      ; TBD
-                                    ,"EmfRecordTypePaintRgn"                    : 74      ; TBD
-                                    ,"EmfRecordTypeExtSelectClipRgn"            : 75      ; TBD
-                                    ,"EmfRecordTypeBitBlt"                      : 76      ; TBD
-                                    ,"EmfRecordTypeStretchBlt"                  : 77      ; TBD
-                                    ,"EmfRecordTypeMaskBlt"                     : 78      ; TBD
-                                    ,"EmfRecordTypePlgBlt"                      : 79      ; TBD
-                                    ,"EmfRecordTypeSetDIBitsToDevice"           : 80      ; TBD
-                                    ,"EmfRecordTypeStretchDIBits"               : 81      ; TBD
-                                    ,"EmfRecordTypeExtCreateFontIndirect"       : 82      ; TBD
-                                    ,"EmfRecordTypeExtTextOutA"                 : 83      ; TBD
-                                    ,"EmfRecordTypeExtTextOutW"                 : 84      ; TBD
-                                    ,"EmfRecordTypePolyBezier16"                : 85      ; TBD
-                                    ,"EmfRecordTypePolygon16"                   : 86      ; TBD
-                                    ,"EmfRecordTypePolyline16"                  : 87      ; TBD
-                                    ,"EmfRecordTypePolyBezierTo16"              : 88      ; TBD
-                                    ,"EmfRecordTypePolylineTo16"                : 89      ; TBD
-                                    ,"EmfRecordTypePolyPolyline16"              : 90      ; TBD
-                                    ,"EmfRecordTypePolyPolygon16"               : 91      ; TBD
-                                    ,"EmfRecordTypePolyDraw16"                  : 92      ; TBD
-                                    ,"EmfRecordTypeCreateMonoBrush"             : 93      ; TBD
-                                    ,"EmfRecordTypeCreateDIBPatternBrushPt"     : 94      ; TBD
-                                    ,"EmfRecordTypeExtCreatePen"                : 95      ; TBD
-                                    ,"EmfRecordTypePolyTextOutA"                : 96      ; TBD
-                                    ,"EmfRecordTypePolyTextOutW"                : 97      ; TBD
-                                    ,"EmfRecordTypeSetICMMode"                  : 98      ; TBD
-                                    ,"EmfRecordTypeCreateColorSpace"            : 99      ; TBD
-                                    ,"EmfRecordTypeSetColorSpace"               : 100     ; TBD
-                                    ,"EmfRecordTypeDeleteColorSpace"            : 101     ; TBD
-                                    ,"EmfRecordTypeGLSRecord"                   : 102     ; TBD
-                                    ,"EmfRecordTypeGLSBoundedRecord"            : 103     ; TBD
-                                    ,"EmfRecordTypePixelFormat"                 : 104     ; TBD
-                                    ,"EmfRecordTypeDrawEscape"                  : 105     ; TBD
-                                    ,"EmfRecordTypeExtEscape"                   : 106     ; TBD
-                                    ,"EmfRecordTypeStartDoc"                    : 107     ; TBD
-                                    ,"EmfRecordTypeSmallTextOut"                : 108     ; TBD
-                                    ,"EmfRecordTypeForceUFIMapping"             : 109     ; TBD
-                                    ,"EmfRecordTypeNamedEscape"                 : 110     ; TBD
-                                    ,"EmfRecordTypeColorCorrectPalette"         : 111     ; TBD
-                                    ,"EmfRecordTypeSetICMProfileA"              : 112     ; TBD
-                                    ,"EmfRecordTypeSetICMProfileW"              : 113     ; TBD
-                                    ,"EmfRecordTypeAlphaBlend"                  : 114     ; TBD
-                                    ,"EmfRecordTypeSetLayout"                   : 115     ; TBD
-                                    ,"EmfRecordTypeTransparentBlt"              : 116     ; TBD
-                                    ,"EmfRecordTypeReserved_117"                : 117     ; TBD
-                                    ,"EmfRecordTypeGradientFill"                : 118     ; TBD
-                                    ,"EmfRecordTypeSetLinkedUFIs"               : 119     ; TBD
-                                    ,"EmfRecordTypeSetTextJustification"        : 120     ; TBD
-                                    ,"EmfRecordTypeColorMatchToTargetW"         : 121     ; TBD
-                                    ,"EmfRecordTypeCreateColorSpaceW"           : 122     ; TBD
-                                    ,"EmfRecordTypeMax"                         : 122     ; TBD
-                                    ,"EmfRecordTypeMin"                         : 1       ; TBD
-                                    ,"EmfPlusRecordTypeInvalid"                 : 16384   ; TBD
-                                    ,"EmfPlusRecordTypeHeader"                  : 16385   ; Identifies a record that is the EMF+ header.
-                                    ,"EmfPlusRecordTypeEndOfFile"               : 16386   ; Identifies a record that marks the last EMF+ record of a metafile.
-                                    ,"EmfPlusRecordTypeComment"                 : 16387   ; GDIP.Graphics.AddMetafileComment()
-                                    ,"EmfPlusRecordTypeGetDC"                   : 16388   ; GDIP.Graphics.GetHDC()
-                                    ,"EmfPlusRecordTypeMultiFormatStart"        : 16389   ; Identifies the start of a multiple-format block.
-                                    ,"EmfPlusRecordTypeMultiFormatSection"      : 16390   ; Identifies a section in a multiple-format block.
-                                    ,"EmfPlusRecordTypeMultiFormatEnd"          : 16391   ; Identifies the end of a multiple-format block.
-                                    ,"EmfPlusRecordTypeObject"                  : 16392   ; TBD
-                                    ,"EmfPlusRecordTypeClear"                   : 16393   ; GDIP.Graphics.Clear()
-                                    ,"EmfPlusRecordTypeFillRects"               : 16394   ; FillRectangles Methods
-                                    ,"EmfPlusRecordTypeDrawRects"               : 16395   ; DrawRectangles Methods
-                                    ,"EmfPlusRecordTypeFillPolygon"             : 16396   ; FillPolygon Methods
-                                    ,"EmfPlusRecordTypeDrawLines"               : 16397   ; DrawLines Methods
-                                    ,"EmfPlusRecordTypeFillEllipse"             : 16398   ; FillEllipse Methods
-                                    ,"EmfPlusRecordTypeDrawEllipse"             : 16399   ; DrawEllipse Methods
-                                    ,"EmfPlusRecordTypeFillPie"                 : 16400   ; FillPie Methods
-                                    ,"EmfPlusRecordTypeDrawPie"                 : 16401   ; DrawPie Methods
-                                    ,"EmfPlusRecordTypeDrawArc"                 : 16402   ; DrawArc Methods
-                                    ,"EmfPlusRecordTypeFillRegion"              : 16403   ; GDIP.Graphics.()
-                                    ,"EmfPlusRecordTypeFillPath"                : 16404   ; GDIP.Graphics.()
-                                    ,"EmfPlusRecordTypeDrawPath"                : 16405   ; GDIP.Graphics.()
-                                    ,"EmfPlusRecordTypeFillClosedCurve"         : 16406   ; FillClosedCurve Methods
-                                    ,"EmfPlusRecordTypeDrawClosedCurve"         : 16407   ; DrawClosedCurve Methods
-                                    ,"EmfPlusRecordTypeDrawCurve"               : 16408   ; DrawCurve Methods
-                                    ,"EmfPlusRecordTypeDrawBeziers"             : 16409   ; DrawBeziers Methods
-                                    ,"EmfPlusRecordTypeDrawImage"               : 16410   ; DrawImage Methods
-                                    ,"EmfPlusRecordTypeDrawImagePoints"         : 16411   ; DrawImage Methods (destination point arrays)
-                                    ,"EmfPlusRecordTypeDrawString"              : 16412   ; DrawString Methods
-                                    ,"EmfPlusRecordTypeSetRenderingOrigin"      : 16413   ; GDIP.Graphics.SetRenderingOrigin()
-                                    ,"EmfPlusRecordTypeSetAntiAliasMode"        : 16414   ; GDIP.Graphics.SetSmoothingMode()
-                                    ,"EmfPlusRecordTypeSetTextRenderingHint"    : 16415   ; GDIP.Graphics.SetTextRenderingHint()
-                                    ,"EmfPlusRecordTypeSetTextContrast"         : 16416   ; GDIP.Graphics.SetTextContrast()
-                                    ,"EmfPlusRecordTypeSetInterpolationMode"    : 16417   ; GDIP.Graphics.SetInterpolationMode()
-                                    ,"EmfPlusRecordTypeSetPixelOffsetMode"      : 16418   ; GDIP.Graphics.SetPixelOffsetMode()
-                                    ,"EmfPlusRecordTypeSetCompositingMode"      : 16419   ; GDIP.Graphics.SetCompositingMode()
-                                    ,"EmfPlusRecordTypeSetCompositingQuality"   : 16420   ; GDIP.Graphics.SetCompositingQuality()
-                                    ,"EmfPlusRecordTypeSave"                    : 16421   ; GDIP.Graphics.Save()
-                                    ,"EmfPlusRecordTypeRestore"                 : 16422   ; GDIP.Graphics.Restore()
-                                    ,"EmfPlusRecordTypeBeginContainer"          : 16423   ; GDIP.Graphics.BeginContainer()
-                                    ,"EmfPlusRecordTypeBeginContainerNoParams"  : 16424   ; GDIP.Graphics.BeginContainer()
-                                    ,"EmfPlusRecordTypeEndContainer"            : 16425   ; GDIP.Graphics.EndContainer()
-                                    ,"EmfPlusRecordTypeSetWorldTransform"       : 16426   ; GDIP.Graphics.SetTransform()
-                                    ,"EmfPlusRecordTypeResetWorldTransform"     : 16427   ; GDIP.Graphics.ResetTransform()
-                                    ,"EmfPlusRecordTypeMultiplyWorldTransform"  : 16428   ; GDIP.Graphics.MultiplyTransform()
-                                    ,"EmfPlusRecordTypeTranslateWorldTransform" : 16429   ; GDIP.Graphics.TranslateTransform()
-                                    ,"EmfPlusRecordTypeScaleWorldTransform"     : 16430   ; GDIP.Graphics.ScaleTransform()
-                                    ,"EmfPlusRecordTypeRotateWorldTransform"    : 16431   ; GDIP.Graphics.RotateTransform()
-                                    ,"EmfPlusRecordTypeSetPageTransform"        : 16432   ; GDIP.Graphics.SetPageScale() and GDIP.Graphics.SetPageUnit()
-                                    ,"EmfPlusRecordTypeResetClip"               : 16433   ; GDIP.Graphics.ResetClip()
-                                    ,"EmfPlusRecordTypeSetClipRect"             : 16434   ; GDIP.Graphics.SetClip()
-                                    ,"EmfPlusRecordTypeSetClipPath"             : 16435   ; GDIP.Graphics.SetClip()
-                                    ,"EmfPlusRecordTypeSetClipRegion"           : 16436   ; GDIP.Graphics.SetClip()
-                                    ,"EmfPlusRecordTypeOffsetClip"              : 16437   ; TranslateClip Methods
-                                    ,"EmfPlusRecordTypeDrawDriverString"        : 16438   ; GDIP.Graphics.DrawDriverString()
-                                    ,"EmfPlusRecordTypeStrokeFillPath"          : 16439   ; TBD
-                                    ,"EmfPlusRecordTypeSerializableObject"      : 16440   ; TBD
-                                    ,"EmfPlusRecordTypeSetTSGraphics"           : 16441   ; TBD
-                                    ,"EmfPlusRecordTypeSetTSClip"               : 16442   ; TBD
-                                    ,"EmfPlusRecordTotal"                       : 16443   ; TBD
-                                    ,"EmfPlusRecordTypeMax"                     : -1      ; TBD
-                                    ,"EmfPlusRecordTypeMin"                     : 16385 } ; TBD
+        Class EmfType {                     ; Specifies if EMF, EMF+, or dual
+            Static EmfTypeEmfOnly     = 3   ; Only EMF
+                 , EmfTypeEmfPlusOnly = 4   ; Only EMF+
+                 , EmfTypeEmfPlusDual = 5   ; Both EMF and EMF+
+        }
         
-        ; Specifies options for the GDIP.Metafile.EmfToWmfBits() method.
-        Static EmfToWmfBitsFlags := {"EmfToWmfBitsFlagsDefault"          : 0   ; Default conversion.
-                                    ,"EmfToWmfBitsFlagsEmbedEmf"         : 1   ; Source EMF metafile is embedded as a comment in the resulting WMF metafile.
-                                    ,"EmfToWmfBitsFlagsIncludePlaceable" : 2   ; Resulting WMF metafile is in the placeable metafile format.
-                                    ,"EmfToWmfBitsFlagsNoXORClip"        : 4 } ; Clipping region is stored in the metafile in the traditional way. 
+        Class EncoderParameterValueType {                       ; Specifies data types for image codec (encoder/decoder) parameters.
+            Static EncoderParameterValueTypeByte          = 1   ; Is an 8-bit unsigned integer.
+                 , EncoderParameterValueTypeASCII         = 2   ; Is a null-terminated character string.
+                 , EncoderParameterValueTypeShort         = 3   ; Is a 16-bit unsigned integer.
+                 , EncoderParameterValueTypeLong          = 4   ; Is a 32-bit unsigned integer.
+                 , EncoderParameterValueTypeRational      = 5   ; Is an array of two, 32-bit unsigned integers representing a fraction.
+                 , EncoderParameterValueTypeLongRange     = 6   ; Is an array of two, 32-bit unsigned integers representing a range.
+                 , EncoderParameterValueTypeUndefined     = 7   ; Is an array of bytes that can hold values of any type.
+                 , EncoderParameterValueTypeRationalRange = 8   ; Is an array of four, 32-bit unsigned integers representing a range of rational numbers.
+                 , EncoderParameterValueTypePointer       = 9   ; Is a pointer to a block of custom metadata.
+        }
         
-        ;
-        Static EmfType := {"EmfTypeEmfOnly"     : 3   ; Only EMF
-                          ,"EmfTypeEmfPlusOnly" : 4   ; Only EMF+
-                          ,"EmfTypeEmfPlusDual" : 5 } ; Both EMF and EMF+
+        Class EncoderValue {                                   ; Specifies values that can be passed as arguments to image encoders.
+            Static EncoderValueColorTypeCMYK            = 0    ; Not used in GDI+ version 1.0.
+                 , EncoderValueColorTypeYCCK            = 1    ; Not used in GDI+ version 1.0.
+                 , EncoderValueCompressionLZW           = 2    ; TIFF image, specifies the LZW compression method.
+                 , EncoderValueCompressionCCITT3        = 3    ; TIFF image, specifies the CCITT3 compression method.
+                 , EncoderValueCompressionCCITT4        = 4    ; TIFF image, specifies the CCITT4 compression method.
+                 , EncoderValueCompressionRle           = 5    ; TIFF image, specifies the RLE compression method.
+                 , EncoderValueCompressionNone          = 6    ; TIFF image, specifies no compression.
+                 , EncoderValueScanMethodInterlaced     = 7    ; Not used in GDI+ version 1.0.
+                 , EncoderValueScanMethodNonInterlaced  = 8    ; Not used in GDI+ version 1.0.
+                 , EncoderValueVersionGif87             = 9    ; Not used in GDI+ version 1.0.
+                 , EncoderValueVersionGif89             = 10   ; Not used in GDI+ version 1.0.
+                 , EncoderValueRenderProgressive        = 11   ; Not used in GDI+ version 1.0.
+                 , EncoderValueRenderNonProgressive     = 12   ; Not used in GDI+ version 1.0.
+                 , EncoderValueTransformRotate90        = 13   ; JPEG image, specifies lossless 90-degree clockwise rotation.
+                 , EncoderValueTransformRotate180       = 14   ; JPEG image, specifies lossless 180-degree clockwise rotation.
+                 , EncoderValueTransformRotate270       = 15   ; JPEG image, specifies lossless 270-degree clockwise rotation.
+                 , EncoderValueTransformFlipHorizontal  = 16   ; JPEG image, specifies a lossless horizontal flip.
+                 , EncoderValueTransformFlipVertical    = 17   ; JPEG image, specifies a lossless vertical flip.
+                 , EncoderValueMultiFrame               = 18   ; Specifies multiple-frame encoding.
+                 , EncoderValueLastFrame                = 19   ; Specifies the last frame of a multiple-frame image.
+                 , EncoderValueFlush                    = 20   ; Specifies that the encoder object is to be closed.
+                 , EncoderValueFrameDimensionTime       = 21   ; Not used in GDI+ version 1.0.
+                 , EncoderValueFrameDimensionResolution = 22   ; Not used in GDI+ version 1.0.
+                 , EncoderValueFrameDimensionPage       = 23   ; TIFF image, specifies the page frame dimension
+                 , EncoderValueColorTypeGray            = 24   ; Undefined
+                 , EncoderValueColorTypeRGB             = 25   ; Undefined
+        }
         
-        ; Specifies data types for image codec (encoder/decoder) parameters.
-        Static EncoderParameterValueType := {"EncoderParameterValueTypeByte"          : 1   ; Is an 8-bit unsigned integer.
-                                            ,"EncoderParameterValueTypeASCII"         : 2   ; Is a null-terminated character string.
-                                            ,"EncoderParameterValueTypeShort"         : 3   ; Is a 16-bit unsigned integer.
-                                            ,"EncoderParameterValueTypeLong"          : 4   ; Is a 32-bit unsigned integer.
-                                            ,"EncoderParameterValueTypeRational"      : 5   ; Is an array of two, 32-bit unsigned integers representing a fraction.
-                                            ,"EncoderParameterValueTypeLongRange"     : 6   ; Is an array of two, 32-bit unsigned integers representing a range.
-                                            ,"EncoderParameterValueTypeUndefined"     : 7   ; Is an array of bytes that can hold values of any type.
-                                            ,"EncoderParameterValueTypeRationalRange" : 8   ; Is an array of four, 32-bit unsigned integers representing a range of rational numbers.
-                                            ,"EncoderParameterValueTypePointer"       : 9 } ; Is a pointer to a block of custom metadata.
+        Class FillMode {                   ; Specifies how to fill areas that are formed when a path or curve intersects itself.
+            Static FillModeAlternate = 0   ; Areas are filled according to the even-odd parity rule.
+                 , FillModeWinding   = 1   ; Areas are filled according to the nonzero winding rule.
+        }
         
-        ; Specifies values that can be passed as arguments to image encoders.
-        Static EncoderValue := {"EncoderValueColorTypeCMYK"            : 0    ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueColorTypeYCCK"            : 1    ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueCompressionLZW"           : 2    ; TIFF image, specifies the LZW compression method.
-                               ,"EncoderValueCompressionCCITT3"        : 3    ; TIFF image, specifies the CCITT3 compression method.
-                               ,"EncoderValueCompressionCCITT4"        : 4    ; TIFF image, specifies the CCITT4 compression method.
-                               ,"EncoderValueCompressionRle"           : 5    ; TIFF image, specifies the RLE compression method.
-                               ,"EncoderValueCompressionNone"          : 6    ; TIFF image, specifies no compression.
-                               ,"EncoderValueScanMethodInterlaced"     : 7    ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueScanMethodNonInterlaced"  : 8    ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueVersionGif87"             : 9    ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueVersionGif89"             : 10   ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueRenderProgressive"        : 11   ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueRenderNonProgressive"     : 12   ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueTransformRotate90"        : 13   ; JPEG image, specifies lossless 90-degree clockwise rotation.
-                               ,"EncoderValueTransformRotate180"       : 14   ; JPEG image, specifies lossless 180-degree clockwise rotation.
-                               ,"EncoderValueTransformRotate270"       : 15   ; JPEG image, specifies lossless 270-degree clockwise rotation.
-                               ,"EncoderValueTransformFlipHorizontal"  : 16   ; JPEG image, specifies a lossless horizontal flip.
-                               ,"EncoderValueTransformFlipVertical"    : 17   ; JPEG image, specifies a lossless vertical flip.
-                               ,"EncoderValueMultiFrame"               : 18   ; Specifies multiple-frame encoding.
-                               ,"EncoderValueLastFrame"                : 19   ; Specifies the last frame of a multiple-frame image.
-                               ,"EncoderValueFlush"                    : 20   ; Specifies that the encoder object is to be closed.
-                               ,"EncoderValueFrameDimensionTime"       : 21   ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueFrameDimensionResolution" : 22   ; Not used in GDI+ version 1.0.
-                               ,"EncoderValueFrameDimensionPage"       : 23   ; TIFF image, specifies the page frame dimension
-                               ,"EncoderValueColorTypeGray"            : 24   ; Undefined
-                               ,"EncoderValueColorTypeRGB"             : 25 } ; Undefined
+        Class FlushIntention {               ; Specifies when to flush the queue of graphics operations.
+            Static FlushIntentionFlush = 0   ; Pending rendering operations are executed and Flush() is not synchronized.
+                 , FlushIntentionSync  = 1   ; Pending rendering operations are executed and Flush() is synchronized.
+        }
         
-        ; Specifies how to fill areas that are formed when a path or curve intersects itself.
-        Static FillMode := {"FillModeAlternate" : 0   ; Areas are filled according to the even-odd parity rule.
-                           ,"FillModeWinding"   : 1 } ; Areas are filled according to the nonzero winding rule.
+        Class FontStyle {                    ; Specifies the style of the typeface of a font.
+            Static FontStyleRegular    = 0   ; Normal weight or thickness of the typeface.
+                 , FontStyleBold       = 1   ; Bold typeface. Bold is a heavier weight or thickness.
+                 , FontStyleItalic     = 2   ; Italic typeface, which produces a noticeable slant to the vertical stems of the characters.
+                 , FontStyleBoldItalic = 3   ; Typeface is both bold and italic.
+                 , FontStyleUnderline  = 4   ; Underline, which displays a line underneath the baseline of the characters.
+                 , FontStyleStrikeout  = 8   ; Strikeout, which displays a horizontal line drawn through the middle of the characters.
+        }
         
-        ; Specifies when to flush the queue of graphics operations.
-        Static FlushIntention := {"FlushIntentionFlush" : 0   ; Pending rendering operations are executed and Flush() is not synchronized.
-                                 ,"FlushIntentionSync"  : 1 } ; Pending rendering operations are executed and Flush() is synchronized.
+        Class GenericFontFamily {                   ;
+            Static GenericFontFamilySerif     = 0   ; 
+                 , GenericFontFamilySansSerif = 1   ; 
+                 , GenericFontFamilyMonospace = 2   ; 
+        }
         
-        ; Specifies the style of the typeface of a font.
-        Static FontStyle := {"FontStyleRegular"    : 0   ; Normal weight or thickness of the typeface.
-                            ,"FontStyleBold"       : 1   ; Bold typeface. Bold is a heavier weight or thickness.
-                            ,"FontStyleItalic"     : 2   ; Italic typeface, which produces a noticeable slant to the vertical stems of the characters.
-                            ,"FontStyleBoldItalic" : 3   ; Typeface is both bold and italic.
-                            ,"FontStyleUnderline"  : 4   ; Underline, which displays a line underneath the baseline of the characters.
-                            ,"FontStyleStrikeout"  : 8 } ; Strikeout, which displays a horizontal line drawn through the middle of the characters.
+        Class GpTestControlEnum {                  ;
+            Static TestControlForceBilinear  = 0   ;
+                 , TestControlNoICM          = 1   ;
+                 , TestControlGetBuildNumber = 2   ;
+        }
         
-        ; 
-        Static GenericFontFamily := {"GenericFontFamilySerif"     : 0   ; 
-                                    ,"GenericFontFamilySansSerif" : 1   ; 
-                                    ,"GenericFontFamilyMonospace" : 2 } ; 
+        Class HatchStyle {                                 ; Specifies the hatch pattern used by a brush of type HatchBrush.
+            Static HatchStyleHorizontal             = 0    ; Horizontal lines.
+                 , HatchStyleVertical               = 1    ; Vertical lines.                                                                                                                                                                                                                                         
+                 , HatchStyleForwardDiagonal        = 2    ; Diagonal lines that slant to the right from top points to bottom points.
+                 , HatchStyleBackwardDiagonal       = 3    ; Diagonal lines that slant to the left from top points to bottom points.
+                 , HatchStyleCross                  = 4    ; Horizontal and vertical lines that cross at 90-degree angles.
+                 , HatchStyleDiagonalCross          = 5    ; Forward diagonal and backward diagonal lines that cross at 90-degree angles.
+                 , HatchStyle05Percent              = 6    ;  5% hatch. The ratio of foreground color to background color is 5:100.
+                 , HatchStyle10Percent              = 7    ; 10% hatch. The ratio of foreground color to background color is 10:100.
+                 , HatchStyle20Percent              = 8    ; 20% hatch. The ratio of foreground color to background color is 20:100.
+                 , HatchStyle25Percent              = 9    ; 25% hatch. The ratio of foreground color to background color is 25:100.
+                 , HatchStyle30Percent              = 10   ; 30% hatch. The ratio of foreground color to background color is 30:100.
+                 , HatchStyle40Percent              = 11   ; 40% hatch. The ratio of foreground color to background color is 40:100.
+                 , HatchStyle50Percent              = 12   ; 50% hatch. The ratio of foreground color to background color is 50:100.
+                 , HatchStyle60Percent              = 13   ; 60% hatch. The ratio of foreground color to background color is 60:100.
+                 , HatchStyle70Percent              = 14   ; 70% hatch. The ratio of foreground color to background color is 70:100.
+                 , HatchStyle75Percent              = 15   ; 75% hatch. The ratio of foreground color to background color is 75:100.
+                 , HatchStyle80Percent              = 16   ; 80% hatch. The ratio of foreground color to background color is 80:100.
+                 , HatchStyle90Percent              = 17   ; 90% hatch. The ratio of foreground color to background color is 90:100.
+                 , HatchStyleLightDownwardDiagonal  = 18   ; Diagonal lines that slant to the right from top points to bottom points and are spaced 50 percent closer together than HatchStyleForwardDiagonal but are not antialiased.
+                 , HatchStyleLightUpwardDiagonal    = 19   ; Diagonal lines that slant to the left from top points to bottom points and are spaced 50 percent closer together than HatchStyleBackwardDiagonal but are not antialiased.
+                 , HatchStyleDarkDownwardDiagonal   = 20   ; Diagonal lines that slant to the right from top points to bottom points, are spaced 50 percent closer together than HatchStyleForwardDiagonal, and are twice the width of HatchStyleForwardDiagonal but are not antialiased.
+                 , HatchStyleDarkUpwardDiagonal     = 21   ; Diagonal lines that slant to the left from top points to bottom points, are spaced 50 percent closer together than HatchStyleBackwardDiagonal, and are twice the width of HatchStyleBackwardDiagonal but are not antialiased.
+                 , HatchStyleWideDownwardDiagonal   = 22   ; Diagonal lines that slant to the right from top points to bottom points, have the same spacing as HatchStyleForwardDiagonal, and are triple the width of HatchStyleForwardDiagonal but are not antialiased.
+                 , HatchStyleWideUpwardDiagonal     = 23   ; Diagonal lines that slant to the left from top points to bottom points, have the same spacing as HatchStyleBackwardDiagonal, and are triple the width of HatchStyleBackwardDiagonal but are not antialiased.
+            Static HatchStyleLightVertical          = 24   ; Vertical lines that are spaced 50 percent closer together than HatchStyleVertical.
+                 , HatchStyleLightHorizontal        = 25   ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal.
+                 , HatchStyleNarrowVertical         = 26   ; Vertical lines that are spaced 75 percent closer together than HatchStyleVertical (or 25 percent closer together than HatchStyleLightVertical).
+                 , HatchStyleNarrowHorizontal       = 27   ; Horizontal lines that are spaced 75 percent closer together than HatchStyleHorizontal ( or 25 percent closer together than HatchStyleLightHorizontal).
+                 , HatchStyleDarkVertical           = 28   ; Vertical lines that are spaced 50 percent closer together than HatchStyleVerical and are twice the width of HatchStyleVertical.
+                 , HatchStyleDarkHorizontal         = 29   ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal and are twice the width of HatchStyleHorizontal.
+                 , HatchStyleDashedDownwardDiagonal = 30   ; Horizontal lines that are composed of forward diagonals.
+                 , HatchStyleDashedUpwardDiagonal   = 31   ; Horizontal lines that are composed of backward diagonals.
+                 , HatchStyleDashedHorizontal       = 32   ; Horizontal dashed lines.
+                 , HatchStyleDashedVertical         = 33   ; Vertical dashed lines.
+                 , HatchStyleSmallConfetti          = 34   ; A hatch that has the appearance of confetti.
+                 , HatchStyleLargeConfetti          = 35   ; A hatch that has the appearance of confetti composed of larger pieces than HatchStyleSmallConfetti.
+                 , HatchStyleZigZag                 = 36   ; Horizontal lines of zigzags.
+                 , HatchStyleWave                   = 37   ; Horizontal lines of tildes.
+                 , HatchStyleDiagonalBrick          = 38   ; A hatch that has the appearance of a wall of bricks laid in a backward diagonal direction.
+                 , HatchStyleHorizontalBrick        = 39   ; A hatch that has the appearance of a wall of bricks laid horizontally.
+                 , HatchStyleWeave                  = 40   ; A hatch that has the appearance of a woven material.
+                 , HatchStylePlaid                  = 41   ; A hatch that has the appearance of a plaid material.
+                 , HatchStyleDivot                  = 42   ; A hatch that has the appearance of divots.
+                 , HatchStyleDottedGrid             = 43   ; Horizontal and vertical dotted lines that cross at 90-degree angles.
+                 , HatchStyleDottedDiamond          = 44   ; Forward diagonal and backward diagonal dotted lines that cross at 90-degree angles.
+                 , HatchStyleShingle                = 45   ; A hatch that has the appearance of shingles laid in a forward diagonal direction.
+                 , HatchStyleTrellis                = 46   ; A hatch that has the appearance of a trellis.
+                 , HatchStyleSphere                 = 47   ; A hatch that has the appearance of a checkerboard of spheres.
+                 , HatchStyleSmallGrid              = 48   ; Horizontal and vertical lines that cross at 90-degree angles and are spaced 50 percent closer together than HatchStyleCross.
+                 , HatchStyleSmallCheckerBoard      = 49   ; A hatch that has the appearance of a checkerboard.
+                 , HatchStyleLargeCheckerBoard      = 50   ; A hatch that has the appearance of a checkerboard with squares that are twice the size of HatchStyleSmallCheckerBoard.
+                 , HatchStyleOutlinedDiamond        = 51   ; Forward diagonal and backward diagonal lines that cross at 90-degree angles but are not antialiased.
+                 , HatchStyleSolidDiamond           = 52   ; A hatch that has the appearance of a checkerboard placed diagonally.
+                 , HatchStyleTotal                  = 53   ; No hatch thereby allowing the brush to be transparent.
+                 , HatchStyleLargeGrid              = 4    ; HatchStyleCross.
+                 , HatchStyleMin                    = 39   ; HatchStyleHorizonal.
+                 , HatchStyleMax                    = 52   ; HatchStyleSolidDiamond.
+        }
         
-        ; 
-        Static GpTestControlEnum := {"TestControlForceBilinear"  : 0
-                                    ,"TestControlNoICM"          : 1
-                                    ,"TestControlGetBuildNumber" : 2 }
+        Class HistogramFormat {               ; Specifies the number and type of histograms that represent the color channels of a bitmap.
+            Static HistogramFormatARGB  = 0   ; Returns four histograms: alpha, red, green, and blue channels.
+                 , HistogramFormatPARGB = 1   ; Returns four histograms: one each for the alpha, red, green, and blue channels.
+                 , HistogramFormatRGB   = 2   ; Returns three histograms: one each for the red, green, and blue channels. 
+                 , HistogramFormatGray  = 3   ; Each pixel is converted to a grayscale value and one histogram is returned.
+                 , HistogramFormatB     = 4   ; Returns a histogram for the blue channel.
+                 , HistogramFormatG     = 5   ; Returns a histogram for the green channel.
+                 , HistogramFormatR     = 6   ; Returns a histogram for the red channel.
+                 , HistogramFormatA     = 7   ; Returns a histogram for the alpha channel.
+        }
         
-        ; Specifies the hatch pattern used by a brush of type HatchBrush.
-        Static HatchStyle := {"HatchStyleHorizontal"             : 0    ; Horizontal lines.
-                             ,"HatchStyleVertical"               : 1    ; Vertical lines.                                                                                                                                                                                                                                         
-                             ,"HatchStyleForwardDiagonal"        : 2    ; Diagonal lines that slant to the right from top points to bottom points.
-                             ,"HatchStyleBackwardDiagonal"       : 3    ; Diagonal lines that slant to the left from top points to bottom points.
-                             ,"HatchStyleCross"                  : 4    ; Horizontal and vertical lines that cross at 90-degree angles.
-                             ,"HatchStyleDiagonalCross"          : 5    ; Forward diagonal and backward diagonal lines that cross at 90-degree angles.
-                             ,"HatchStyle05Percent"              : 6    ;  5% hatch. The ratio of foreground color to background color is 5:100.
-                             ,"HatchStyle10Percent"              : 7    ; 10% hatch. The ratio of foreground color to background color is 10:100.
-                             ,"HatchStyle20Percent"              : 8    ; 20% hatch. The ratio of foreground color to background color is 20:100.
-                             ,"HatchStyle25Percent"              : 9    ; 25% hatch. The ratio of foreground color to background color is 25:100.
-                             ,"HatchStyle30Percent"              : 10   ; 30% hatch. The ratio of foreground color to background color is 30:100.
-                             ,"HatchStyle40Percent"              : 11   ; 40% hatch. The ratio of foreground color to background color is 40:100.
-                             ,"HatchStyle50Percent"              : 12   ; 50% hatch. The ratio of foreground color to background color is 50:100.
-                             ,"HatchStyle60Percent"              : 13   ; 60% hatch. The ratio of foreground color to background color is 60:100.
-                             ,"HatchStyle70Percent"              : 14   ; 70% hatch. The ratio of foreground color to background color is 70:100.
-                             ,"HatchStyle75Percent"              : 15   ; 75% hatch. The ratio of foreground color to background color is 75:100.
-                             ,"HatchStyle80Percent"              : 16   ; 80% hatch. The ratio of foreground color to background color is 80:100.
-                             ,"HatchStyle90Percent"              : 17   ; 90% hatch. The ratio of foreground color to background color is 90:100.
-                             ,"HatchStyleLightDownwardDiagonal"  : 18   ; Diagonal lines that slant to the right from top points to bottom points and are spaced 50 percent closer together than HatchStyleForwardDiagonal but are not antialiased.
-                             ,"HatchStyleLightUpwardDiagonal"    : 19   ; Diagonal lines that slant to the left from top points to bottom points and are spaced 50 percent closer together than HatchStyleBackwardDiagonal but are not antialiased.
-                             ,"HatchStyleDarkDownwardDiagonal"   : 20   ; Diagonal lines that slant to the right from top points to bottom points, are spaced 50 percent closer together than HatchStyleForwardDiagonal, and are twice the width of HatchStyleForwardDiagonal but are not antialiased.
-                             ,"HatchStyleDarkUpwardDiagonal"     : 21   ; Diagonal lines that slant to the left from top points to bottom points, are spaced 50 percent closer together than HatchStyleBackwardDiagonal, and are twice the width of HatchStyleBackwardDiagonal but are not antialiased.
-                             ,"HatchStyleWideDownwardDiagonal"   : 22   ; Diagonal lines that slant to the right from top points to bottom points, have the same spacing as HatchStyleForwardDiagonal, and are triple the width of HatchStyleForwardDiagonal but are not antialiased.
-                             ,"HatchStyleWideUpwardDiagonal"     : 23   ; Diagonal lines that slant to the left from top points to bottom points, have the same spacing as HatchStyleBackwardDiagonal, and are triple the width of HatchStyleBackwardDiagonal but are not antialiased.
-                             ,"HatchStyleLightVertical"          : 24   ; Vertical lines that are spaced 50 percent closer together than HatchStyleVertical.
-                             ,"HatchStyleLightHorizontal"        : 25   ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal.
-                             ,"HatchStyleNarrowVertical"         : 26   ; Vertical lines that are spaced 75 percent closer together than HatchStyleVertical (or 25 percent closer together than HatchStyleLightVertical).
-                             ,"HatchStyleNarrowHorizontal"       : 27   ; Horizontal lines that are spaced 75 percent closer together than HatchStyleHorizontal ( or 25 percent closer together than HatchStyleLightHorizontal).
-                             ,"HatchStyleDarkVertical"           : 28   ; Vertical lines that are spaced 50 percent closer together than HatchStyleVerical and are twice the width of HatchStyleVertical.
-                             ,"HatchStyleDarkHorizontal"         : 29   ; Horizontal lines that are spaced 50 percent closer together than HatchStyleHorizontal and are twice the width of HatchStyleHorizontal.
-                             ,"HatchStyleDashedDownwardDiagonal" : 30   ; Horizontal lines that are composed of forward diagonals.
-                             ,"HatchStyleDashedUpwardDiagonal"   : 31   ; Horizontal lines that are composed of backward diagonals.
-                             ,"HatchStyleDashedHorizontal"       : 32   ; Horizontal dashed lines.
-                             ,"HatchStyleDashedVertical"         : 33   ; Vertical dashed lines.
-                             ,"HatchStyleSmallConfetti"          : 34   ; A hatch that has the appearance of confetti.
-                             ,"HatchStyleLargeConfetti"          : 35   ; A hatch that has the appearance of confetti composed of larger pieces than HatchStyleSmallConfetti.
-                             ,"HatchStyleZigZag"                 : 36   ; Horizontal lines of zigzags.
-                             ,"HatchStyleWave"                   : 37   ; Horizontal lines of tildes.
-                             ,"HatchStyleDiagonalBrick"          : 38   ; A hatch that has the appearance of a wall of bricks laid in a backward diagonal direction.
-                             ,"HatchStyleHorizontalBrick"        : 39   ; A hatch that has the appearance of a wall of bricks laid horizontally.
-                             ,"HatchStyleWeave"                  : 40   ; A hatch that has the appearance of a woven material.
-                             ,"HatchStylePlaid"                  : 41   ; A hatch that has the appearance of a plaid material.
-                             ,"HatchStyleDivot"                  : 42   ; A hatch that has the appearance of divots.
-                             ,"HatchStyleDottedGrid"             : 43   ; Horizontal and vertical dotted lines that cross at 90-degree angles.
-                             ,"HatchStyleDottedDiamond"          : 44   ; Forward diagonal and backward diagonal dotted lines that cross at 90-degree angles.
-                             ,"HatchStyleShingle"                : 45   ; A hatch that has the appearance of shingles laid in a forward diagonal direction.
-                             ,"HatchStyleTrellis"                : 46   ; A hatch that has the appearance of a trellis.
-                             ,"HatchStyleSphere"                 : 47   ; A hatch that has the appearance of a checkerboard of spheres.
-                             ,"HatchStyleSmallGrid"              : 48   ; Horizontal and vertical lines that cross at 90-degree angles and are spaced 50 percent closer together than HatchStyleCross.
-                             ,"HatchStyleSmallCheckerBoard"      : 49   ; A hatch that has the appearance of a checkerboard.
-                             ,"HatchStyleLargeCheckerBoard"      : 50   ; A hatch that has the appearance of a checkerboard with squares that are twice the size of HatchStyleSmallCheckerBoard.
-                             ,"HatchStyleOutlinedDiamond"        : 51   ; Forward diagonal and backward diagonal lines that cross at 90-degree angles but are not antialiased.
-                             ,"HatchStyleSolidDiamond"           : 52   ; A hatch that has the appearance of a checkerboard placed diagonally.
-                             ,"HatchStyleTotal"                  : 53   ; No hatch thereby allowing the brush to be transparent.
-                             ,"HatchStyleLargeGrid"              : 4    ; HatchStyleCross.
-                             ,"HatchStyleMin"                    : 39   ; HatchStyleHorizonal.
-                             ,"HatchStyleMax"                    : 52 } ; HatchStyleSolidDiamond.
+        Class HotkeyPrefix {              ; Specifies how to display hot keys.
+            Static HotkeyPrefixNone = 0   ; No hot key processing occurs.
+                 , HotkeyPrefixShow = 1   ; Unicode text is scanned for ampersands (&), which are interpreted as hot key markers.
+                 , HotkeyPrefixHide = 2   ; Unicode text is scanned for ampersands (&), which are substituted and removed.
+        }
         
-        ; Specifies the number and type of histograms that represent the color channels of a bitmap.
-        Static HistogramFormat := {"HistogramFormatARGB"  : 0   ; Returns four histograms: alpha, red, green, and blue channels.
-                                  ,"HistogramFormatPARGB" : 1   ; Returns four histograms: one each for the alpha, red, green, and blue channels.
-                                  ,"HistogramFormatRGB"   : 2   ; Returns three histograms: one each for the red, green, and blue channels. 
-                                  ,"HistogramFormatGray"  : 3   ; Each pixel is converted to a grayscale value and one histogram is returned.
-                                  ,"HistogramFormatB"     : 4   ; Returns a histogram for the blue channel.
-                                  ,"HistogramFormatG"     : 5   ; Returns a histogram for the green channel.
-                                  ,"HistogramFormatR"     : 6   ; Returns a histogram for the red channel.
-                                  ,"HistogramFormatA"     : 7 } ; Returns a histogram for the alpha channel.
+        Class ImageCodecFlags {                             ; Indicates attributes of an image codec.                       
+            Static ImageCodecFlagsEncoder        = 0x00001  ; Codec supports encoding (saving).
+                 , ImageCodecFlagsDecoder        = 0x00002  ; Codec supports decoding (reading).
+                 , ImageCodecFlagsSupportBitmap  = 0x00004  ; Codec supports raster images (bitmaps).
+                 , ImageCodecFlagsSupportVector  = 0x00008  ; Codec supports vector images (metafiles).
+                 , ImageCodecFlagsSeekableEncode = 0x00010  ; Encoder requires a seekable output stream.
+                 , ImageCodecFlagsBlockingDecode = 0x00020  ; Decoder has blocking behavior during the decoding process.
+                 , ImageCodecFlagsBuiltin        = 0x10000  ; The codec is built in to GDI+.
+                 , ImageCodecFlagsSystem         = 0x20000  ; Not used in GDI+ version 1.0.
+                 , ImageCodecFlagsUser           = 0x40000  ; Not used in GDI+ version 1.0.
+        }        
         
-        ; Specifies how to display hot keys.
-        Static HotkeyPrefix := {"HotkeyPrefixNone" : 0   ; No hot key processing occurs.
-                               ,"HotkeyPrefixShow" : 1   ; Unicode text is scanned for ampersands (&), which are interpreted as hot key markers.
-                               ,"HotkeyPrefixHide" : 2 } ; Unicode text is scanned for ampersands (&), which are substituted and removed.
+        Class ImageFlags {                                 ; Specifies the attributes of the pixel data contained in an Image object.
+            Static ImageFlagsNone              = 0x0       ; No format information.
+                 , ImageFlagsScalable          = 0x1       ; Image can be scaled.
+                 , ImageFlagsHasAlpha          = 0x2       ; Pixel data contains alpha values.
+                 , ImageFlagsHasTranslucent    = 0x4       ; Pixel data has alpha values other than 0 and 255.
+                 , ImageFlagsPartiallyScalable = 0x8       ; Pixel data is partially scalable with some limitations.
+                 , ImageFlagsColorSpaceRGB     = 0x10      ; Image is stored using an RGB color space.
+                 , ImageFlagsColorSpaceCMYK    = 0x20      ; Image is stored using a CMYK color space.
+                 , ImageFlagsColorSpaceGRAY    = 0x40      ; Image is a grayscale image.
+                 , ImageFlagsColorSpaceYCBCR   = 0x80      ; Image is stored using a YCBCR color space.
+                 , ImageFlagsColorSpaceYCCK    = 0x100     ; Image is stored using a YCCK color space.
+                 , ImageFlagsHasRealDPI        = 0x1000    ; Dots per inch information is stored in the image.
+                 , ImageFlagsHasRealPixelSize  = 0x2000    ; Pixel size is stored in the image.
+                 , ImageFlagsReadOnly          = 0x10000   ; Pixel data is read-only.
+                 , ImageFlagsCaching           = 0x20000   ; Pixel data can be cached for faster access.                                                 
+        }
         
-        ; Indicates attributes of an image codec.
-        Static ImageCodecFlags := {"ImageCodecFlagsEncoder"        : 1        ; Codec supports encoding (saving).
-                                  ,"ImageCodecFlagsDecoder"        : 2        ; Codec supports decoding (reading).
-                                  ,"ImageCodecFlagsSupportBitmap"  : 4        ; Codec supports raster images (bitmaps).
-                                  ,"ImageCodecFlagsSupportVector"  : 8        ; Codec supports vector images (metafiles).
-                                  ,"ImageCodecFlagsSeekableEncode" : 16       ; Encoder requires a seekable output stream.
-                                  ,"ImageCodecFlagsBlockingDecode" : 32       ; Decoder has blocking behavior during the decoding process.
-                                  ,"ImageCodecFlagsBuiltin"        : 65536    ; The codec is built in to GDI+.
-                                  ,"ImageCodecFlagsSystem"         : 131072   ; Not used in GDI+ version 1.0.
-                                  ,"ImageCodecFlagsUser"           : 262144 } ; Not used in GDI+ version 1.0.
+        Class ImageLockMode {                      ; Specifies flags that are passed to the flags parameter of the this.Bitmap.LockBits() method. 
+            Static ImageLockModeRead         = 1   ; Portion of the image is locked for reading.
+                 , ImageLockModeWrite        = 2   ; Portion of the image is locked for writing.
+                 , ImageLockModeUserInputBuf = 4   ; Buffer used for reading or writing pixel data is allocated by the user.
+        }
         
-        ; DONE THROUGH HERE
-        ; Specifies the attributes of the pixel data contained in an Image object.
-        Static ImageFlags := {"ImageFlagsNone"              : 0x0       ; No format information.
-                             ,"ImageFlagsScalable"          : 0x1       ; Image can be scaled.
-                             ,"ImageFlagsHasAlpha"          : 0x2       ; Pixel data contains alpha values.
-                             ,"ImageFlagsHasTranslucent"    : 0x4       ; Pixel data has alpha values other than 0 and 255.
-                             ,"ImageFlagsPartiallyScalable" : 0x8       ; Pixel data is partially scalable with some limitations.
-                             ,"ImageFlagsColorSpaceRGB"     : 0x10      ; Image is stored using an RGB color space.
-                             ,"ImageFlagsColorSpaceCMYK"    : 0x20      ; Image is stored using a CMYK color space.
-                             ,"ImageFlagsColorSpaceGRAY"    : 0x40      ; Image is a grayscale image.
-                             ,"ImageFlagsColorSpaceYCBCR"   : 0x80      ; Image is stored using a YCBCR color space.
-                             ,"ImageFlagsColorSpaceYCCK"    : 0x100     ; Image is stored using a YCCK color space.
-                             ,"ImageFlagsHasRealDPI"        : 0x1000    ; Dots per inch information is stored in the image.
-                             ,"ImageFlagsHasRealPixelSize"  : 0x2000    ; Pixel size is stored in the image.
-                             ,"ImageFlagsReadOnly"          : 0x10000   ; Pixel data is read-only.
-                             ,"ImageFlagsCaching"           : 0x20000 } ; Pixel data can be cached for faster access.                                                 
+        Class ImageType {                  ; Indicates whether an image is a bitmap or a metafile.
+            Static ImageTypeUnknown  = 0   ; Image type is not known.
+                 , ImageTypeBitmap   = 1   ; Bitmap image.
+                 , ImageTypeMetafile = 2   ; Metafile image.
+        }
         
-        ; Specifies flags that are passed to the flags parameter of the GDIP.Bitmap.LockBits() method. 
-        Static ImageLockMode := {"ImageLockModeRead"         : 1   ; Portion of the image is locked for reading.
-                                ,"ImageLockModeWrite"        : 2   ; Portion of the image is locked for writing.
-                                ,"ImageLockModeUserInputBuf" : 4 } ; Buffer used for reading or writing pixel data is allocated by the user.
+        Class InterpolationMode {   ; Specifies the algorithm that is used when images are scaled or rotated.
+            Static InterpolationModeInvalid             = -1   ; Used internally.
+                 , InterpolationModeDefault             =  0   ; Default interpolation mode.
+                 , InterpolationModeLowQuality          =  1   ; Low-quality mode.
+                 , InterpolationModeHighQuality         =  2   ; High-quality mode.
+                 , InterpolationModeBilinear            =  3   ; Bilinear interpolation. Don't use to shirnk past 50% of original size.
+                 , InterpolationModeBicubic             =  4   ; Bicubic interpolation. Don't use to shirnk past 25% of original size.
+                 , InterpolationModeNearestNeighbor     =  5   ; nearest-neighbor interpolation.
+                 , InterpolationModeHighQualityBilinear =  6   ; high-quality, bilinear interpolation.
+                 , InterpolationModeHighQualityBicubic  =  7   ; high-quality, bicubic interpolation.
+        }
         
-        ; Indicates whether an image is a bitmap or a metafile.
-        Static ImageType := {"ImageTypeUnknown"  : 0   ; Image type is not known.
-                            ,"ImageTypeBitmap"   : 1   ; Bitmap image.
-                            ,"ImageTypeMetafile" : 2 } ; Metafile image.
+        Class ItemDataPosition {                        ; Specify the location of custom metadata in an image file.
+            Static ItemDataPositionAfterHeader  = 0x0   ; Custom metadata is stored after the file header. Valid for JPEG, PNG, and GIF.
+                 , ItemDataPositionAfterPalette = 0x1   ; Custom metadata is stored after the palette. Valid for PNG.
+                 , ItemDataPositionAfterBits    = 0x2   ; Custom metadata is stored after the pixel data. Valid for GIF and PNG.
+        }
         
-        ; Specifies the algorithm that is used when images are scaled or rotated.
-        Static InterpolationMode := {"InterpolationModeInvalid"             : -1   ; Used internally.
-                                    ,"InterpolationModeDefault"             :  0   ; Default interpolation mode.
-                                    ,"InterpolationModeLowQuality"          :  1   ; Low-quality mode.
-                                    ,"InterpolationModeHighQuality"         :  2   ; High-quality mode.
-                                    ,"InterpolationModeBilinear"            :  3   ; Bilinear interpolation. Don't use to shirnk past 50% of original size.
-                                    ,"InterpolationModeBicubic"             :  4   ; Bicubic interpolation. Don't use to shirnk past 25% of original size.
-                                    ,"InterpolationModeNearestNeighbor"     :  5   ; nearest-neighbor interpolation.
-                                    ,"InterpolationModeHighQualityBilinear" :  6   ; high-quality, bilinear interpolation.
-                                    ,"InterpolationModeHighQualityBicubic"  :  7 } ; high-quality, bicubic interpolation.
+        Class LinearGradientMode {                          ; Specifies the direction in which the change of color occurs for a linear gradient brush.
+            Static LinearGradientModeHorizontal       = 0   ; Color to change in a horizontal direction from the left of the display to the right of the display.
+                 , LinearGradientModeVertical         = 1   ; Color to change in a vertical direction from the top of the display to the bottom of the display.
+                 , LinearGradientModeForwardDiagonal  = 2   ; Color to change in a forward diagonal direction from the upper-left corner to the lower-right corner of the display.
+                 , LinearGradientModeBackwardDiagonal = 3   ; Color to change in a backward diagonal direction from the upper-right corner to the lower-left corner of the display.
+        }
         
-        ; Specify the location of custom metadata in an image file.
-        Static ItemDataPosition := {"ItemDataPositionAfterHeader"  : 0x0   ; Custom metadata is stored after the file header. Valid for JPEG, PNG, and GIF.
-                                   ,"ItemDataPositionAfterPalette" : 0x1   ; Custom metadata is stored after the palette. Valid for PNG.
-                                   ,"ItemDataPositionAfterBits"    : 0x2 } ; Custom metadata is stored after the pixel data. Valid for GIF and PNG.
+        Class LineCap {                          ; Specifies the type of graphic shape to use on the end of a line drawn with a Windows GDI+ pen.
+            Static LineCapFlat          = 0x0    ; Line ends at the last point. The end is squared off.
+                 , LineCapSquare        = 0x1    ; Square cap. The center of the square is the last point in the line.
+                 , LineCapRound         = 0x2    ; Circular cap. The center of the circle is the last point in the line.
+                 , LineCapTriangle      = 0x3    ; Triangular cap. The base of the triangle is the last point in the line.
+                 , LineCapNoAnchor      = 0x10   ; Line ends are not anchored.
+                 , LineCapSquareAnchor  = 0x11   ; Line ends are anchored with a square.
+                 , LineCapRoundAnchor   = 0x12   ; Line ends are anchored with a circle.
+                 , LineCapDiamondAnchor = 0x13   ; Line ends are anchored with a diamond.
+                 , LineCapArrowAnchor   = 0x14   ; Line ends are anchored with arrowheads.
+                 , LineCapCustom        = 0xFF   ; Line ends are made from a CustomLineCap.
+                 , LineCapAnchorMask    = 0xF0   ; Undefined.
+        }
         
-        ; Specifies the direction in which the change of color occurs for a linear gradient brush.
-        Static LinearGradientMode := {"LinearGradientModeHorizontal"       : 0   ; Color to change in a horizontal direction from the left of the display to the right of the display.
-                                     ,"LinearGradientModeVertical"         : 1   ; Color to change in a vertical direction from the top of the display to the bottom of the display.
-                                     ,"LinearGradientModeForwardDiagonal"  : 2   ; Color to change in a forward diagonal direction from the upper-left corner to the lower-right corner of the display.
-                                     ,"LinearGradientModeBackwardDiagonal" : 3 } ; Color to change in a backward diagonal direction from the upper-right corner to the lower-left corner of the display.
+        Class LineJoin {                      ; Specifies how to join two lines that are drawn by the same pen and whose ends meet. 
+            Static LineJoinMiter        = 0   ; Mitered join. This produces a sharp corner or a clipped corner, depending on whether the length of the miter exceeds the miter limit.
+                 , LineJoinBevel        = 1   ; Beveled join. This produces a diagonal corner.
+                 , LineJoinRound        = 2   ; Circular join. This produces a smooth, circular arc between the lines.
+                 , LineJoinMiterClipped = 3   ; Mitered join. This produces a sharp corner or a beveled corner, depending on whether the length of the miter exceeds the miter limit.
+        }
         
-        ; Specifies the type of graphic shape to use on the end of a line drawn with a Windows GDI+ pen.
-        Static LineCap := {"LineCapFlat"          : 0x0    ; Line ends at the last point. The end is squared off.
-                          ,"LineCapSquare"        : 0x1    ; Square cap. The center of the square is the last point in the line.
-                          ,"LineCapRound"         : 0x2    ; Circular cap. The center of the circle is the last point in the line.
-                          ,"LineCapTriangle"      : 0x3    ; Triangular cap. The base of the triangle is the last point in the line.
-                          ,"LineCapNoAnchor"      : 0x10   ; Line ends are not anchored.
-                          ,"LineCapSquareAnchor"  : 0x11   ; Line ends are anchored with a square.
-                          ,"LineCapRoundAnchor"   : 0x12   ; Line ends are anchored with a circle.
-                          ,"LineCapDiamondAnchor" : 0x13   ; Line ends are anchored with a diamond.
-                          ,"LineCapArrowAnchor"   : 0x14   ; Line ends are anchored with arrowheads.
-                          ,"LineCapCustom"        : 0xFF   ; Line ends are made from a CustomLineCap.
-                          ,"LineCapAnchorMask"    : 0xF0 } ; Undefined.
+        Class MatrixOrder {                 ; Specifies the order of multiplication when a new matrix is multiplied by an existing matrix.
+            Static MatrixOrderPrepend = 0   ; The new matrix is on the left and the existing matrix is on the right.
+                 , MatrixOrderAppend  = 1   ; The existing matrix is on the left and the new matrix is on the right.
+        }
         
-        ; Specifies how to join two lines that are drawn by the same pen and whose ends meet. 
-        Static LineJoin := {"LineJoinMiter"        : 0   ; Mitered join. This produces a sharp corner or a clipped corner, depending on whether the length of the miter exceeds the miter limit.
-                           ,"LineJoinBevel"        : 1   ; Beveled join. This produces a diagonal corner.
-                           ,"LineJoinRound"        : 2   ; Circular join. This produces a smooth, circular arc between the lines.
-                           ,"LineJoinMiterClipped" : 3 } ; Mitered join. This produces a sharp corner or a beveled corner, depending on whether the length of the miter exceeds the miter limit.
+        Class MetafileFrameUnit {                    ; Specifies the unit of measure for a metafile frame rectangle.
+            Static MetafileFrameUnitPixel      = 2   ; Unit is 1 pixel.
+                 , MetafileFrameUnitPoint      = 3   ; Unit is 1 pixel.
+                 , MetafileFrameUnitInch       = 4   ; Unit is 1 pixel.
+                 , MetafileFrameUnitDocument   = 5   ; Unit is 1/300 inch.
+                 , MetafileFrameUnitMillimeter = 6   ; Unit is 1 pixel.
+                 , MetafileFrameUnitGdi        = 7   ; Unit is 0.01 millimeter.
+        }
         
-        ; Specifies the order of multiplication when a new matrix is multiplied by an existing matrix.
-        Static MatrixOrder := {"MatrixOrderPrepend" : 0   ; The new matrix is on the left and the existing matrix is on the right.
-                              ,"MatrixOrderAppend"  : 1 } ; The existing matrix is on the left and the new matrix is on the right.
+        Class MetafileType {                      ; Specifies types of metafiles.
+            Static MetafileTypeInvalid      = 0   ; metafile format that is not recognized in GDI+.
+                 , MetafileTypeWmf          = 1   ; WMF file. Such a file contains only GDI records.
+                 , MetafileTypeWmfPlaceable = 2   ; WMF file that has a placeable metafile header in front of it.
+                 , MetafileTypeEmf          = 3   ; EMF file. Such a file contains only GDI records.
+                 , MetafileTypeEmfPlusOnly  = 4   ; EMF+ file. Such a file contains only GDI+ records and must be displayed by using GDI+.
+                 , MetafileTypeEmfPlusDual  = 5   ; EMF+ Dual file. Such a file contains GDI+ records along with alternative GDI records and can be displayed by using either GDI or GDI+.
+        }
         
-        ; Specifies the unit of measure for a metafile frame rectangle.
-        Static MetafileFrameUnit := {"MetafileFrameUnitPixel"      : 2   ; Unit is 1 pixel.
-                                    ,"MetafileFrameUnitPoint"      : 3   ; Unit is 1 pixel.
-                                    ,"MetafileFrameUnitInch"       : 4   ; Unit is 1 pixel.
-                                    ,"MetafileFrameUnitDocument"   : 5   ; Unit is 1/300 inch.
-                                    ,"MetafileFrameUnitMillimeter" : 6   ; Unit is 1 pixel.
-                                    ,"MetafileFrameUnitGdi"        : 7 } ; Unit is 0.01 millimeter.
+        Class ObjectType {                          ; Indicates the object type value of an EMF+ record.
+            Static ObjectTypeInvalid         = 0    ; Is invalid.
+                 , ObjectTypeBrush           = 1    ; Is a brush.
+                 , ObjectTypePen             = 2    ; Is a pen.
+                 , ObjectTypePath            = 3    ; Is a path.
+                 , ObjectTypeRegion          = 4    ; Is a region.
+                 , ObjectTypeImage           = 5    ; Is an image.
+                 , ObjectTypeFont            = 6    ; Is a font.
+                 , ObjectTypeStringFormat    = 7    ; Is a string format.
+                 , ObjectTypeImageAttributes = 8    ; Is an image attribute.
+                 , ObjectTypeCustomLineCap   = 9    ; Is a custom line cap.
+                 , ObjectTypeGraphics        = 10   ; Is graphics.
+                 , ObjectTypeMax             = 10   ; Maximum enumeration value. Currently, ObjectTypeGraphics.
+                 , ObjectTypeMin             = 1    ; Minimum enumeration value. Currently, ObjectTypeBrush.
+        }
         
-        ; Specifies types of metafiles.
-        Static MetafileType := {"MetafileTypeInvalid"      : 0   ; metafile format that is not recognized in GDI+.
-                               ,"MetafileTypeWmf"          : 1   ; WMF file. Such a file contains only GDI records.
-                               ,"MetafileTypeWmfPlaceable" : 2   ; WMF file that has a placeable metafile header in front of it.
-                               ,"MetafileTypeEmf"          : 3   ; EMF file. Such a file contains only GDI records.
-                               ,"MetafileTypeEmfPlusOnly"  : 4   ; EMF+ file. Such a file contains only GDI+ records and must be displayed by using GDI+.
-                               ,"MetafileTypeEmfPlusDual"  : 5 } ; EMF+ Dual file. Such a file contains GDI+ records along with alternative GDI records and can be displayed by using either GDI or GDI+.
+        Class PaletteFlags {                   ; Indicates attributes of the color data in a palette.
+            Static PaletteFlagsHasAlpha  = 0   ; One or more of the palette entries contains alpha (transparency) information.
+                 , PaletteFlagsGrayScale = 1   ; Palette contains only grayscale entries.
+                 , PaletteFlagsHalftone  = 2   ; Palette is the Windows halftone palette.
+        }
         
-        ; Indicates the object type value of an EMF+ record.
-        Static ObjectType := {"ObjectTypeInvalid"         : 0    ; Is invalid.
-                             ,"ObjectTypeBrush"           : 1    ; Is a brush.
-                             ,"ObjectTypePen"             : 2    ; Is a pen.
-                             ,"ObjectTypePath"            : 3    ; Is a path.
-                             ,"ObjectTypeRegion"          : 4    ; Is a region.
-                             ,"ObjectTypeImage"           : 5    ; Is an image.
-                             ,"ObjectTypeFont"            : 6    ; Is a font.
-                             ,"ObjectTypeStringFormat"    : 7    ; Is a string format.
-                             ,"ObjectTypeImageAttributes" : 8    ; Is an image attribute.
-                             ,"ObjectTypeCustomLineCap"   : 9    ; Is a custom line cap.
-                             ,"ObjectTypeGraphics"        : 10   ; Is graphics.
-                             ,"ObjectTypeMax"             : 10   ; Maximum enumeration value. Currently, ObjectTypeGraphics.
-                             ,"ObjectTypeMin"             : 1  } ; Minimum enumeration value. Currently, ObjectTypeBrush.
+        Class PaletteType {                          ; The members of the enumeration identify several standard color palette formats.
+            Static PaletteTypeCustom           = 0   ; Arbitrary custom palette provided by the caller.
+                 , PaletteTypeOptimal          = 1   ; Palette of colors that are optimal for a particular bitmap.
+                 , PaletteTypeFixedBW          = 2   ; Palette that has two colors.
+                 , PaletteTypeFixedHalftone8   = 3   ; Palette based on two intensities each (off or full) for the red, green, and blue channels.
+                 , PaletteTypeFixedHalftone27  = 4   ; Palette based on three intensities each for the red, green, and blue channels.
+                 , PaletteTypeFixedHalftone64  = 5   ; Palette based on four intensities each for the red, green, and blue channels.
+                 , PaletteTypeFixedHalftone125 = 6   ; Palette based on five intensities each for the red, green, and blue channels.
+                 , PaletteTypeFixedHalftone216 = 7   ; Palette based on six intensities each for the red, green, and blue channels.
+                 , PaletteTypeFixedHalftone252 = 8   ; Palette based on 6 intensities of red, 7 intensities of green, and 6 intensities of blue.
+                 , PaletteTypeFixedHalftone256 = 9   ; Palette based on 8 intensities of red, 8 intensities of green, and 4 intensities of blue.
+        }
         
-        ; Indicates attributes of the color data in a palette.
-        Static PaletteFlags := {"PaletteFlagsHasAlpha"  : 0   ; One or more of the palette entries contains alpha (transparency) information.
-                               ,"PaletteFlagsGrayScale" : 1   ; Palette contains only grayscale entries.
-                               ,"PaletteFlagsHalftone"  : 2 } ; Palette is the Windows halftone palette.
+        Class PathPointType {                         ; Indicates point types and flags for the data points in a path.
+            Static PathPointTypeStart        = 0x00   ; The point is the start of a figure.
+                 , PathPointTypeLine         = 0x01   ; The point is one of the two endpoints of a line.
+                 , PathPointTypeBezier       = 0x03   ; The point is an endpoint or control point of a cubic Bézier spline.
+                 , PathPointTypePathTypeMask = 0x07   ; Masks all bits except for the three low-order bits, which indicate the point type.
+                 , PathPointTypeDashMode     = 0x10   ; Not used.
+                 , PathPointTypePathMarker   = 0x20   ; The point is a marker.
+                 , PathPointTypeCloseSubpath = 0x80   ; The point is the last point in a closed subpath (figure).
+                 , PathPointTypeBezier3      = 0x03   ; The point is an endpoint or control point of a cubic Bézier spline.
+        }
         
-        ; The members of the enumeration identify several standard color palette formats.
-        Static PaletteType := {"PaletteTypeCustom"           : 0   ; Arbitrary custom palette provided by the caller.
-                              ,"PaletteTypeOptimal"          : 1   ; Palette of colors that are optimal for a particular bitmap.
-                              ,"PaletteTypeFixedBW"          : 2   ; Palette that has two colors.
-                              ,"PaletteTypeFixedHalftone8"   : 3   ; Palette based on two intensities each (off or full) for the red, green, and blue channels.
-                              ,"PaletteTypeFixedHalftone27"  : 4   ; Palette based on three intensities each for the red, green, and blue channels.
-                              ,"PaletteTypeFixedHalftone64"  : 5   ; Palette based on four intensities each for the red, green, and blue channels.
-                              ,"PaletteTypeFixedHalftone125" : 6   ; Palette based on five intensities each for the red, green, and blue channels.
-                              ,"PaletteTypeFixedHalftone216" : 7   ; Palette based on six intensities each for the red, green, and blue channels.
-                              ,"PaletteTypeFixedHalftone252" : 8   ; Palette based on 6 intensities of red, 7 intensities of green, and 6 intensities of blue.
-                              ,"PaletteTypeFixedHalftone256" : 9 } ; Palette based on 8 intensities of red, 8 intensities of green, and 4 intensities of blue.
+        Class PenAlignment {                ; Specifies the alignment of a pen relative to the stroke that is being drawn.
+            Static PenAlignmentCenter = 0   ; Pen is aligned on the center of the line that is drawn.
+                 , PenAlignmentInset  = 1   ; If drawing a polygon, the pen is aligned on the inside edge of the polygon.
+        }
         
-        ; Indicates point types and flags for the data points in a path.
-        Static PathPointType := {"PathPointTypeStart"        : 0x00   ; The point is the start of a figure.
-                                ,"PathPointTypeLine"         : 0x01   ; The point is one of the two endpoints of a line.
-                                ,"PathPointTypeBezier"       : 0x03   ; The point is an endpoint or control point of a cubic Bézier spline.
-                                ,"PathPointTypePathTypeMask" : 0x07   ; Masks all bits except for the three low-order bits, which indicate the point type.
-                                ,"PathPointTypeDashMode"     : 0x10   ; Not used.
-                                ,"PathPointTypePathMarker"   : 0x20   ; The point is a marker.
-                                ,"PathPointTypeCloseSubpath" : 0x80   ; The point is the last point in a closed subpath (figure).
-                                ,"PathPointTypeBezier3"      : 0x03 } ; The point is an endpoint or control point of a cubic Bézier spline.
+        Class PenType {                         ; Indicates the type of pattern, texture, or gradient that a pen draws.
+            Static PenTypeSolidColor     =  0   ; Pen draws with a solid color.
+                 , PenTypeHatchFill      =  1   ; Pen draws with a hatch pattern that is specified by a HatchBrush object.
+                 , PenTypeTextureFill    =  2   ; Pen draws with a texture that is specified by a TextureBrush object.
+                 , PenTypePathGradient   =  3   ; Pen draws with a color gradient that is specified by a PathGradientBrush object.
+                 , PenTypeLinearGradient =  4   ; Pen draws with a color gradient that is specified by a LinearGradientBrush object.
+                 , PenTypeUnknown        = -1   ; Pen type is unknown.
+        }
         
-        ; Specifies the alignment of a pen relative to the stroke that is being drawn.
-        Static PenAlignment := {"PenAlignmentCenter" : 0   ; Pen is aligned on the center of the line that is drawn.
-                               ,"PenAlignmentInset"  : 1 } ; If drawing a polygon, the pen is aligned on the inside edge of the polygon.
+        Class PixelOffsetMode {                      ; Specifies the pixel offset mode of a Graphics object.
+            Static PixelOffsetModeInvalid     = -1   ; Used internally.
+                 , PixelOffsetModeDefault     =  0   ; Equivalent to PixelOffsetModeNone.
+                 , PixelOffsetModeHighSpeed   =  1   ; Equivalent to PixelOffsetModeNone.
+                 , PixelOffsetModeHighQuality =  2   ; Equivalent to PixelOffsetModeHalf.
+                 , PixelOffsetModeNone        =  3   ; Indicates that pixel centers have integer coordinates.
+                 , PixelOffsetModeHalf        =  4   ; Indicates that pixel centers have coordinates that are half way between integer values.
+        }
         
-        ; Indicates the type of pattern, texture, or gradient that a pen draws.
-        Static PenType := {"PenTypeSolidColor"     :  0   ; Pen draws with a solid color.
-                          ,"PenTypeHatchFill"      :  1   ; Pen draws with a hatch pattern that is specified by a HatchBrush object.
-                          ,"PenTypeTextureFill"    :  2   ; Pen draws with a texture that is specified by a TextureBrush object.
-                          ,"PenTypePathGradient"   :  3   ; Pen draws with a color gradient that is specified by a PathGradientBrush object.
-                          ,"PenTypeLinearGradient" :  4   ; Pen draws with a color gradient that is specified by a LinearGradientBrush object.
-                          ,"PenTypeUnknown"        : -1 } ; Pen type is unknown.
+        Class RotateFlipType {              ; Specifies the direction of an image's rotation and the axis used to flip the image.
+            Static RotateNoneFlipNone = 0   ; No rotation and no flipping.
+                 , Rotate90FlipNone   = 1   ; 90-degree rotation without flipping.
+                 , Rotate180FlipNone  = 2   ; 180-degree rotation without flipping.
+                 , Rotate270FlipNone  = 3   ; 270-degree rotation without flipping.
+                 , RotateNoneFlipX    = 4   ; No rotation and a horizontal flip.
+                 , Rotate90FlipX      = 5   ; 90-degree rotation followed by a horizontal flip.
+                 , Rotate180FlipX     = 6   ; 180-degree rotation followed by a horizontal flip.
+                 , Rotate270FlipX     = 7   ; 270-degree rotation followed by a horizontal flip.
+                 , RotateNoneFlipY    = 6   ; No rotation and a vertical flip.
+                 , Rotate90FlipY      = 7   ; 90-degree rotation followed by a vertical flip.
+                 , Rotate180FlipY     = 4   ; 180-degree rotation followed by a vertical flip.
+                 , Rotate270FlipY     = 5   ; 270-degree rotation followed by a vertical flip.
+                 , RotateNoneFlipXY   = 2   ; No rotation, a horizontal flip, and then a vertical flip.
+                 , Rotate90FlipXY     = 3   ; 90-degree rotation followed by a horizontal flip and then a vertical flip.
+                 , Rotate180FlipXY    = 0   ; 180-degree rotation followed by a horizontal flip and then a vertical flip.
+                 , Rotate270FlipXY    = 1   ; 270-degree rotation followed by a horizontal flip and then a vertical flip.
+        }
         
-        ; Specifies the pixel offset mode of a Graphics object.
-        Static PixelOffsetMode := {"PixelOffsetModeInvalid"     : -1   ; Used internally.
-                                  ,"PixelOffsetModeDefault"     :  0   ; Equivalent to PixelOffsetModeNone.
-                                  ,"PixelOffsetModeHighSpeed"   :  1   ; Equivalent to PixelOffsetModeNone.
-                                  ,"PixelOffsetModeHighQuality" :  2   ; Equivalent to PixelOffsetModeHalf.
-                                  ,"PixelOffsetModeNone"        :  3   ; Indicates that pixel centers have integer coordinates.
-                                  ,"PixelOffsetModeHalf"        :  4 } ; Indicates that pixel centers have coordinates that are half way between integer values.
+        Class SmoothingMode {                       ; Specifies the type of smoothing (antialiasing) that is applied to lines and curves.
+            Static SmoothingModeInvalid      = -1   ; Reserved.
+                 , SmoothingModeDefault      =  0   ; Smoothing is not applied.
+                 , SmoothingModeHighSpeed    =  1   ; Smoothing is not applied.
+                 , SmoothingModeHighQuality  =  2   ; Smoothing is applied using an 8 X 4 box filter.
+                 , SmoothingModeNone         =  3   ; Smoothing is not applied.
+                 , SmoothingModeAntiAlias    =  4   ; Smoothing is applied using an 8 X 4 box filter.
+                 , SmoothingModeAntiAlias8x4 =  4   ; Smoothing is applied using an 8 X 4 box filter.
+                 , SmoothingModeAntiAlias8x8 =  5   ; Smoothing is applied using an 8 X 8 box filter.
+        }
         
-        ; Specifies the direction of an image's rotation and the axis used to flip the image.
-        Static RotateFlipType := {"RotateNoneFlipNone" : 0   ; No rotation and no flipping.
-                                 ,"Rotate90FlipNone"   : 1   ; 90-degree rotation without flipping.
-                                 ,"Rotate180FlipNone"  : 2   ; 180-degree rotation without flipping.
-                                 ,"Rotate270FlipNone"  : 3   ; 270-degree rotation without flipping.
-                                 ,"RotateNoneFlipX"    : 4   ; No rotation and a horizontal flip.
-                                 ,"Rotate90FlipX"      : 5   ; 90-degree rotation followed by a horizontal flip.
-                                 ,"Rotate180FlipX"     : 6   ; 180-degree rotation followed by a horizontal flip.
-                                 ,"Rotate270FlipX"     : 7   ; 270-degree rotation followed by a horizontal flip.
-                                 ,"RotateNoneFlipY"    : 6   ; No rotation and a vertical flip.
-                                 ,"Rotate90FlipY"      : 7   ; 90-degree rotation followed by a vertical flip.
-                                 ,"Rotate180FlipY"     : 4   ; 180-degree rotation followed by a vertical flip.
-                                 ,"Rotate270FlipY"     : 5   ; 270-degree rotation followed by a vertical flip.
-                                 ,"RotateNoneFlipXY"   : 2   ; No rotation, a horizontal flip, and then a vertical flip.
-                                 ,"Rotate90FlipXY"     : 3   ; 90-degree rotation followed by a horizontal flip and then a vertical flip.
-                                 ,"Rotate180FlipXY"    : 0   ; 180-degree rotation followed by a horizontal flip and then a vertical flip.
-                                 ,"Rotate270FlipXY"    : 1 } ; 270-degree rotation followed by a horizontal flip and then a vertical flip.
+        Class Status {                              ; Indicates the result of a Windows GDI+ method call.
+            Static Ok                        = 0    ; Method call was successful.
+                 , GenericError              = 1    ; There was an error on the method call which is not defined elsewhere in this enumeration.
+                 , InvalidParameter          = 2    ; One of the arguments passed to the method was not valid.
+                 , OutOfMemory               = 3    ; Operating system is out of memory and could not allocate memory to process the method call. For an explanation of how constructors use the OutOfMemory status, see the Remarks section at the end of this topic.
+                 , ObjectBusy                = 4    ; One of the arguments specified in the API call is already in use in another thread.
+                 , InsufficientBuffer        = 5    ; A buffer specified as an argument in the API call is not large enough to hold the data to be received.
+                 , NotImplemented            = 6    ; The method is not implemented.
+                 , Win32Error                = 7    ; The method generated a Win32 error.
+                 , WrongState                = 8    ; The object is in an invalid state to satisfy the API call.
+                 , Aborted                   = 9    ; The method was aborted.
+                 , FileNotFound              = 10   ; The specified image file or metafile cannot be found.
+                 , ValueOverflow             = 11   ; The method performed an arithmetic operation that produced a numeric overflow.
+                 , AccessDenied              = 12   ; A write operation is not allowed on the specified file.
+                 , UnknownImageFormat        = 13   ; The specified image file format is not known.
+                 , FontFamilyNotFound        = 14   ; The specified font family is incorrect or the font family is not installed and cannot be found.
+                 , FontStyleNotFound         = 15   ; The specified style is not available for the specified font family.
+                 , NotTrueTypeFont           = 16   ; The font retrieved from an HDC or LOGFONT is not a TrueType font and cannot be used with GDI+.
+                 , UnsupportedGdiplusVersion = 17   ; The version of GDI+ that is installed on the system is incompatible with the version with which the application was compiled.
+                 , GdiplusNotInitialized     = 18   ; The GDI+API is not in an initialized state. (This should never happen with this AHK library as the object initialize GDIPlus for you.)
+                 , PropertyNotFound          = 19   ; The specified property does not exist in the image.
+                 , PropertyNotSupported      = 20   ; The specified property is not supported by the format of the image and, therefore, cannot be set.
+                 , ProfileNotFound           = 21   ; The color profile required to save an image in CMYK format was not found.
+        }
         
-        ; Specifies the type of smoothing (antialiasing) that is applied to lines and curves.
-        Static SmoothingMode := {"SmoothingModeInvalid"      : -1   ; Reserved.
-                                ,"SmoothingModeDefault"      :  0   ; Smoothing is not applied.
-                                ,"SmoothingModeHighSpeed"    :  1   ; Smoothing is not applied.
-                                ,"SmoothingModeHighQuality"  :  2   ; Smoothing is applied using an 8 X 4 box filter.
-                                ,"SmoothingModeNone"         :  3   ; Smoothing is not applied.
-                                ,"SmoothingModeAntiAlias"    :  4   ; Smoothing is applied using an 8 X 4 box filter.
-                                ,"SmoothingModeAntiAlias8x4" :  4   ; Smoothing is applied using an 8 X 4 box filter.
-                                ,"SmoothingModeAntiAlias8x8" :  5 } ; Smoothing is applied using an 8 X 8 box filter.
+        Class StringAlignment {                ; Specifies how a string is aligned in reference to the bounding rectangle.
+            Static StringAlignmentNear   = 0   ; Alignment is towards the origin of the bounding rectangle.
+                 , StringAlignmentCenter = 1   ; Alignment is centered between origin and extent (width) of the formatting rectangle.
+                 , StringAlignmentFar    = 2   ; Alignment is to the far extent (right side) of the formatting rectangle.
+        }
         
-        ; Indicates the result of a Windows GDI+ method call.
-        Static Status := {"Ok"                        : 0    ; Method call was successful.
-                         ,"GenericError"              : 1    ; There was an error on the method call which is not defined elsewhere in this enumeration.
-                         ,"InvalidParameter"          : 2    ; One of the arguments passed to the method was not valid.
-                         ,"OutOfMemory"               : 3    ; Operating system is out of memory and could not allocate memory to process the method call. For an explanation of how constructors use the OutOfMemory status, see the Remarks section at the end of this topic.
-                         ,"ObjectBusy"                : 4    ; One of the arguments specified in the API call is already in use in another thread.
-                         ,"InsufficientBuffer"        : 5    ; A buffer specified as an argument in the API call is not large enough to hold the data to be received.
-                         ,"NotImplemented"            : 6    ; The method is not implemented.
-                         ,"Win32Error"                : 7    ; The method generated a Win32 error.
-                         ,"WrongState"                : 8    ; The object is in an invalid state to satisfy the API call.
-                         ,"Aborted"                   : 9    ; The method was aborted.
-                         ,"FileNotFound"              : 10   ; The specified image file or metafile cannot be found.
-                         ,"ValueOverflow"             : 11   ; The method performed an arithmetic operation that produced a numeric overflow.
-                         ,"AccessDenied"              : 12   ; A write operation is not allowed on the specified file.
-                         ,"UnknownImageFormat"        : 13   ; The specified image file format is not known.
-                         ,"FontFamilyNotFound"        : 14   ; The specified font family is incorrect or the font family is not installed and cannot be found.
-                         ,"FontStyleNotFound"         : 15   ; The specified style is not available for the specified font family.
-                         ,"NotTrueTypeFont"           : 16   ; The font retrieved from an HDC or LOGFONT is not a TrueType font and cannot be used with GDI+.
-                         ,"UnsupportedGdiplusVersion" : 17   ; The version of GDI+ that is installed on the system is incompatible with the version with which the application was compiled.
-                         ,"GdiplusNotInitialized"     : 18   ; The GDI+API is not in an initialized state. (This should never happen with this AHK library as the object initialize GDIPlus for you.)
-                         ,"PropertyNotFound"          : 19   ; The specified property does not exist in the image.
-                         ,"PropertyNotSupported"      : 20   ; The specified property is not supported by the format of the image and, therefore, cannot be set.
-                         ,"ProfileNotFound"           : 21 } ; The color profile required to save an image in CMYK format was not found.
+        Class StringDigitSubstitute {                     ; Specifies how to substitute digits in a string according to a user's locale or language.
+            Static StringDigitSubstituteUser        = 0   ; User-defined substitution scheme.
+                 , StringDigitSubstituteNone        = 1   ; Disable substitutions.
+                 , StringDigitSubstituteNational    = 2   ; Substitution digits that correspond with the official national language of the user's locale.
+                 , StringDigitSubstituteTraditional = 3   ; Substitution digits that correspond with the user's native script or language
+        }
         
-        ; Specifies how a string is aligned in reference to the bounding rectangle.
-        Static StringAlignment := {"StringAlignmentNear"   : 0   ; Alignment is towards the origin of the bounding rectangle.
-                                  ,"StringAlignmentCenter" : 1   ; Alignment is centered between origin and extent (width) of the formatting rectangle.
-                                  ,"StringAlignmentFar"    : 2 } ; Alignment is to the far extent (right side) of the formatting rectangle.
+        Class StringFormatFlags {                                        ; Specifies text layout information (such as orientation and clipping) and display manipulations
+            Static StringFormatFlagsDirectionRightToLeft  = 0x1          ; Reading order is right to left.
+                 , StringFormatFlagsDirectionVertical     = 0x2          ; Individual lines of text are drawn vertically on the display device.
+                 , StringFormatFlagsNoFitBlackBox         = 0x4          ; Parts of characters are allowed to overhang the string's layout rectangle.
+                 , StringFormatFlagsDisplayFormatControl  = 0x20         ; Unicode layout control characters are displayed with a representative character.
+                 , StringFormatFlagsNoFontFallback        = 0x400        ; Alternate font is used for characters that are not supported in the requested font.
+                 , StringFormatFlagsMeasureTrailingSpaces = 0x800        ; Space at the end of each line is included in a string measurement.
+                 , StringFormatFlagsNoWrap                = 0x1000       ; Wrapping of text to the next line is disabled.
+                 , StringFormatFlagsLineLimit             = 0x2000       ; Only entire lines are laid out in the layout rectangle.
+                 , StringFormatFlagsNoClip                = 0x4000       ; Only entire lines are laid out in the layout rectangle.
+                 , StringFormatFlagsBypassGDI             = 0x80000000   ; Undefined.
+        }
         
-        ; Specifies how to substitute digits in a string according to a user's locale or language.
-        Static StringDigitSubstitute := {"StringDigitSubstituteUser"        : 0   ; User-defined substitution scheme.
-                                        ,"StringDigitSubstituteNone"        : 1   ; Disable substitutions.
-                                        ,"StringDigitSubstituteNational"    : 2   ; Substitution digits that correspond with the official national language of the user's locale.
-                                        ,"StringDigitSubstituteTraditional" : 3 } ; Substitution digits that correspond with the user's native script or language
+        Class StringTrimming {                           ; Specifies how to trim characters from a string so that the string fits into a layout rectangle.
+            Static StringTrimmingNone              = 0   ; No trimming is done.
+                 , StringTrimmingCharacter         = 1   ; String is broken at the boundary of the last character that is inside the layout rectangle.
+                 , StringTrimmingWord              = 2   ; String is broken at the boundary of the last word that is inside the layout rectangle.
+                 , StringTrimmingEllipsisCharacter = 3   ; String is broken at the boundary of the last character that is inside the layout rectangle and an ellipsis (...) is inserted after the character.
+                 , StringTrimmingEllipsisWord      = 4   ; String is broken at the boundary of the last word that is inside the layout rectangle and an ellipsis (...) is inserted after the word.
+                 , StringTrimmingEllipsisPath      = 5   ; Center is removed from the string and replaced by an ellipsis. 
+        }
         
-        ; Specifies text layout information (such as orientation and clipping) and display manipulations
-        Static StringFormatFlags := {"StringFormatFlagsDirectionRightToLeft"  : 0x1          ; Reading order is right to left.
-                                    ,"StringFormatFlagsDirectionVertical"     : 0x2          ; Individual lines of text are drawn vertically on the display device.
-                                    ,"StringFormatFlagsNoFitBlackBox"         : 0x4          ; Parts of characters are allowed to overhang the string's layout rectangle.
-                                    ,"StringFormatFlagsDisplayFormatControl"  : 0x20         ; Unicode layout control characters are displayed with a representative character.
-                                    ,"StringFormatFlagsNoFontFallback"        : 0x400        ; Alternate font is used for characters that are not supported in the requested font.
-                                    ,"StringFormatFlagsMeasureTrailingSpaces" : 0x800        ; Space at the end of each line is included in a string measurement.
-                                    ,"StringFormatFlagsNoWrap"                : 0x1000       ; Wrapping of text to the next line is disabled.
-                                    ,"StringFormatFlagsLineLimit"             : 0x2000       ; Only entire lines are laid out in the layout rectangle.
-                                    ,"StringFormatFlagsNoClip"                : 0x4000       ; Only entire lines are laid out in the layout rectangle.
-                                    ,"StringFormatFlagsBypassGDI"             : 0x80000000 } ; Undefined.
+        Class TextRenderingHint {                                  ; Specifies the process used to render text. This affects text quality.
+            Static TextRenderingHintSystemDefault            = 0   ; Character is drawn using the currently selected system font smoothing mode (also called a rendering hint).
+                 , TextRenderingHintSingleBitPerPixelGridFit = 1   ; Character is drawn using its glyph bitmap and hinting to improve character appearance on stems and curvature.
+                 , TextRenderingHintSingleBitPerPixel        = 2   ; Character is drawn using its glyph bitmap and no hinting. Better performance at cost of quality.
+                 , TextRenderingHintAntiAliasGridFit         = 3   ; Character is drawn using its antialiased glyph bitmap and hinting. Better quality at cost of performance.
+                 , TextRenderingHintAntiAlias                = 4   ; Character is drawn using its antialiased glyph bitmap and no hinting.
+                 , TextRenderingHintClearTypeGridFit         = 5   ; Character is drawn using its glyph ClearType bitmap and hinting.
+        }
         
-        ; Specifies how to trim characters from a string so that the string fits into a layout rectangle.
-        Static StringTrimming := {"StringTrimmingNone"              : 0   ; No trimming is done.
-                                 ,"StringTrimmingCharacter"         : 1   ; String is broken at the boundary of the last character that is inside the layout rectangle.
-                                 ,"StringTrimmingWord"              : 2   ; String is broken at the boundary of the last word that is inside the layout rectangle.
-                                 ,"StringTrimmingEllipsisCharacter" : 3   ; String is broken at the boundary of the last character that is inside the layout rectangle and an ellipsis (...) is inserted after the character.
-                                 ,"StringTrimmingEllipsisWord"      : 4   ; String is broken at the boundary of the last word that is inside the layout rectangle and an ellipsis (...) is inserted after the word.
-                                 ,"StringTrimmingEllipsisPath"      : 5 } ; Center is removed from the string and replaced by an ellipsis. 
+        Class Unit {                    ; Specifies the unit of measure for a given data type.
+            Static UnitWorld      = 0   ; World coordinates, a nonphysical unit.
+                 , UnitDisplay    = 1   ; Display specific units.
+                 , UnitPixel      = 2   ; Unit is 1 pixel.
+                 , UnitPoint      = 3   ; Unit is 1 point or 1/72 inch.
+                 , UnitInch       = 4   ; Unit is 1 inch.
+                 , UnitDocument   = 5   ; Unit is 1/300 inch.
+                 , UnitMillimeter = 6   ; Unit is 1 millimeter.
+                 , UnitAbsolute   = 7   ; Unit is memetic and of type easter egg.
+        }
         
-        ; Specifies the process used to render text. This affects text quality.
-        Static TextRenderingHint := {"TextRenderingHintSystemDefault"            : 0   ; Character is drawn using the currently selected system font smoothing mode (also called a rendering hint).
-                                    ,"TextRenderingHintSingleBitPerPixelGridFit" : 1   ; Character is drawn using its glyph bitmap and hinting to improve character appearance on stems and curvature.
-                                    ,"TextRenderingHintSingleBitPerPixel"        : 2   ; Character is drawn using its glyph bitmap and no hinting. Better performance at cost of quality.
-                                    ,"TextRenderingHintAntiAliasGridFit"         : 3   ; Character is drawn using its antialiased glyph bitmap and hinting. Better quality at cost of performance.
-                                    ,"TextRenderingHintAntiAlias"                : 4   ; Character is drawn using its antialiased glyph bitmap and no hinting.
-                                    ,"TextRenderingHintClearTypeGridFit"         : 5 } ; Character is drawn using its glyph ClearType bitmap and hinting.
+        Class WarpMode {                     ; Specifies warp modes that can be used to transform images.
+            Static WarpModePerspective = 0   ; Perspective warp mode.
+                 , WarpModeBilinear    = 1   ; Bilinear warp mode.
+        }
         
-        ; Specifies the unit of measure for a given data type.
-        Static Unit := {"UnitWorld"      : 0   ; World coordinates, a nonphysical unit.
-                       ,"UnitDisplay"    : 1   ; Display specific units.
-                       ,"UnitPixel"      : 2   ; Unit is 1 pixel.
-                       ,"UnitPoint"      : 3   ; Unit is 1 point or 1/72 inch.
-                       ,"UnitInch"       : 4   ; Unit is 1 inch.
-                       ,"UnitDocument"   : 5   ; Unit is 1/300 inch.
-                       ,"UnitMillimeter" : 6   ; Unit is 1 millimeter.
-                       ,"UnitAbsolute"   : 7 } ; Unit is memetic and of type easter egg.
-        
-        ; Specifies warp modes that can be used to transform images.
-        Static WarpMode := {"WarpModePerspective" : 0   ; Perspective warp mode.
-                           ,"WarpModeBilinear"    : 1 } ; Bilinear warp mode.
-        
-        ; Specifies how repeated copies of an image are used to tile an area.
-        Static WrapMode := {"WrapModeTile"       : 0   ; Tiling without flipping.
-                           ,"WrapModeTileFlipX"  : 1   ; Tiles are flipped horizontally as you move from one tile to the next in a row.
-                           ,"WrapModeTileFlipY"  : 2   ; Tiles are flipped vertically as you move from one tile to the next in a column.
-                           ,"WrapModeTileFlipXY" : 3   ; Tiles are flipped horizontally as you move along a row and flipped vertically as you move along a column.
-                           ,"WrapModeClamp"      : 4 } ; No tiling takes place.
+        Class WrapMode {                    ; Specifies how repeated copies of an image are used to tile an area.
+            Static WrapModeTile       = 0   ; Tiling without flipping.
+                 , WrapModeTileFlipX  = 1   ; Tiles are flipped horizontally as you move from one tile to the next in a row.
+                 , WrapModeTileFlipY  = 2   ; Tiles are flipped vertically as you move from one tile to the next in a column.
+                 , WrapModeTileFlipXY = 3   ; Tiles are flipped horizontally as you move along a row and flipped vertically as you move along a column.
+                 , WrapModeClamp      = 4   ; No tiling takes place.
+        }
     }
     
     ;####################################################################################################################
@@ -2935,25 +2973,25 @@ Class GDIP
     {
         color := {}
         
-        ; Black and gray/grey                          ; White                                             
-         color.Black                := 0x000000        ,color.MistyRose            := 0xFFE4E1         
-        ,color.DarkSlateGray        := 0x2F4F4F        ,color.AntiqueWhite         := 0xFAEBD7         
-        ,color.DarkSlateGrey        := 0x2F4F4F        ,color.Linen                := 0xFAF0E6         
-        ,color.DimGray              := 0x696969        ,color.Beige                := 0xF5F5DC         
-        ,color.DimGrey              := 0x696969        ,color.WhiteSmoke           := 0xF5F5F5         
-        ,color.SlateGray            := 0x708090        ,color.LavenderBlush        := 0xFFF0F5         
-        ,color.SlateGrey            := 0x708090        ,color.OldLace              := 0xFDF5E6         
-        ,color.Gray                 := 0x808080        ,color.AliceBlue            := 0xF0F8FF         
-        ,color.Grey                 := 0x808080        ,color.Seashell             := 0xFFF5EE         
-        ,color.LightSlateGray       := 0x778899        ,color.GhostWhite           := 0xF8F8FF         
-        ,color.LightSlateGrey       := 0x778899        ,color.Honeydew             := 0xF0FFF0         
-        ,color.DarkGray             := 0xA9A9A9        ,color.FloralWhite          := 0xFFFAF0         
-        ,color.DarkGrey             := 0xA9A9A9        ,color.Azure                := 0xF0FFFF         
-        ,color.Silver               := 0xC0C0C0        ,color.MintCream            := 0xF5FFFA         
-        ,color.LightGray            := 0xD3D3D3        ,color.Snow                 := 0xFFFAFA         
-        ,color.LightGrey            := 0xD3D3D3        ,color.Ivory                := 0xFFFFF0         
-        ,color.Gainsboro            := 0xDCDCDC        ,color.White                := 0xFFFFFF         
-                                                                                                                           
+        ; Black and gray/grey                          ; White 
+         color.Black                := 0x000000        ,color.MistyRose            := 0xFFE4E1 
+        ,color.DarkSlateGray        := 0x2F4F4F        ,color.AntiqueWhite         := 0xFAEBD7 
+        ,color.DarkSlateGrey        := 0x2F4F4F        ,color.Linen                := 0xFAF0E6 
+        ,color.DimGray              := 0x696969        ,color.Beige                := 0xF5F5DC 
+        ,color.DimGrey              := 0x696969        ,color.WhiteSmoke           := 0xF5F5F5 
+        ,color.SlateGray            := 0x708090        ,color.LavenderBlush        := 0xFFF0F5 
+        ,color.SlateGrey            := 0x708090        ,color.OldLace              := 0xFDF5E6 
+        ,color.Gray                 := 0x808080        ,color.AliceBlue            := 0xF0F8FF 
+        ,color.Grey                 := 0x808080        ,color.Seashell             := 0xFFF5EE 
+        ,color.LightSlateGray       := 0x778899        ,color.GhostWhite           := 0xF8F8FF 
+        ,color.LightSlateGrey       := 0x778899        ,color.Honeydew             := 0xF0FFF0 
+        ,color.DarkGray             := 0xA9A9A9        ,color.FloralWhite          := 0xFFFAF0 
+        ,color.DarkGrey             := 0xA9A9A9        ,color.Azure                := 0xF0FFFF 
+        ,color.Silver               := 0xC0C0C0        ,color.MintCream            := 0xF5FFFA 
+        ,color.LightGray            := 0xD3D3D3        ,color.Snow                 := 0xFFFAFA 
+        ,color.LightGrey            := 0xD3D3D3        ,color.Ivory                := 0xFFFFF0 
+        ,color.Gainsboro            := 0xDCDCDC        ,color.White                := 0xFFFFFF 
+        
         ; Red                                          ; Pink
          color.DarkRed              := 0x8B0000        ,color.MediumVioletRed      := 0xC71585
         ,color.Red                  := 0xFF0000        ,color.DeepPink             := 0xFF1493
@@ -2961,1168 +2999,867 @@ Class GDIP
         ,color.Crimson              := 0xDC143C        ,color.HotPink              := 0xFF69B4
         ,color.IndianRed            := 0xCD5C5C        ,color.LightPink            := 0xFFB6C1
         ,color.LightCoral           := 0xF08080        ,color.Pink                 := 0xFFC0CB
-        ,color.Salmon               := 0xFA8072        
-        ,color.DarkSalmon           := 0xE9967A        
-        ,color.LightSalmon          := 0xFFA07A        
-                                                                                                                           
-        ; Blue                                         ; Purple, violet, and magenta                           
-         color.Navy                 := 0x000080        ,color.Indigo               := 0x4B0082             
-        ,color.DarkBlue             := 0x00008B        ,color.Purple               := 0x800080             
-        ,color.MediumBlue           := 0x0000CD        ,color.DarkMagenta          := 0x8B008B             
-        ,color.Blue                 := 0x0000FF        ,color.DarkViolet           := 0x9400D3             
-        ,color.MidnightBlue         := 0x191970        ,color.DarkSlateBlue        := 0x483D8B             
-        ,color.RoyalBlue            := 0x4169E1        ,color.BlueViolet           := 0x8A2BE2             
-        ,color.SteelBlue            := 0x4682B4        ,color.DarkOrchid           := 0x9932CC             
-        ,color.DodgerBlue           := 0x1E90FF        ,color.Fuchsia              := 0xFF00FF             
-        ,color.DeepSkyBlue          := 0x00BFFF        ,color.Magenta              := 0xFF00FF             
-        ,color.CornflowerBlue       := 0x6495ED        ,color.SlateBlue            := 0x6A5ACD             
-        ,color.SkyBlue              := 0x87CEEB        ,color.MediumSlateBlue      := 0x7B68EE             
-        ,color.LightSkyBlue         := 0x87CEFA        ,color.MediumOrchid         := 0xBA55D3             
-        ,color.LightSteelBlue       := 0xB0C4DE        ,color.MediumPurple         := 0x9370DB             
-        ,color.LightBlue            := 0xADD8E6        ,color.Orchid               := 0xDA70D6             
-        ,color.PowderBlue           := 0xB0E0E6        ,color.Violet               := 0xEE82EE             
-                                                       ,color.Plum                 := 0xDDA0DD            
-                                                       ,color.Thistle              := 0xD8BFD8            
-                                                       ,color.Lavender             := 0xE6E6FA            
-                                                                                                                           
-        ; Green                                        ; Cyan                                                       
-         color.DarkGreen            := 0x006400        ,color.Teal                 := 0x008080             
-        ,color.Green                := 0x008000        ,color.DarkCyan             := 0x008B8B             
-        ,color.DarkOliveGreen       := 0x556B2F        ,color.LightSeaGreen        := 0x20B2AA             
-        ,color.ForestGreen          := 0x228B22        ,color.CadetBlue            := 0x5F9EA0             
-        ,color.SeaGreen             := 0x2E8B57        ,color.DarkTurquoise        := 0x00CED1             
-        ,color.Olive                := 0x808000        ,color.MediumTurquoise      := 0x48D1CC             
-        ,color.OliveDrab            := 0x6B8E23        ,color.Turquoise            := 0x40E0D0             
-        ,color.MediumSeaGreen       := 0x3CB371        ,color.Aqua                 := 0x00FFFF             
-        ,color.LimeGreen            := 0x32CD32        ,color.Cyan                 := 0x00FFFF             
-        ,color.Lime                 := 0x00FF00        ,color.Aquamarine           := 0x7FFFD4             
-        ,color.SpringGreen          := 0x00FF7F        ,color.PaleTurquoise        := 0xAFEEEE             
-        ,color.MediumSpringGreen    := 0x00FA9A        ,color.LightCyan            := 0xE0FFFF             
-        ,color.DarkSeaGreen         := 0x8FBC8F                                                                     
-        ,color.MediumAquamarine     := 0x66CDAA        ; Orange                                                     
-        ,color.YellowGreen          := 0x9ACD32        ,color.OrangeRed            := 0xFF4500             
-        ,color.LawnGreen            := 0x7CFC00        ,color.Tomato               := 0xFF6347             
-        ,color.Chartreuse           := 0x7FFF00        ,color.DarkOrange           := 0xFF8C00             
-        ,color.LightGreen           := 0x90EE90        ,color.Coral                := 0xFF7F50             
-        ,color.GreenYellow          := 0xADFF2F        ,color.Orange               := 0xFFA500             
-        ,color.PaleGreen            := 0x98FB98        
-                                                                                                                           
-        ; Brown                                                 ; Yellow                                                   
-         color.Maroon               := 0x800000        ,color.DarkKhaki            := 0xBDB76B            
-        ,color.Brown                := 0xA52A2A        ,color.Gold                 := 0xFFD700            
-        ,color.SaddleBrown          := 0x8B4513        ,color.Khaki                := 0xF0E68C            
-        ,color.Sienna               := 0xA0522D        ,color.PeachPuff            := 0xFFDAB9            
-        ,color.Chocolate            := 0xD2691E        ,color.Yellow               := 0xFFFF00            
-        ,color.DarkGoldenrod        := 0xB8860B        ,color.PaleGoldenrod        := 0xEEE8AA            
-        ,color.Peru                 := 0xCD853F        ,color.Moccasin             := 0xFFE4B5            
-        ,color.RosyBrown            := 0xBC8F8F        ,color.PapayaWhip           := 0xFFEFD5            
-        ,color.Goldenrod            := 0xDAA520        ,color.LightGoldenrodYellow := 0xFAFAD2            
-        ,color.SandyBrown           := 0xF4A460        ,color.LemonChiffon         := 0xFFFACD            
-        ,color.Tan                  := 0xD2B48C        ,color.LightYellow          := 0xFFFFE0            
-        ,color.Burlywood            := 0xDEB887                                                                     
-        ,color.Wheat                := 0xF5DEB3                                                                     
-        ,color.NavajoWhite          := 0xFFDEAD                                                                     
-        ,color.Bisque               := 0xFFE4C4                                                                     
-        ,color.BlanchedAlmond       := 0xFFEBCD                                                                     
-        ,color.Cornsilk             := 0xFFF8DC                                                                     
+        ,color.Salmon               := 0xFA8072 
+        ,color.DarkSalmon           := 0xE9967A 
+        ,color.LightSalmon          := 0xFFA07A 
+        
+        ; Blue                                         ; Purple, violet, and magenta 
+         color.Navy                 := 0x000080        ,color.Indigo               := 0x4B0082 
+        ,color.DarkBlue             := 0x00008B        ,color.Purple               := 0x800080 
+        ,color.MediumBlue           := 0x0000CD        ,color.DarkMagenta          := 0x8B008B 
+        ,color.Blue                 := 0x0000FF        ,color.DarkViolet           := 0x9400D3 
+        ,color.MidnightBlue         := 0x191970        ,color.DarkSlateBlue        := 0x483D8B 
+        ,color.RoyalBlue            := 0x4169E1        ,color.BlueViolet           := 0x8A2BE2 
+        ,color.SteelBlue            := 0x4682B4        ,color.DarkOrchid           := 0x9932CC 
+        ,color.DodgerBlue           := 0x1E90FF        ,color.Fuchsia              := 0xFF00FF 
+        ,color.DeepSkyBlue          := 0x00BFFF        ,color.Magenta              := 0xFF00FF 
+        ,color.CornflowerBlue       := 0x6495ED        ,color.SlateBlue            := 0x6A5ACD 
+        ,color.SkyBlue              := 0x87CEEB        ,color.MediumSlateBlue      := 0x7B68EE 
+        ,color.LightSkyBlue         := 0x87CEFA        ,color.MediumOrchid         := 0xBA55D3 
+        ,color.LightSteelBlue       := 0xB0C4DE        ,color.MediumPurple         := 0x9370DB 
+        ,color.LightBlue            := 0xADD8E6        ,color.Orchid               := 0xDA70D6 
+        ,color.PowderBlue           := 0xB0E0E6        ,color.Violet               := 0xEE82EE 
+                                                       ,color.Plum                 := 0xDDA0DD 
+                                                       ,color.Thistle              := 0xD8BFD8 
+                                                       ,color.Lavender             := 0xE6E6FA 
+        
+        ; Green                                        ; Cyan 
+         color.DarkGreen            := 0x006400        ,color.Teal                 := 0x008080 
+        ,color.Green                := 0x008000        ,color.DarkCyan             := 0x008B8B 
+        ,color.DarkOliveGreen       := 0x556B2F        ,color.LightSeaGreen        := 0x20B2AA 
+        ,color.ForestGreen          := 0x228B22        ,color.CadetBlue            := 0x5F9EA0 
+        ,color.SeaGreen             := 0x2E8B57        ,color.DarkTurquoise        := 0x00CED1 
+        ,color.Olive                := 0x808000        ,color.MediumTurquoise      := 0x48D1CC 
+        ,color.OliveDrab            := 0x6B8E23        ,color.Turquoise            := 0x40E0D0 
+        ,color.MediumSeaGreen       := 0x3CB371        ,color.Aqua                 := 0x00FFFF 
+        ,color.LimeGreen            := 0x32CD32        ,color.Cyan                 := 0x00FFFF 
+        ,color.Lime                 := 0x00FF00        ,color.Aquamarine           := 0x7FFFD4 
+        ,color.SpringGreen          := 0x00FF7F        ,color.PaleTurquoise        := 0xAFEEEE 
+        ,color.MediumSpringGreen    := 0x00FA9A        ,color.LightCyan            := 0xE0FFFF 
+        ,color.DarkSeaGreen         := 0x8FBC8F 
+        ,color.MediumAquamarine     := 0x66CDAA        ; Orange 
+        ,color.YellowGreen          := 0x9ACD32        ,color.OrangeRed            := 0xFF4500 
+        ,color.LawnGreen            := 0x7CFC00        ,color.Tomato               := 0xFF6347 
+        ,color.Chartreuse           := 0x7FFF00        ,color.DarkOrange           := 0xFF8C00 
+        ,color.LightGreen           := 0x90EE90        ,color.Coral                := 0xFF7F50 
+        ,color.GreenYellow          := 0xADFF2F        ,color.Orange               := 0xFFA500 
+        ,color.PaleGreen            := 0x98FB98 
+        
+        ; Brown                                                 ; Yellow 
+         color.Maroon               := 0x800000        ,color.DarkKhaki            := 0xBDB76B 
+        ,color.Brown                := 0xA52A2A        ,color.Gold                 := 0xFFD700 
+        ,color.SaddleBrown          := 0x8B4513        ,color.Khaki                := 0xF0E68C 
+        ,color.Sienna               := 0xA0522D        ,color.PeachPuff            := 0xFFDAB9 
+        ,color.Chocolate            := 0xD2691E        ,color.Yellow               := 0xFFFF00 
+        ,color.DarkGoldenrod        := 0xB8860B        ,color.PaleGoldenrod        := 0xEEE8AA 
+        ,color.Peru                 := 0xCD853F        ,color.Moccasin             := 0xFFE4B5 
+        ,color.RosyBrown            := 0xBC8F8F        ,color.PapayaWhip           := 0xFFEFD5 
+        ,color.Goldenrod            := 0xDAA520        ,color.LightGoldenrodYellow := 0xFAFAD2 
+        ,color.SandyBrown           := 0xF4A460        ,color.LemonChiffon         := 0xFFFACD 
+        ,color.Tan                  := 0xD2B48C        ,color.LightYellow          := 0xFFFFE0 
+        ,color.Burlywood            := 0xDEB887 
+        ,color.Wheat                := 0xF5DEB3 
+        ,color.NavajoWhite          := 0xFFDEAD 
+        ,color.Bisque               := 0xFFE4C4 
+        ,color.BlanchedAlmond       := 0xFFEBCD 
+        ,color.Cornsilk             := 0xFFF8DC 
         
         this.colorhex := Color
         
         Return
     }
     
-    ;===================================================================================================================.
-    ; A PointF object contains 2 float values representing x and y coords.                                              |
+    
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; GdiplusTypes.h                                                                                                    |
+    ;___________________________________________________________________________________________________________________|
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Point Class - Represents a location in a 2D coordinate system                                                     |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; A Point object contains x and y values.                                                                           |
     ; Properties:                                                                                                       |
-    ; .x                X coord (float)                                                                                 |
-    ; .y                Y coord (float)                                                                                 |
-    ; .structP          Pointer to PointF struct                                                                        |
+    ; .X                X coord                                                                                         |
+    ; .Y                Y coord                                                                                         |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
-    ; PointF()          Create a PointF object with x and y values of 0                                                 |
-    ; PointF(f, f)      Create a PointF object with float x and float y values                                          |
-    ; PointF(SizeF)     Create a PointF object with x equal to SizeF.width and y equal to SizeF.height                  |
-    ; PointF(PointF)    Create a clone of the provided PointF struct                                                    |
+    ; Point()           Set X and Y to 0                                                                                |
+    ; Point(num1, num2) Set X to num1 and Y to num2                                                                     |
+    ; Point(Size)       Set X to Size.width and Y to Size.height                                                        |
+    ; Point(Point)      Set X to Point.X and Y to Point.Y                                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .equals(PointF)   Returns true if native PointF values are equal to provided PointF values                        |
-    ; .plus(PointF)     Returns a new PointF object containing the sum of  PointF objects > returns new PointF object   |
-    ; .minus(PointF)    Subtracts the x and y PointF values from the native PointF object > returns a new PointF object |
+    ; .Struct(type)     Return pointer to struct. type = expected data type (Int, Float, ...) No param = Int            |
+    ; .Plus(Point)      Return a new Point object with sum of Point and NativePoint values                              |
+    ; .Minus(Point)     Return a new Point object with difference of NativePoint and Point values                       |
+    ; .Equals(Point)    Return True if Point and NativePoint have equal values                                          |
     ;                                                                                                                   |
-    ; Remarks           If working with only integers, use Point.                                                       |
-    ;                   Int numbers are accepted by float methods and will be treated as float.                         |
-    ;                   Point and Size are accepted but are converted to float.                                         |
-    ;                   There is no way to use the + and - operators with PointFs. Use the plus() or minus() methods.   |
+    ; Remarks           Struct type is updated to the requested type at .Struct() call.                                 |
+    ;                   There is no way to use the + and - operators between Points. Use .plus(p) or .minus(p).         |
     ;___________________________________________________________________________________________________________________|
-    ;===================================================================================================================.
-    ; A Point object contains 2 integer properties representing x and y values.                                         |
-    ; Properties:                                                                                                       |
-    ; .x                X coord (integer)                                                                               |
-    ; .y                Y coord (integer)                                                                               |
-    ; .structP          Pointer to Point struct                                                                         |
-    ;                                                                                                                   |
-    ; Constructors:                                                                                                     |
-    ; Point()           Create a Point object with x and y values of 0                                                  |
-    ; Point(int1, int2) Create a Point object with int x and int y values                                               |
-    ; Point(Size)       Create a Point object with x equal to size.width and y equal to size.height                     |
-    ; Point(Point)      Create a clone of the provided Point struct                                                     |
-    ;                                                                                                                   |
-    ; Methods:                                                                                                          |
-    ; .equals(Point)    Returns true if native Point values are equal to provided Point values                          |
-    ; .plus(Point)      Returns a new Point object containing the sum of  Point objects > returns new Point object      |
-    ; .minus(Point)     Subtracts the x and y Point values from the native Point object > returns a new Point object    |
-    ;                                                                                                                   |
-    ; Remarks           If working with float/decimal numbers, use PointF.                                              |
-    ;                   There is no way to use the + and - operators with Points. Use the plus() or minus() methods.    |
-    ;___________________________________________________________________________________________________________________|
-    Class Point extends GDIP
+    Class Point
     {
-        type    := "Point"
-        x       := ""
-        y       := ""
-        struct  := ""
-        structP := ""
+        _type   := "Point"
+        Width   := ""
+        Height  := ""
         
-        ; ## CONSTRUCTOR ##
+        ; ## Constructor ##
         ; Point()
-        ; Point(int, int)
-        ; Point(SizeObj)
-        ; Point(PointObj)
-        __New(obj_x="U", y="U")
+        ; Point(x, y)
+        ; Point(Point)
+        ; Point(Size)
+        __New(x="", y="")
         {
-            err := 0
-            (this.is_int(obj_x) && this.is_int(y))     ? (this.x := obj_x       ,this.y := y)
-                : (obj_x == "U" && y == "U")             ? (this.x := 0           ,this.y := 0)
-                : (obj_x.type == "Point") && (y == "U") ? (this.x := obj_x.x     ,this.y := obj_x.y)
-                : (obj_x.type == "Size") && (y == "U")  ? (this.x := obj_x.width ,this.y := obj_x.height)
-                : err := 1
+             this.SetCapacity("_struct", 8)
+            ,this.structP := this.GetAddress("_struct")
             
-            (err)
-                ? this.error_log(A_ThisFunc, "Failed to create Point struct."   ; If error, log it
-                    , "No params, 2 ints, 1 size object, or 1 Point object"
-                    , {obj_x:obj_x, y:y})
-                : (this.SetCapacity("struct", 8)                                ; Else build Point
-                    , this.structP := this.GetAddress("struct")
-                    , NumPut(this.x, this.structP+0, 0, "Int")
-                    , NumPut(this.y, this.structP+0, 4, "Int") )
+            ,(x = "" && y = "")                     ; empty
+                ? this._set_xy(0, 0)
+            : (GDIP.is_num(x) && GDIP.is_num(y))    ; nums
+                ? this._set_xy(x, y)
+            : (x._type == "Point" && y = "")         ; Point
+                ? this._set_xy(x.X, x.Y)
+            : (x._type == "Size" && y = "")          ; Size
+                ? this._set_xy(x.Width, x.Height)
+            : GDIP.error_log(A_ThisFunc, "Point constructor error."
+                , "Empty: Point()`nFrom two numbers: Point(x, y)"
+                . "`nFrom another Point: Point(Point)`nFrom a Size: Point(Size)"
+                , {p1:w, p2:h})
         }
         
-        ; For testing purposes > Shows contents of this object
-        show(msg="")
+        Show(type="Int")
         {
-            MsgBox, % (msg = "" ? "" : msg "`n")
-                . "type: " this.type    "`nstructP: " this.structP
-                . "`nx: "  this.x       "`ny: "       this.y
-                . "`nStructP x: " NumGet(this.structP+0, 0, "Int")
-                . "`nStructP y: " NumGet(this.structP+0, 4, "Int")
+            ptr := this.Struct()
+            MsgBox, % this._type " Object:"
+                . "`nthis.X: "       this.X
+                . "`nthis.Y: "       this.Y
+                . "`nthis.structP: " this.structP
+                . "`nSturct x: "     NumGet(ptr, 0, type)
+                . "`nSturct y: "     NumGet(ptr, 4, type)
             Return
         }
         
-        ; ## METHODS ##
-        
-        ; Description   Determine if native and provided Point objects have equal values
-        ; Point         Point object to do equality check against native Point object
-        ; Return        1 = True, 0 = False
-        equals(Point)
+        _set_xy(x, y)
         {
-            (Point.type == "Point") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a Point object be passed in as a parameter."
-                    , "Must supply a Point object.", {providedObject: Point})
-            Return (this.x = Point.x) && (this.y = Point.y) ? 1 : 0
+             this.X := x
+            ,this.Y := y
         }
         
-        ; Description   Adds the x and y values of the native and provided Point objects
-        ; Point         Point object to add to the native Point object
-        ; Return        New Point object containing the added x and y values
-        ; Remark        The x values and y values are added together, not x+y
-        ;               This is a replacement for the GDIPlus +Operator (IE: Point1 + Point2)
-        plus(Point)
+        ; type      Pass expected structure type
+        ; Return    Pointer to struct
+        Struct(type="Int")
         {
-            (Point.type == "Point") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a Point object be passed in as a parameter."
-                    , "Must supply a Point object.", {providedObject: Point})
-            Return new GDIP.Point(this.x + Point.x, this.y + Point.y)
+             NumPut(this.X, this.structP+0, 0, type)
+            ,NumPut(this.Y, this.structP+0, 4, type)
+            Return structP+0
         }
         
-        ; Description   Subtracts the x and y Point values from the native Point object
-        ; Point         Point object to subtract from the native Point object
-        ; Return        A new Point object containing the difference of the x and y values
-        ; Remark        The x values and y values are subtracted, not x-y
-        ;               Native Point is the minuend and provided point is the subtrahend
-        ;               This is a replacement for the GDIPlus -Operator (IE: Point1 + Point2)
-        minus(Point)
+        Plus(Point)
         {
-            (Point.type == "Point") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a Point object be passed in as a parameter."
-                    , "Must supply a Point object.", {providedObject: Point})
-            Return new GDIP.Point(this.x - Point.x, this.y - Point.y)
+            Return new GDIP.Point(this.X + Point.X, this.Y + Point.Y)
+        }
+        
+        Minus(Point)
+        {
+            Return new GDIP.Point(this.X - Point.X, this.Y - Point.Y )
+        }
+        
+        Equals(Point)
+        {
+            Return (this.X = Point.X && this.Y = Point.Y) ? 1 : 0
         }
     }
     
-    ;===================================================================================================================.
-    ; A PointF object contains 2 float values representing x and y coords.                                              |
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Size Class - Represents a dimension in a 2D coordinate system                                                     |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; A Size object contains width and height values.                                                                   |
     ; Properties:                                                                                                       |
-    ; .x                X coord (float)                                                                                 |
-    ; .y                Y coord (float)                                                                                 |
-    ; .structP          Pointer to PointF struct                                                                        |
+    ; .Width            Size Width                                                                                      |
+    ; .Height           Size Height                                                                                     |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
-    ; PointF()          Create a PointF object with x and y values of 0                                                 |
-    ; PointF(f, f)      Create a PointF object with float x and float y values                                          |
-    ; PointF(SizeF)     Create a PointF object with x equal to SizeF.width and y equal to SizeF.height                  |
-    ; PointF(PointF)    Create a clone of the provided PointF struct                                                    |
+    ; Size()            Set Width and Height to 0                                                                       |
+    ; Size(num1, num2)  Set Width to num1 and Height to num2                                                            |
+    ; Size(Size)        Set Width to Size.Width and Height to Size.Height                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .equals(PointF)   Returns true if native PointF values are equal to provided PointF values                        |
-    ; .plus(PointF)     Returns a new PointF object containing the sum of  PointF objects > returns new PointF object   |
-    ; .minus(PointF)    Subtracts the x and y PointF values from the native PointF object > returns a new PointF object |
+    ; .Struct(type)     Return pointer to struct. type = expected data type (Int, Float, ...) No param = Int            |
+    ; .Plus(Size)       Return a new Size object with sum of Size and NativeSize values                                 |
+    ; .Minus(Size)      Return a new Size object with difference of NativeSize and Size values                          |
+    ; .Equals(Size)     Return True if Size and NativeSize have equal values                                            |
+    ; .Empty()          Return true if width or height <= 0                                                             |
     ;                                                                                                                   |
-    ; Remarks           If working with only integers, use Point.                                                       |
-    ;                   Int numbers are accepted by float methods and will be treated as float.                         |
-    ;                   Point and Size are accepted but are converted to float.                                         |
-    ;                   There is no way to use the + and - operators with PointFs. Use the plus() or minus() methods.   |
+    ; Remarks           Struct type is updated to the requested type at .Struct() call.                                 |
+    ;                   There is no way to use the + and - operators between Sizes. Use .plus(s) or .minus(s).          |
     ;___________________________________________________________________________________________________________________|
-    Class PointF extends GDIP
+    Class Size
     {
-        type    := "PointF"
-        x       := ""
-        y       := ""
-        struct  := ""
-        structP := ""
+        _type   := "Size"
+        Width   := ""
+        Height  := ""
         
-        ; ## CONSTRUCTOR ##
-        ; PointF()
-        ; PointF(float, float)
-        ; PointF(SizeFObj)
-        ; PointF(PointFObj)
-        __New(obj_x="U", y="U")
-        {
-            err := 0
-            (this.is_num(obj_x) && this.is_num(y))      ? (this.x := obj_x       ,this.y := y)
-                : (obj_x == "U" && y == "U")              ? (this.x := 0           ,this.y := 0)
-                : (y == "U") && (obj_x.type == "PointF"
-                    || obj_x.type == "Point")           ? (this.x := obj_x.x     ,this.y := obj_x.y)
-                : (y == "U") && (obj_x.type == "SizeF"
-                    || obj_x.type == "Size")            ? (this.x := obj_x.width ,this.y := obj_x.height)
-                : err := 1
-            
-            (err)
-                ? this.error_log(A_ThisFunc, "Failed to create PointF struct."  ; If error, log it
-                    , "No params, 2 floats, SizeF object, or PointF object"
-                    , {obj_x:obj_x, y:y})
-                : (this.SetCapacity("struct", 8)                                ; Else build PointF
-                    , this.structP := this.GetAddress("struct")
-                    , NumPut(this.x, this.structP+0, 0, "Float")
-                    , NumPut(this.y, this.structP+0, 4, "Float") )
-        }
-        
-        ; For testing purposes > Shows contents of this object
-        show(msg="")
-        {
-            MsgBox, % (msg = "" ? "" : msg "`n")
-                . "type: " this.type    "`nstructP: " this.structP
-                . "`nx: "  this.x       "`ny: "       this.y
-                . "`nStructP x: " NumGet(this.structP+0, 0, "Float")
-                . "`nStructP y: " NumGet(this.structP+0, 4, "Float")
-            Return
-        }
-        
-        ; ## METHODS ##
-        
-        ; Description   Determine if native and provided PointF objects have equal values
-        ; PointF        PointF object to do equality check against native PointF object
-        ; Return        1 = True, 0 = False
-        equals(PointF)
-        {
-            (PointF.type == "PointF") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a PointF object be passed in as a parameter."
-                    , "Must supply a PointF object.", {providedObject: PointF})
-            Return (this.x = PointF.x) && (this.y = PointF.y) ? 1 : 0
-        }
-        
-        ; Description   Adds the x and y values of the native and provided PointF objects
-        ; PointF        PointF object to add to the native PointF object
-        ; Return        New PointF object containing the added x and y values
-        ; Remark        The x values and y values are added together, not x+y
-        ;               This is a replacement for the PointF +Operator
-        plus(PointF)
-        {
-            (PointF.type == "PointF") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a PointF object be passed in as a parameter."
-                    , "Must supply a PointF object.", {providedObject: PointF})
-            Return new GDIP.PointF(this.x + PointF.x, this.y + PointF.y)
-        }
-        
-        ; Description   Subtracts the x and y PointF values from the native PointF object
-        ; PointF        PointF object to subtract from the native PointF object
-        ; Return        A new PointF object containing the difference of the x and y values
-        ; Remark        The x values and y values are subtracted, not x-y
-        ;               Native PointF is the minuend and provided PointF is the subtrahend
-        ;               This replaces the PointF -Operator
-        minus(PointF)
-        {
-            (PointF.type == "PointF") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a PointF object be passed in as a parameter."
-                    , "Must supply a PointF object.", {providedObject: PointF})
-            Return new GDIP.PointF(this.x - PointF.x, this.y - PointF.y)
-        }
-    }
-    
-    ;===================================================================================================================.
-    ; A Size object contains 2 int values representing width and height.                                                |
-    ; Properties:                                                                                                       |
-    ; .width            width (integer)                                                                                 |
-    ; .height           height (integer)                                                                                |
-    ; .structP          Pointer to Size struct (width > height)                                                         |
-    ;                                                                                                                   |
-    ; Constructors:                                                                                                     |
-    ; Size()            Create a Size object with width and height values of 0                                          |
-    ; Size(int1, int2)  Create a Size object with int width and int height                                              |
-    ; Size(Size)        Create a clone of the provided Size object                                                      |
-    ;                                                                                                                   |
-    ; Methods:                                                                                                          |
-    ; .empty()          Returns true if the native width or height is 0 or less                                         |
-    ; .equals(Size)     Returns true if the native Size is equal to the supplied Size                                   |
-    ; .plus(Size)       Returns a new Size object containing the sum of the native Size and the provided Size           |
-    ; .minus(Size)      Returns a new Size object containing the difference of the native Size and the provided Size    |
-    ;                                                                                                                   |
-    ; Remarks           If working with float/decimal numbers, use SizeF.                                               |
-    ;                   There is no way to use the + and - operators with Sizes. Use the plus() or minus() methods.     |
-    ;___________________________________________________________________________________________________________________|
-    Class Size extends GDIP
-    {
-        type    := "Size"
-        width   := ""
-        height  := ""
-        struct  := ""
-        structP := ""
-        
-        ; ## CONSTRUCTOR ##
+        ; ## Constructor ##
         ; Size()
-        ; Size(int, int)
+        ; Size(width, height)
         ; Size(Size)
-        __New(obj_width="U", height="U")
+        __New(w="", h="")
         {
-            err := 0
-            (this.is_int(obj_width) && this.is_int(height))   ? (this.width  := obj_width ,this.height := height)
-                : (obj_width == "U" && height == "U")           ? (this.width  := 0         ,this.height := 0)
-                : (obj_width.type = "Size") && (height == "U") ? (this.width  := obj_width.width
-                                                                ,this.height := obj_width.height)
-                : err := 1
+             this.SetCapacity("_struct", 8)
+            ,this.structP := this.GetAddress("_struct")
             
-            (err)
-                ? this.error_log(A_ThisFunc, "Failed to create Size struct."    ; If error, log it
-                    , "No params, 2 ints, 1 Size object, or 1 point object"
-                    , {obj_or_width:obj_width, height:height})
-                : (this.SetCapacity("struct", 8)                                ; Else build Size struct
-                    ,this.structP := this.GetAddress("struct")
-                    ,NumPut(this.width , this.structP+0, 0, "Int")
-                    ,NumPut(this.height, this.structP+0, 4, "Int") )
+            ,(w = "" && h = "")
+                ? this._set_wh(0, 0)
+            : (GDIP.is_num(w) && GDIP.is_num(h))
+                ? this._set_wh(w, h)
+            : (w._type == "Size" && h = "")
+                ? this._set_wh(w.Width, w.Height)
+            : GDIP.error_log(A_ThisFunc, "Size constructor error."
+                  , "Empty: Size()`nFrom two numbers: Size(width, height)"
+                  . "`nFrom another Size: Size(Size)", {p1:w, p2:h})
         }
         
-        ; For testing purposes > Shows contents of this object
-        show(msg="")
+        Show(type="Int")
         {
-            MsgBox, % (msg = "" ? "" : msg "`n")
-                    . "type: "    this.type     "`nstructP: " this.structP
-                    . "`nwidth: " this.width    "`nheight: "  this.height
-                    . "`nStructP width: "  NumGet(this.structP+0, 0, "Int")
-                    . "`nStructP height: " NumGet(this.structP+0, 4, "Int")
+            ptr := this.Struct()
+            MsgBox, % "Size Object:"
+                . "`nthis.Width: "    this.Width
+                . "`nthis.Height: "   this.Height
+                . "`nthis.structP: "  this.structP
+                . "`nSturct width: "  NumGet(ptr, 0, type)
+                . "`nSturct height: " NumGet(ptr, 4, type)
             Return
         }
         
-        ; ## METHODS ##
-        
-        ; Description   Determine if Size object width and height are set to 0
-        ; Return        1 = True, 0 = False
-        Empty()
+        _set_wh(w, h)
         {
-            Return (this.width = 0 || this.height = 0) ? 1 : 0
+             this.Width  := w
+            ,this.Height := h
         }
         
-        ; Description   Determine if native Size and provided Size have equal width/height values
-        ; Size          Size object to do equality check against native Size object
-        ; Return        1 = True, 0 = False
+        ; type      Pass expected structure type
+        Struct(type="Int")
+        {
+             NumPut(this.Width,  this.structP+0, 0, type)
+            ,NumPut(this.Height, this.structP+0, 4, type)
+            Return structP+0
+        }
+        
+        Plus(Size)
+        {
+            Return new GDIP.Size(this.Width + Size.Width, this.Height + Size.Height)
+        }
+        
+        Minus(Size)
+        {
+            Return new GDIP.Size(this.Width - Size.Width, this.Height - Size.Height)
+        }
+        
         Equals(Size)
         {
-            (size.type == "Size") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a Size object be passed in as a parameter."
-                    , "Must supply a Size object.", {Size: Size})
-            Return (this.width = Size.width && this.height = Size.height) ? 1 : 0
+            Return (this.Width = Size.Width && this.Height = Size.Height) ? 1 : 0
         }
         
-        ; Description   Add width and height values of native and provided Size objects
-        ; Size          Size object to add to the native Size object
-        ; Return        New Size object containing the added width and height values
-        ; Remark        This is a replacement for the GDIPlus +Operator (IE: Size1 + Size2)
-        plus(Size)
-        {
-            (Size.type == "Size") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a Size object be passed in as a parameter."
-                    , "Must supply a Size object.", {Size: Size})
-            Return new GDIP.Size((this.width + Size.width), (this.height + Size.height))
-        }
-        
-        ; Description   Subtracts the x and y Size values from the native Size object
-        ; Size          Size object to subtract from the native Size object
-        ; Return        A new Size object containing the difference of the width and height values
-        ; Remark        The provided Size values are always subtracted from the native Size values
-        ;               This is a replacement for the GDIPlus -Operator (IE: Size1 - Size2)
-        minus(Size)
-        {
-            (Size.type == "Size") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a Size object be passed in as a parameter."
-                    , "Must supply a Size object.", {Size: Size})
-            Return new GDIP.Size((this.width - Size.width), (this.height - Size.height))
-        }
-    }
-    
-    ;===================================================================================================================.
-    ; A SizeF object contains 2 float values representing width and height.                                             |
-    ; Properties:                                                                                                       |
-    ; .width            width (float)                                                                                   |
-    ; .height           height (float)                                                                                  |
-    ; .structP          Pointer to SizeF struct (width > height)                                                        |
-    ;                                                                                                                   |
-    ; Constructors:                                                                                                     |
-    ; SizeF()           Create a SizeF object with width and height values of 0                                         |
-    ; SizeF(f1, f2)     Create a SizeF object with float width and float height                                         |
-    ; SizeF(SizeF)      Create a clone of the provided SizeF object                                                     |
-    ;                                                                                                                   |
-    ; Methods:                                                                                                          |
-    ; .empty()          Returns true if the native width or height is 0 or less                                         |
-    ; .equals(SizeF)    Returns true if the native SizeF is equal to the supplied SizeF                                 |
-    ; .plus(SizeF)      Returns a new SizeF object containing the sum of the native SizeF and the provided SizeF        |
-    ; .minus(SizeF)     Returns a new SizeF object containing the difference of the native SizeF and the provided SizeF |
-    ;                                                                                                                   |
-    ; Remarks           If working with only integers, use Size.                                                        |
-    ;                   Int numbers are accepted by float methods and will be treated as float.                         |
-    ;                   Point and Size are accepted but are converted to float.                                         |
-    ;                   There is no way to use the + and - operators with SizeF. Use the plus() or minus() methods.     |
-    ;___________________________________________________________________________________________________________________|
-    Class SizeF extends GDIP
-    {
-        type    := "SizeF"
-        width   := ""
-        height  := ""
-        struct  := ""
-        structP := ""
-        
-        ; ## CONSTRUCTOR ##
-        ; SizeF()
-        ; SizeF(float, float)
-        ; SizeF(SizeF)
-        __New(obj_width="U", height="U")
-        {
-            err := 0
-            (this.is_num(obj_width) && this.is_num(height))   ? (this.width  := obj_width ,this.height := height)
-                : (obj_width == "U" && height == "U")           ? (this.width  := 0         ,this.height := 0)
-                : (obj_width.type = "SizeF") && (height == "U") ? (this.width  := obj_width.width
-                                                                ,this.height := obj_width.height)
-                : err := 1
-            
-            (err)
-                ? this.error_log(A_ThisFunc, "Failed to create SizeF struct."    ; If error, log it
-                    , "No params, 2 floats, 1 SizeF object, or 1 Point object"
-                    , {obj_or_width:obj_width, height:height})
-                : (this.SetCapacity("struct", 8)                                ; Else build SizeF struct
-                    ,this.structP := this.GetAddress("struct")
-                    ,NumPut(this.width , this.structP+0, 0, "Float")
-                    ,NumPut(this.height, this.structP+0, 4, "Float") )
-        }
-        
-        ; For testing purposes > Shows contents of this object
-        show(msg="")
-        {
-            MsgBox, % (msg = "" ? "" : msg "`n")
-                    . "type: "    this.type     "`nstructP: " this.structP
-                    . "`nwidth: " this.width    "`nheight: "  this.height
-                    . "`nStructP width: "  NumGet(this.structP+0, 0, "Float")
-                    . "`nStructP height: " NumGet(this.structP+0, 4, "Float")
-            Return
-        }
-        
-        ; ## METHODS ##
-        
-        ; Description   Determine if SizeF object width and height are set to 0
-        ; Return        1 = True, 0 = False
         Empty()
         {
-            Return (this.width = 0 || this.height = 0) ? 1 : 0
-        }
-        
-        ; Description   Determine if native SizeF and provided SizeF have equal width/height values
-        ; SizeF         SizeF object to do equality check against native SizeF object
-        ; Return        1 = True, 0 = False
-        Equals(SizeF)
-        {
-            (SizeF.type == "SizeF") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a SizeF object be passed in as a parameter."
-                    , "Must supply a SizeF object.", {SizeF: SizeF})
-            Return (this.width = SizeF.width && this.height = SizeF.height) ? 1 : 0
-        }
-        
-        ; Description   Add width and height values of native and provided SizeF objects
-        ; SizeF         SizeF object to add to the native SizeF object
-        ; Return        New SizeF object containing the added width and height values
-        ; Remark        This is a replacement for the GDIPlus +Operator (IE: SizeF1 + SizeF2)
-        plus(SizeF)
-        {
-            (SizeF.type == "SizeF") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a SizeF object be passed in as a parameter."
-                    , "Must supply a SizeF object.", {SizeF: SizeF})
-            Return new GDIP.SizeF((this.width + SizeF.width), (this.height + SizeF.height))
-        }
-        
-        ; Description   Subtracts the x and y SizeF values from the native SizeF object
-        ; SizeF         SizeF object to subtract from the native SizeF object
-        ; Return        A new SizeF object containing the difference of the width and height values
-        ; Remark        The provided SizeF values are always subtracted from the native SizeF values
-        ;               This is a replacement for the GDIPlus -Operator (IE: SizeF1 - SizeF2)
-        minus(SizeF)
-        {
-            (SizeF.type == "SizeF") ? ""
-                : this.error_log(A_ThisFunc, "This method requires a SizeF object be passed in as a parameter."
-                    , "Must supply a SizeF object.", {SizeF: SizeF})
-            Return new GDIP.SizeF((this.width - SizeF.width), (this.height - SizeF.height))
+            Return (this.Width <= 0 || this.Height <= 0) ? 1 : 0
         }
     }
     
-    ;===================================================================================================================.
-    ; A RectF object contains 4 integer values representing x, y, width, and height.                                    |
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Rect Class - Represents a rectangle in a 2D coordinate system                                                     |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; A Rect object contains X, Y, Width, and Height values. It also stores left, right, top, and bottom edge coords.   |
     ; Properties:                                                                                                       |
-    ; .x                Rect leftmost x coordinate (integer)                                                            |
-    ; .y                Rect topmost y coordinate (integer)                                                             |
-    ; .width            Rect width (integer)                                                                            |
-    ; .height           Rect height (integer)                                                                           |
-    ; .left             Left x coord (synonymous with .x)                                                               |
-    ; .right            Right x coord                                                                                   |
-    ; .top              Top y coord (synonymous with .y)                                                                |
-    ; .bottom           Bottom y coord                                                                                  |
-    ; .structP          Pointer to Rect struct (x > y > width > height)                                                 |
+    ; .X                X location                                                                                      |
+    ; .Y                Y location                                                                                      |
+    ; .Width            Rect Width including border                                                                     |
+    ; .Height           Rect Height including border                                                                    |
+    ; .Left             X coordinate of Left edge                                                                       |
+    ; .Top              Y coordinate of Top edge                                                                        |
+    ; .Right            X coordinate of Right edge                                                                      |
+    ; .Bottom           Y coordinate of Bottom edge                                                                     |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
-    ; Rect()            Create a Rect object with width and height values of 0                                          |
-    ; Rect(i1, i2, i3, i4) Create a Rect object with int x, y, width, and height                                        |
-    ; Rect(Point, Size) Create a Rect object using a Point and Size object                                              |
+    ; Rect()            X, Y, Width, and Height = 0                                                                     |
+    ; Rect(x, y, w, h)  X=x, Y=y, Width=w Height=h                                                                      |
+    ; Rect(Point, Size) X=Point.X, Y=Point.Y, Width=Size.Width, Height=Size.Height                                      |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; Clone()           Returns a new Rect object with the same values as the native Rect object.                       |
-    ; Contains(x, y)    Returns true if int x and int y fall within the native Rect                                     |
-    ; Contains(Point)   Returns true if Point.x and Point.y falls within native Rect                                    |
-    ; Contains(Rect)    Returns true if provided Rect falls within native Rect                                          |
-    ; Equals(Rect)      Returns true if supplied and native Rect have equal x, y, width, and height values              |
-    ; GetBottom()       Returns bottom y coordinate of this Rect                                                        |
-    ; GetBounds(Rect)   Copies native Rect values to the provide Rect object > no return                                |
-    ; GetLeft()         Returns left x coordinate of this Rect                                                          |
-    ; GetLocation(Point) Copies native x and y value from Rect to the provided Point object > no return                 |
-    ; GetRight()        Returns right x coordinate of this Rect                                                         |
-    ; GetSize(Size)     Copies native width and height from Rect to the provided Size object > no return                |
-    ; GetTop()          Returns top y coordinate of this Rect                                                           |
-    ; Inflate(dx, dy)   Expands native Rect by int dx wide on both sides and int dy on top and bottom > no return       |
-    ; Inflate(Point)    Expands native Rect by point.x on both sides and point.y on top and bottom > no return          |
-    ; Inflate(Size)     Expands native Rect by size.width on both sides and size.height on th top and bottom > no return|
-    ; Intersect(Rect)   Get values of Rect created by intersecting native with  provided rect then assign to native rect|
-    ; Intersect(Rect1   Get values of Rect created by intersecting Rect1 and Rect2 then assign to native rect           |
-    ;   ,Rect2, RectOut)                                                                                                |
-    ; IntersectsWith(Rect) Return true if provided Rect intersects native Rect                                          |
-    ; IsEmptyArea()     Return true if width or height of Rect is 0 or less                                             |
-    ; Offset(Point)     Reposition Rect by moving x Point.x and y by Point.y                                            |
-    ; Offset(dx, dy)    Reposition Rect by moving x by int dx and y by int dy                                           |
-    ; Union(RectOut     Find Rect size to unionize Rect1 and Rect2 then assign them to RectOut                          |
-    ;   , Rect1, Rect2)                                                                                                 |
+    ; .Struct(type)     Return pointer to struct. type = expected data type (Int, Float, ...). No param = Int.          |
+    ; .Clone()          Return new Rect object with copy of NativeRect's values.                                        |
+    ; .GetLocation(Point) Store X and Y values of NativeRect into Point object.                                         |
+    ; .GetSize(Size)    Store Width and Height values of Rect into Size object.                                         |
+    ; .GetBounds(Rect)  Update Rect values with NativeRect's values.                                                    |
+    ; .GetLeft()        Use the .Left   property.                                                                       |
+    ; .GetTop()         Use the .Top    property.                                                                       |
+    ; .GetRight()       Use the .Right  property.                                                                       |
+    ; .GetBottom()      Use the .Bottom property.                                                                       |
+    ; .IsEmptyArea()    Return True if width or height <= 0.                                                            |
+    ; .Equals(Rect)     Return True if NativeRect and Rect have equal values.                                           |
+    ; .Contains(x, y)   Return True if the (x,y) coordinate provided falls inside NativeRect.                           |
+    ; .Contains(Point)  Return True if the Point provided falls inside NativeRect.                                      |
+    ; .Inflate(dx, dy)  Increase width of NativeRect by dx and height by dy. Sizes decreases if negative.               |
+    ; .Inflate(Point)   Increases width by Point.X and Height by Point.Y. Sizes decreases if negative.                  |
+    ; .Intersect(Rect)  Update NativeRect values to the intersect values of NativeRect and Rect.                        |
+    ; .Intersect(R1, R2 Update ROut values to the intersect values of R1 and R2.                                        |
+    ;           , ROut) Return 1=                                                                                       |
+    ; .IntersectsWith(Rect) Return true if Rect intersects with NativeRect                                              |
+    ; .Union(Rect1)     Update NativeRect to the values needed to unionize Rect1 and NativeRect.                        |
+    ; .Union(R1, R2     Update RectOut to the values needed to unionize R1 and R2.                                      |
+    ;       ,RectOut)                                                                                                   |
+    ; .Offset(dx, dy)   Update NativeRect x,y with dx,dy                                                                |
+    ; .Offset(Point)    Update NativeRect x,y with Point.X,Point.Y                                                      |
     ;                                                                                                                   |
-    ; Remarks           If working with float/decimal numbers, use RectF.                                               |
-    ;                   There is no way to use the + and - operators with Rects. Use the plus() or minus() methods.     |
+    ; Remarks           A return value of "" means there was a parameter error.                                         |
+    ;                   Struct type is updated to the requested type at .Struct() call.                                 |
     ;___________________________________________________________________________________________________________________|
-    Class Rect extends GDIP
+    Class Rect
     {
-        type    := "Rect"
-        x       := ""
-        y       := ""
-        width   := ""
-        height  := ""
-        bottom  := ""
-        top     := ""
-        struct  := ""
-        structP := ""
+         _type   := "Rect"
+        ,X       := Left   := ""
+        ,Y       := Top    := ""
+        ,Width   := Right  := ""
+        ,Height  := Bottom := ""
         
-        
-        ; ##  Constructor ##
+        ; ## Constructor ##
         ; Rect()
-        ; Rect(int, int, int, int)
+        ; Rect(x, y, width, height)
         ; Rect(Point, Size)
-        __New(obj_x="U", obj_y="U", width="U", height="U")
+        __New(x="", y="", w="", h="")
         {
-            err := 0
-            (this.is_int(obj_x) && this.is_int(obj_y) && this.is_int(width) && this.is_int(height)) ; All int
-                ? (this.left  := this.x := obj_x     ,this.top    := this.y := obj_y
-                  ,this.width := width               ,this.height := height
-                  ,this.right := obj_x + width       ,this.bottom := obj_y + height )
-            : (obj_x == "U" && obj_y == "U" && width == "U" && height == "U")                           ; All blank
-                ? (this.left  := this.x := 0         ,this.top    := this.y := 0
-                  ,this.width := 0                   ,this.height := 0
-                  ,this.right := 0                   ,this.bottom := 0 )
-            : (obj_x.type == "Point" && obj_y.type == "Size" && width == "U" && height == "U")        ; Point + Size
-                ? (this.left  := this.x := obj_x.x   ,this.top    := this.y := obj_x.y 
-                  ,this.width := obj_y.width         ,this.height := obj_y.height
-                  ,this.right := this.x + this.width ,this.bottom := this.y + this.height )
-            : err := 1                                                                              ; Error
+            this.SetCapacity("_struct", 16)
+            ,this.structP := this.GetAddress("_struct")
             
-            (err)
-                ? this.error_log(A_ThisFunc, "Failed to create Rect struct."                        ; If error, log it
-                    , "No params, 4 ints, 1 size object and 1 point object"
-                    , {obj_x:obj_x, obj_y:obj_y, width:width, height:height})
-                : (this.SetCapacity("struct", 16)                                                   ; Else build Rect
-                    ,this.structP := this.GetAddress("struct")
-                    ,this._update_struct() )
+            ,(x = "" && y = "" && w = "" && h = "")
+                ? this._set_xywh(0, 0, 0, 0)
+            : (GDIP.is_num(x) && GDIP.is_num(y) && GDIP.is_num(w) && GDIP.is_num(h))
+                ? this._set_xywh(x, y, w, h)
+            : (x._type == "Point" && y._type == "Size" && w = "" && h = "")
+                ? this._set_xywh(x.X, x.Y, y.Width, y.Height)
+            : GDIP.error_log(A_ThisFunc, "Invalid Parameter", "Empty: Rect()"
+                . "`nNumbers: Rect(n1, n2, n3, n4)`nPoint and Size Object: Rect(Point, Size)"
+                , {p1:x, p2:y, p3:w, p4:h})
         }
         
-        _update_struct()
+        _set_xywh(x, y, w, h)
         {
-             NumPut(this.x     , this.structP+0,  0, "Int")
-            ,NumPut(this.y     , this.structP+0,  4, "Int")
-            ,NumPut(this.width , this.structP+0,  8, "Int")
-            ,NumPut(this.height, this.structP+0, 12, "Int")
+             this.Left   := this.X       := x
+            ,this.Top    := this.Y       := y
+            ,this.Right  := (this.Width  := w) + x
+            ,this.Bottom := (this.Height := h) + y
         }
         
-        ; For testing purposes > Shows contents of this object
-        show(msg="")
+        _set_edge(l, t, r, b)
         {
-            MsgBox, % (msg = "" ? "" : msg "`n")
-                . "type: "             this.type                "`nstructP: "   this.structP
-                . "`nx: "              this.x                   "`ny: "         this.y
-                . "`nwidth: "          this.width               "`nheight: "    this.height
-                . "`nleft: "           this.left                "`nright: "     this.right
-                . "`ntop: "            this.top                 "`nbottom: "    this.bottom
-                . "`nStructP x: "      NumGet(this.structP+0,  0, "Int")
-                . "`nStructP y: "      NumGet(this.structP+0,  4, "Int")
-                . "`nStructP width: "  NumGet(this.structP+0,  8, "Int")
-                . "`nStructP height: " NumGet(this.structP+0, 12, "Int")
+             this.X      := this.Left    := l
+            ,this.Y      := this.Top     := t
+            ,this.Width  := (this.Right  := r) - l
+            ,this.Height := (this.Bottom := b) - t
+        }
+        
+        ; type      Pass expected structure type
+        ; Return    Pointer to struct
+        Struct(type="Int")
+        {
+             NumPut(this.X,      this.structP+0,  0, type)
+            ,NumPut(this.Y,      this.structP+0,  4, type)
+            ,NumPut(this.Width,  this.structP+0,  8, type)
+            ,NumPut(this.Height, this.structP+0, 12, type)
+            Return structP+0
+        }
+        
+        Show(type="Int") ; Used for testing purposes
+        {
+            ptr := this.Struct()
+            MsgBox, % this._type " object:"
+                . "`nthis.structP: "  this.structP
+                . "`nthis.X: "        this.X
+                . "`nthis.Y: "        this.Y
+                . "`nthis.Width: "    this.Width
+                . "`nthis.Height: "   this.Height
+                . "`nLeft: "          this.Left
+                . "`nTop: "           this.Top
+                . "`nRight: "         this.Right
+                . "`nBottom: "        this.Bottom
+                . "`nStruct X: "      (x := NumGet(ptr,  0, type))
+                . "`nStruct Y: "      (y := NumGet(ptr,  4, type))
+                . "`nStruct Width: "  (w := NumGet(ptr,  8, type))
+                . "`nStruct Height: " (h := NumGet(ptr, 12, type))
+                . "`nStruct Left: "   x
+                . "`nStruct Top: "    y
+                . "`nStruct Right: "  x+w
+                . "`nStruct Bottom: " y+h
             Return
         }
         
         ; ## METHODS ##
-        ; Description       Creates a new Rect object and initializes it with the contents of this Rect object.
         Clone()
         {
-            Return new gdip.rect(this.x, this.y, this.width, this.height)
+            Return new GDIP.Rect(this.X, this.Y, this.Width, this.Height)
         }
         
-        ; This is an overloaded method:
-        ; Contains(x, y)    Determine if point int x and int y falls within native Rect
-        ; Contains(Point)   Determine if Point falls within native Rect
-        ; Contains(Rect)    Determine if provided Rect falls within native Rect
-        ; Return            1 = True, 0 = False
-        ; Remark            Contains include lines falling on 
-        Contains(obj_x, y="U")
+        GetLocation(Point)
         {
-            Return (this.is_int(obj_x) && this.is_int(y) ; check x y coords
-                    && (obj_x >= this.left)     && (obj_x < this.right)
-                    && (    y >= this.top)      && (    y < this.bottom)         ) ? 1
-                : (obj_x.type == "Point" && y == "U"       ; check Point.x Point.y coords
-                    && (obj_x.x >= this.left)   && (obj_x.x < this.right)
-                    && (obj_x.y >= this.top)    && (obj_x.y < this.bottom)       ) ? 1
-                : (obj_x.type == "Rect" && y == "U"        ; check if Rect is inside rect
-                    && (this.x <= obj_x.x)      && (this.right  <= obj_x.right)
-                    && (this.y <= obj_x.y)      && (this.bottom <= obj_x.bottom) ) ? 1
-                : 0                                      ; does not contain
+            Point._set_xy(this.X, this.Y)
         }
         
-        ; Description       Determine if the supplied and native have equal x, y, width, and height values
-        ; Rect              Rect struct to compare
-        ; Return            1 = True, 0 = False
+        GetSize(Size)
+        {
+            Size._set_wh(this.Width, this.Height)
+        }
+        
+        GetBounds(Rect)
+        {
+            Rect._set_xywh(this.X, this.Y, this.Width, this.Height)
+        }
+        
+        IsEmptyArea()
+        {
+            Return (this.Width <= 0 || this.Height <= 0) ? 1 : 0
+        }
+        
         Equals(Rect)
         {
-            Return (Rect.x     = this.x     && Rect.y      = this.y
-                &&  Rect.width = this.width && Rect.height = this.height ) ? 1 : 0
+            Return (this.X = Rect.X && this.Y = Rect.Y && this.Width = Rect.Width && this.Height = Rect.Height) ? 1 : 0
         }
         
-        ; Description       Retrieves coordinate for the bottom edge of this Rect
-        GetBottom()
+        ; Contains(x, y)
+        ; Contains(Point)
+        ; Contains(Rect)
+        ; Return: 1 = Contains, 0 = Does not contain, "" = Error
+        Contains(x, y="")
         {
-            Return this.bottom
+            Return (x._type == "Point" && y = "") ; Point object
+                    ? (x.X >= this.X && x.Y >= this.Y && x.X < this.Right && x.Y < this.Bottom)
+                        ? 1 : 0
+                : (x._type == "Rect" && y = "") ; Rect object
+                    ? (Rect.X >= this.X && Rect.Y >= this.Y && Rect.X < this.Right && Rect.Y < this.Bottom)
+                        ? 1 : 0
+                : (x >= this.X && y >= this.Y && x < this.Right && y < this.Bottom) ; x,y coords
+                        ? 1 : 0
         }
         
-        ; Description       Copy the current rect values to the provide Rect object
-        GetBounds(ByRef Rect)
+        ; Inflate(dx, dy)
+        ; Inflate(Point)
+        Inflate(dx, dy="")
         {
-            (Rect.type == "Rect")
-                ? (Rect.x := this.x, Rect.y := this.y, Rect.width := this.width, Rect.height := this.height)
-                : this.error_log(A_ThisFunc, "This functions requires a Rect object for the parameter."
-                    , "Rect object", {providedRect:Rect})
+            (dx._type == "Point" && dy = "")
+                ? this._set_xywh(this.Width + (dx.X*2) ; Point object
+                                ,this.Height + (dx.Y*2)
+                                ,this.X - dx.X
+                                ,this.Y - dx.Y )
+                : this._set_xywh(this.Width + (dx*2) ; dx,dy
+                                ,this.Height + (dy*2)
+                                ,this.X - dx
+                                ,this.Y - dy )
         }
         
-        ; Description       Retrieves coordinate for the left edge of this Rect
-        ; Remark            Left is synonymous with x of a Rect
-        GetLeft()
+        ; Intersect(Rect)
+        ; Intersect(Rect1, Rect2, RectOut)
+        ; Return        0 = Empty, 1 = Not Empty, "" = Error
+        Intersect(Rect1, Rect2="", ByRef RectOut="")
         {
-            Return this.left
-        }
-        
-        ; Description       Get x and y value from Rect and assign them to the provided Point object
-        ; Return            No return value
-        GetLocation(ByRef Point)
-        {
-            Point := new GDIP.Point(this.x, this.y)
-        }
-        
-        ; Description       Retrieves coordinate for the right edge of this Rect
-        GetRight()
-        {
-            Return this.right
-        }
-        
-        ; Description       Get width and height value from Rect and assign them to the provided Size object
-        ; Return            No return value
-        GetSize(ByRef Size)
-        {
-            Size := new GDIP.Size(this.width, this.height)
-        }
-        
-        ; Description       Retrieves coordinate for the top edge of this Rect
-        ; Remark            Top is synonymous with y of a Rect
-        GetTop()
-        {
-            Return this.top
-        }
-        
-        ; Overloaded method:
-        ; Inflate(dx, dy)   Expand left & right edges by int dx and top & bottom edges by int dy
-        ; Inflate(Point)    Expand left & right edges by Point.x and the top & bottom edges by Point.y
-        ; Inflate(Size)     Expand left & right edges by Size.width and the top & bottom edges by Size.height
-        ; Return            No return value
-        ; Remark            A rectangle should not be able to have a negative width or height
-        Inflate(dx_obj, dy="U")
-        {
-            err := 0
-            (this.is_int(dx_obj) && this.is_int(dy)) ; Both int
-                ? (this.left  := this.x -= dx_obj       ,this.top    := this.y -= dy
-                  ,this.right += dx_obj                 ,this.bottom += dy
-                  ,this.width += (dx_obj*2)             ,this.height += (dy*2) )
-            : (dx_obj.type == "Point" && dy == "U")   ; Point obj
-                ? (this.left  := this.x -= dx_obj.x     ,this.top    := this.y -= dx_obj.y
-                  ,this.right += dx_obj.x               ,this.bottom += dx_obj.y
-                  ,this.width += (dx_obj.x*2)           ,this.height += (dx_obj.y*2) )
-            : (dx_obj.type == "Size" && dy == "U")    ; Size obj
-                ? (this.left  := this.x -= dx_obj.width ,this.top    := this.y -= dx_obj.height
-                  ,this.right += dx_obj.width           ,this.bottom += dx_obj.height
-                  ,this.width += (dx_obj.width*2)       ,this.height += (dx_obj.height*2) )
-            : err := 1
+            (Rect1._type == "Rect" && Rect2 = "" && RectOut = "") ; Rect object
+                ? (this._set_edge(this.get_max(this.Left  , Rect1.Left  )
+                                 ,this.get_max(this.Top   , Rect1.Top   )
+                                 ,this.get_min(this.Right , Rect1.Right )
+                                 ,this.get_min(this.Bottom, Rect1.Bottom) )
+                  ,status := !this.IsEmptyArea() )
+                : (RectOut._set_edge(this.get_max(Rect1.Left  , Rect2.Left  )
+                                    ,this.get_max(Rect1.Top   , Rect2.Top   )
+                                    ,this.get_min(Rect1.Right , Rect2.Right )
+                                    ,this.get_min(Rect1.Bottom, Rect2.Bottom) )
+                  ,status := !RectOut.IsEmptyArea() )
             
-            (err)
-                ? this.error_log(A_ThisFunc, "This functions requires two integers, a Point object, or a Size "
-                    . "object parameter.", "Point Object, Size Object, 2 Intgers", {dx_obj:dx_obj, dy:dy})
-                : this._update_struct()
-        }
-        
-        ; This is an overloaded method:
-        ; Intersect(Rect)   Update current Rect values to represent the rectangle created by the intersection.
-        ; Intersect(Rect1   Create new Rect using values of the rectangle created by Rect1 and Rect2 intersecting
-        ;   , Rect2, RectOut) 
-        ; Description       
-        ; Rect              Rect object to to intersect with
-        ; Return            0 = No intersection, 1 = Intersect found
-        ; Remark            If there is no intersection, all values are updated to 0
-        Intersect(Rect1, Rect2="U", ByRef RectOut="U")
-        {
-            status := "err"
-            (Rect1.type == "Rect" && Rect2 == "U" && RectOut == "U")                      ; Only Rect1
-                ? (this.left := this.x := (this.left   > Rect.left)   ? this.left   : Rect.left
-                  ,this.top  := this.y := (this.top    > Rect.top)    ? this.top    : Rect.top
-                  ,this.right          := (this.right  < Rect.right)  ? this.right  : Rect.right
-                  ,this.bottom         := (this.bottom < Rect.bottom) ? this.bottom : Rect.bottom
-                  ,this.width          := (this.right  - this.left)
-                  ,this.height         := (this.bottom - this.top)
-                  ,this._update_struct() ,status := this.IsEmptyArea() )
-            : (Rect1.type == "Rect" && Rect2.type == "Rect" && RectOut.type == "Rect")  ; Rect1, Rect2, and RectOut
-                ? (RectOut.left := RectOut.x := (Rect1.left     > Rect2.left)   ? Rect1.left   : Rect2.left
-                  ,RectOut.top  := RectOut.y := (Rect1.top      > Rect2.top)    ? Rect1.top    : Rect2.top
-                  ,RectOut.right             := (Rect1.right    < Rect2.right)  ? Rect1.right  : Rect2.right
-                  ,RectOut.bottom            := (Rect1.bottom   < Rect2.bottom) ? Rect1.bottom : Rect2.bottom
-                  ,RectOut.width             := (RectOut.right  - RectOut.left)
-                  ,RectOut.height            := (RectOut.bottom - RectOut.top)
-                  ,RectOut._update_struct() ,status := RectOut.IsEmptyArea() )
-            : this.error_log(A_ThisFunc, "Bad parameter", "A single Rect or 3 Rects are required."
-                , {Rect1:Rect1, Rect2:Rect2, RectOut:RectOut}) ; Error > Bad parameter passed
             Return status
         }
         
-        ; Description       Determine if provided Rect and native Rect intersect
-        ; Return            1 = True, 0 = False
         IntersectsWith(Rect)
         {
-            Return ((this.left < Rect.right)
-                &&  (this.right > Rect.left)
-                &&  (this.top < Rect.bottom)
-                &&  (this.bottom > Rect.top) ) ? 1 : 0
+            Return ((this.Left   < Rect.Right )
+                &&  (this.Top    > Rect.Bottom)
+                &&  (this.Right  > Rect.Left  )
+                &&  (this.Bottom < Rect.Top   ) ) ? 1 : 0
         }
         
-        ; Description       Determines whether this rectangle is empty.
-        ; Return            1 = Empty, 0 = Not empty
-        IsEmptyArea()
+        ; Return        0 = Empty, 1 = Not Empty, "" = Error
+        Union(Rect1, Rect2="", ByRef RectOut="")
         {
-            Return (this.width <= 0 || this.height <= 0) ? 1 : 0
-        }
-        
-        ; Offset(Point)     Moves the rectangle by int dx horizontally and by int dy vertically.
-        ; Offset(dx, dy)    Moves this rectangle horizontally a distance of point.X and vertically a distance of point.Y.
-        ; Return            No return value
-        Offset(dx_obj, dy="U")
-        {
-            (this.is_int(dx_obj) && this.is_int(dy))
-                ? (this.left := this.x += dx_obj    ,this.top := this.y += dy
-                  ,this.right          += dx_obj    ,this.bottom        += dy
-                  ,this._update_struct() )
-            : (dx_obj == "Point" && y == "U")
-                ? (this.left := this.x += dx_obj.x  ,this.top := this.y += dx_obj.y
-                  ,this.right          += dx_obj.x  ,this.bottom        += dx_obj.y
-                  ,this._update_struct() )
-            : this.error_log(A_ThisFunc, "Bad parameter", "Point object or two integers", {dx_obj:dx_obj, dy:dy})
-        }
-        
-        ; Description       Creates a new Rect that stores the union of two other Rect objects.
-        ; Rect1, Rect2      The two Rect objects to join
-        ; RectOut           The Rect output that will contain the unioned Rects.
-        ; Return            1 = Empty Rect, 0 = Not Empty, Err = Error occurred
-        ; Remark            A union Rect is a Rect big enough to accommodate both Rect objects.
-        Union(ByRef RectOut, Rect1, Rect2)
-        {
-            status := 0
-            (RectOut.type == "Rect" && Rect1.type == "Rect" && Rect2.type == "Rect")
-                ? (RectOut.left := RectOut.x := (Rect1.left   < Rect2.left   ? Rect1.left   : Rect2.left)
-                  ,RectOut.top  := RectOut.y := (Rect1.top    < Rect2.top    ? Rect1.top    : Rect2.top)
-                  ,RectOut.right             := (Rect1.right  > Rect2.right  ? Rect1.right  : Rect2.right)
-                  ,RectOut.bottom            := (Rect1.bottom > Rect2.bottom ? Rect1.bottom : Rect2.bottom)
-                  ,RectOut.width  := (RectOut.right - RectOut.left)
-                  ,RectOut.height := (RectOut.bottom - RectOut.top)
-                  ,RectOut._update_struct()
-                  ,status := !RectOut.IsEmptyArea() )
-                : (this.error_log(A_ThisFunc, "Bad parameter", "Requires 3 Rect objects."
-                    , {RectOut:RectOut, Rect1:Rect1, Rect2:Rect2})
-                  ,status := "err" )
+            (Rect1._type == "Rect" && Rect2 = "" && RectOut = "") ; Rect object
+                ? (this._set_edge(this.get_min(this.Left  , Rect1.Left  )
+                                 ,this.get_min(this.Top   , Rect1.Top   )
+                                 ,this.get_max(this.Right , Rect1.Right )
+                                 ,this.get_max(this.Bottom, Rect1.Bottom) )
+                  ,status := !this.IsEmptyArea() )
+                : (RectOut._set_edge(this.get_min(Rect1.Left  , Rect2.Left  )
+                                    ,this.get_min(Rect1.Top   , Rect2.Top   )
+                                    ,this.get_max(Rect1.Right , Rect2.Right )
+                                    ,this.get_max(Rect1.Bottom, Rect2.Bottom) )
+                  ,status := !this.IsEmptyArea() )
+            
             Return status
         }
         
+        ; Offset(x, y)
+        ; Offset(Point)
+        Offset(dx, dy="")
+        {
+            (dx._type = "Point" && y = "")
+                ? this._set_xywh(this.X + dx.X, this.Y + dx.Y, this.width, this.height)
+                : this._set_xywh(this.X + dx, this.Y + dy, this.width, this.height)
+       }
     }
     
-    ;===================================================================================================================.
-    ; A RectF object contains 4 float values representing x, y, width, and height.                                      |
+    
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; GdiplusColor.h                                                                                                    |
+    ;___________________________________________________________________________________________________________________|
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Color Class - Stores a 32 bit value tha represents Alpha, Red, Blue, and Green values.                            |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; A Color object has Alpha (transparency), Red, Green, and Blue values. Type is ARBG                                |
     ; Properties:                                                                                                       |
-    ; .x                RectF leftmost x coordinate (integer)                                                           |
-    ; .y                RectF topmost y coordinate (integer)                                                            |
-    ; .width            RectF width (integer)                                                                           |
-    ; .height           RectF height (integer)                                                                          |
-    ; .left             Left x coord (synonymous with .x)                                                               |
-    ; .right            Right x coord                                                                                   |
-    ; .top              Top y coord (synonymous with .y)                                                                |
-    ; .bottom           Bottom y coord                                                                                  |
-    ; .structP          Pointer to RectF struct (x > y > width > height)                                                |
+    ; .Alpha            Transparency. 0-255                                                                             |
+    ; .Red              Red value. 0-255                                                                                |
+    ; .Blue             Blue value. 0-255                                                                               |
+    ; .Green            Green value. 0-255                                                                              |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
-    ; RectF()           Create a RectF object with width and height values of 0                                         |
-    ; RectF(f1, f2, f3, f4) Create a RectF object with int x, y, width, and height                                      |
-    ; RectF(PointF, SizeF) Create a RectF object using a PointF and SizeF object                                        |
+    ; Color()           Defaults to solid black. A=255, R=0, B=0, G=0                                                   |
+    ; Color(ARBG)       Copy ARBG object values. A=ARBG.A, R=ARBG.R, B=ARBG.B, G=ARBG.G                                 |
+    ; Color(r, b, g)    Red, blue, green values. Alpha is assumed opaque. A=255, R=r, B=b, G=g                          |
+    ; Color(a, r, b, g) Set values A=a, R=r, B=b, G=g                                                                   |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; Clone()           Returns a new RectF object with the same values as the native RectF object.                     |
-    ; Contains(x, y)    Returns true if int x and int y fall within the native RectF                                    |
-    ; Contains(PointF)  Returns true if PointF.x and PointF.y falls within native RectF                                 |
-    ; Contains(RectF)   Returns true if provided RectF falls within native RectF                                        |
-    ; Equals(RectF)     Returns true if supplied and native RectF have equal x, y, width, and height values             |
-    ; GetBottom()       Returns bottom y coordinate of this RectF                                                       |
-    ; GetBounds(RectF)  Copies native RectF values to the provide RectF object > no return                              |
-    ; GetLeft()         Returns left x coordinate of this RectF                                                         |
-    ; GetLocation(PointF) Copies native x and y value from RectF to the provided PointF object > no return              |
-    ; GetRight()        Returns right x coordinate of this RectF                                                        |
-    ; GetSizeF(SizeF)   Copies native width and height from RectF to the provided SizeF object > no return              |
-    ; GetTop()          Returns top y coordinate of this RectF                                                          |
-    ; Inflate(dx, dy)   Expands native RectF by int dx wide on both sides and int dy on top and bottom                  |
-    ; Inflate(PointF)   Expands native RectF by PointF.x on both sides and PointF.y on top and bottom                   |
-    ; Inflate(SizeF)    Expands native RectF by SizeF.width on both sides and SizeF.height on th top and bottom         |
-    ; Intersect(RectF)  Returns a new RectF with values set to the rectangle intersection made by the 2 RectFs          |
-    ; Intersect(RectF1  Returns a new RectF with values set to the rectangle intersection made by RectF1 and RectF2     |
-    ;   ,RectF2, RectFOut)                                                                                              |
-    ; IntersectsWith(RectF) Return true if provided RectF intersects native RectF                                       |
-    ; IsEmptyArea()     Return true if width or height of RectF is 0 or less                                            |
-    ; Offset(PointF)    Reposition RectF by moving x PointF.x and y by PointF.y                                         |
-    ; Offset(dx, dy)    Reposition RectF by moving x by int dx and y by int dy                                          |
-    ; Union(RectFOut    Find RectF SizeF to unionize RectF1 and RectF2 then assign them to RectFOut                     |
-    ;   , RectF1, RectF2)                                                                                               |
+    ; .struct()         Builds struct and returns struct pointer.                                                       |
     ;                                                                                                                   |
-    ; Remarks           If working with float/decimal numbers, use RectFF.                                              |
-    ;                   There is no way to use the + and - operators with RectFs. Use the plus() or minus() methods.    |
+    ; Enum: Names       List of 139 pre-defined colors. Use: this.name.Colorname                                        |
     ;___________________________________________________________________________________________________________________|
-    Class RectF extends GDIP
+
+    Class Color
     {
-        type    := "RectF"
-        x       := ""
-        y       := ""
-        width   := ""
-        height  := ""
-        bottom  := ""
-        top     := ""
-        struct  := ""
-        structP := ""
+         _type   := "ARBG"
+        ,Alpha   := A := 0
+        ,Red     := R := 0
+        ,Blue    := B := 0
+        ,Green   := G := 0
         
-        
-        ; ##  Constructor ##
-        ; RectF()
-        ; RectF(float, float, float, float)
-        ; RectF(PointF, SizeF)
-        __New(obj_x="U", obj_y="U", width="U", height="U")
+        ; Color()
+        ; Color(ARBG)
+        ; Color(red, blue, green)
+        ; Color(alpha, red, blue, green)
+        __New(a="", r="", b="", g="")
         {
-            err := 0
-            (this.is_num(obj_x) && this.is_num(obj_y) && this.is_num(width) && this.is_num(height))     ; All float
-                ? (this.left  := this.x := obj_x        ,this.top    := this.y := obj_y
-                  ,this.width := width                  ,this.height := height
-                  ,this.right := obj_x + width          ,this.bottom := obj_y + height )
-            : (obj_x == "U" && obj_y == "U" && width == "U" && height == "U")                           ; All blank
-                ? (this.left  := this.x := 0            ,this.top    := this.y := 0
-                  ,this.width := 0                      ,this.height := 0
-                  ,this.right := 0                      ,this.bottom := 0 )
-            : ((obj_x.type == "PointF" || obj_x.type == "Point")                                        ; PointF + SizeF
-                && (obj_y.type == "SizeF" || obj_y.type == "Size")
-                && width == "U" && height == "U")
-                ? (this.left  := this.x := obj_x.x      ,this.top    := this.y := obj_x.y 
-                  ,this.width := obj_y.width            ,this.height := obj_y.height
-                  ,this.right := this.x + this.width    ,this.bottom := this.y + this.height )
-            : err := 1                                                                                  ; Error
-            
-            (err)
-                ? this.error_log(A_ThisFunc, "Failed to create RectF struct."                           ; If error, log it
-                    , "No params, 4 floats, 1 SizeF object and 1 PointF object"
-                    , {obj_x:obj_x, obj_y:obj_y, width:width, height:height})
-                : (this.SetCapacity("struct", 16)                                                       ; Else build RectF
-                    ,this.structP := this.GetAddress("struct")
-                    ,this._update_struct() )
+            this.SetCapacity("_ARBG", 4)
+            ,this.structP := this.GetAddress("_ARBG")
+            ,(a._type == "ARBG" && r = "" && b = "" && g = "") ; ARBG object
+                ? this._set_arbg(ARBG.A, ARBG.R, ARBG.B, ARBG.G)
+            : (a="" && r="" && b="" && g="")  ; Empty
+                ? this._set_arbg(255, 0, 0, 0)
+            : (g = "") ; R B G
+                ? this._set_arbg(255, a, r, b)
+                : this._set_arbg(a, r, b, g) ; A R B G
         }
         
-        _update_struct()
+        ; Remark: Values below 0 are set to 0 and values above 255 are set to 255
+        _set_arbg(a, r, b, g)
         {
-             NumPut(this.x     , this.structP+0,  0, "Float")
-            ,NumPut(this.y     , this.structP+0,  4, "Float")
-            ,NumPut(this.width , this.structP+0,  8, "Float")
-            ,NumPut(this.height, this.structP+0, 12, "Float")
+             this.Alpha := this.A := a
+            ,this.Red   := this.R := r
+            ,this.Blue  := this.G := b
+            ,this.Green := this.B := g
         }
         
-        ; For testing purposes > Shows contents of this object
-        show(msg="")
+        show()
         {
-            MsgBox, % (msg = "" ? "" : msg "`n")
-                . "type: "             this.type                "`nstructP: "   this.structP
-                . "`nx: "              this.x                   "`ny: "         this.y
-                . "`nwidth: "          this.width               "`nheight: "    this.height
-                . "`nleft: "           this.left                "`nright: "     this.right
-                . "`ntop: "            this.top                 "`nbottom: "    this.bottom
-                . "`nStructP x: "      NumGet(this.structP+0,  0, "Float")
-                . "`nStructP y: "      NumGet(this.structP+0,  4, "Float")
-                . "`nStructP width: "  NumGet(this.structP+0,  8, "Float")
-                . "`nStructP height: " NumGet(this.structP+0, 12, "Float")
-            Return
+            ptr := this.Struct()
+            MsgBox, % this._type " object:"
+                . "`nthis.Alpha: " this.Alpha
+                . "`nthis.Red: " this.Red
+                . "`nthis.Blue: " this.Blue
+                . "`nthis.Green: " this.Green
+                . "`nthis.structP: " this.structP
+                . "`nNumGet Alpha: " NumGet(ptr, 3, "UChar")
+                . "`nNumGet Red: "   NumGet(ptr, 2, "UChar")
+                . "`nNumGet Blue: "  NumGet(ptr, 1, "UChar")
+                . "`nNumGet Green: " NumGet(ptr, 0, "UChar")
         }
         
-        ; ## METHODS ##
-        ; Description       Creates a new RectF object and initializes it with the contents of this RectF object.
-        Clone()
+        Struct()
         {
-            Return new gdip.RectF(this.x, this.y, this.width, this.height)
+             NumPut(this.Green, this.structP+0, 0, "UChar")
+            ,NumPut(this.Blue,  this.structP+0, 1, "UChar")
+            ,NumPut(this.Red,   this.structP+0, 2, "UChar")
+            ,NumPut(this.Alpha, this.structP+0, 3, "UChar")
+            Return structP+0
         }
-        
-        ; This is an overloaded method:
-        ; Contains(x, y)    Determine if float x and float y fall within native RectF
-        ; Contains(PointF)  Determine if PointF falls within native RectF
-        ; Contains(RectF)   Determine if provided RectF falls within native RectF
-        ; Return            1 = True, 0 = False
-        ; Remark            Contains include lines falling on 
-        Contains(obj_x, y="U")
+       
+        ; Common color constants
+        Class name
         {
-            Return (this.is_num(obj_x) && this.is_num(y)                            ; check x y coords
-                    && (obj_x >= this.left)     && (obj_x < this.right)
-                    && (    y >= this.top)      && (    y < this.bottom)            ) ? 1
-                : ((obj_x.type == "PointF" || obj_x.type == "Point") && y == "U"    ; check PointF xy coords
-                    && (obj_x.x >= this.left)   && (obj_x.x < this.right)
-                    && (obj_x.y >= this.top)    && (obj_x.y < this.bottom)          ) ? 1
-                : (obj_x.type == "RectF" && y == "U"                                ; check if RectF is inside RectF
-                    && (this.x <= obj_x.x)      && (this.right >= obj_x.right)
-                    && (this.y <= obj_x.y)      && (this.bottom >= obj_x.bottom)    ) ? 1
-                : 0                                                                 ; does not contain
-        }
-        
-        ; Description       Determine if the supplied and native have equal x, y, width, and height values
-        ; RectF             RectF struct to compare
-        ; Return            1 = True, 0 = False
-        Equals(RectF)
-        {
-            Return (RectF.x     = this.x     && RectF.y      = this.y
-                &&  RectF.width = this.width && RectF.height = this.height ) ? 1 : 0
-        }
-        
-        ; Description       Retrieves coordinate for the bottom edge of this RectF
-        GetBottom()
-        {
-            Return this.bottom
-        }
-        
-        ; Description       Copy the current RectF values to the provide RectF object
-        GetBounds(ByRef RectF)
-        {
-            (RectF.type == "RectF")
-                ? (RectF.x := this.x, RectF.y := this.y, RectF.width := this.width, RectF.height := this.height)
-                : this.error_log(A_ThisFunc, "This functions requires a RectF object for the parameter."
-                    , "RectF object", {providedRectF:RectF})
-        }
-        
-        ; Description       Retrieves coordinate for the left edge of this RectF
-        ; Remark            Left is synonymous with x of a RectF
-        GetLeft()
-        {
-            Return this.left
-        }
-        
-        ; Description       Get x and y value from RectF and assign them to the provided PointF object
-        ; Return            No return value
-        GetLocation(ByRef PointF)
-        {
-            PointF := new GDIP.PointF(this.x, this.y)
-        }
-        
-        ; Description       Retrieves coordinate for the right edge of this RectF
-        GetRight()
-        {
-            Return this.right
-        }
-        
-        ; Description       Get width and height value from RectF and assign them to the provided SizeF object
-        ; Return            No return value
-        GetSizeF(ByRef SizeF)
-        {
-            SizeF := new GDIP.SizeF(this.width, this.height)
-        }
-        
-        ; Description       Retrieves coordinate for the top edge of this RectF
-        ; Remark            Top is synonymous with y of a RectF
-        GetTop()
-        {
-            Return this.top
-        }
-        
-        ; Overloaded method:
-        ; Inflate(dx, dy)   Expand left & right edges by float dx and top & bottom edges by float dy
-        ; Inflate(PointF)   Expand left & right edges by PointF.x and the top & bottom edges by PointF.y
-        ; Inflate(SizeF)    Expand left & right edges by SizeF.width and the top & bottom edges by SizeF.height
-        ; Return            No return value
-        ; Remark            A RectFangle should not be able to have a negative width or height
-        Inflate(dx_obj, dy="U")
-        {
-            err := 0
-            (this.is_num(dx_obj) && this.is_num(dy))                                ; Both float
-                ? (this.left  := this.x -= dx_obj       ,this.top    := this.y -= dy
-                  ,this.right += dx_obj                 ,this.bottom += dy
-                  ,this.width += (dx_obj*2)             ,this.height += (dy*2) )
-            : ((dx_obj.type == "PointF" || dx_obj.type == "Point") && dy == "U")    ; PointF obj
-                ? (this.left  := this.x -= dx_obj.x     ,this.top    := this.y -= dx_obj.y
-                  ,this.right += dx_obj.x               ,this.bottom += dx_obj.y
-                  ,this.width += (dx_obj.x*2)           ,this.height += (dx_obj.y*2) )
-            : ((dx_obj.type == "SizeF" || dx_obj.type == "Size") && dy == "U")      ; SizeF obj
-                ? (this.left  := this.x -= dx_obj.width ,this.top    := this.y -= dx_obj.height
-                  ,this.right += dx_obj.width           ,this.bottom += dx_obj.height
-                  ,this.width += (dx_obj.width*2)       ,this.height += (dx_obj.height*2) )
-            : err := 1
-            
-            (err)
-                ? this.error_log(A_ThisFunc, "This functions requires two Floats, a PointF object, or a SizeF "
-                    . "object parameter.", "PointF Object, SizeF Object, 2 Floats", {dx_obj:dx_obj, dy:dy})
-                : this._update_struct()
-        }
-        
-        ; This is an overloaded method:
-        ; Intersect(RectF)  Update current RectF values to represent the RectFangle created by the intersection.
-        ; Intersect(RectF1  Create new RectF using values of the RectFangle created by RectF1 and RectF2 intersecting
-        ;   ,RectF2,RectFOut) 
-        ; Description       
-        ; RectF             RectF object to to intersect with
-        ; Return            0 = No intersection, 1 = Intersect found
-        ; Remark            If there is no intersection, all values are updated to 0
-        Intersect(RectF1, RectF2="U", ByRef RectFOut="U")
-        {
-            status := "err"
-            (RectF1.type == "RectF" && RectF2 == "U" && RectFOut == "U")  ; Only RectF1
-                ? (this.left := this.x := (this.left   > RectF.left)   ? this.left   : RectF.left
-                  ,this.top  := this.y := (this.top    > RectF.top)    ? this.top    : RectF.top
-                  ,this.right          := (this.right  < RectF.right)  ? this.right  : RectF.right
-                  ,this.bottom         := (this.bottom < RectF.bottom) ? this.bottom : RectF.bottom
-                  ,this.width          := (this.right  - this.left)
-                  ,this.height         := (this.bottom - this.top)
-                  ,this._update_struct(), status := !this.IsEmptyArea() )
-            : (RectF1.type == "RectF" && RectF2.type == "RectF" && RectFOut.type == "RectF")  ; RectF1, RectF2, and RectFOut
-                ? (RectFOut.left := RectFOut.x := (RectF1.left     > RectF2.left)   ? RectF1.left   : RectF2.left
-                  ,RectFOut.top  := RectFOut.y := (RectF1.top      > RectF2.top)    ? RectF1.top    : RectF2.top
-                  ,RectFOut.right              := (RectF1.right    < RectF2.right)  ? RectF1.right  : RectF2.right
-                  ,RectFOut.bottom             := (RectF1.bottom   < RectF2.bottom) ? RectF1.bottom : RectF2.bottom
-                  ,RectFOut.width              := (RectFOut.right  - RectFOut.left)
-                  ,RectFOut.height             := (RectFOut.bottom - RectFOut.top)
-                  ,RectFOut._update_struct(), status := !this.IsEmptyArea() )
-            : this.error_log(A_ThisFunc, "Bad parameter", "A single RectF or 3 RectFs are required."
-                , {RectF1:RectF1, RectF2:RectF2, RectFOut:RectFOut}) ; Error > Bad parameter passed
-            Return status
-        }
-        
-        ; Description       Determine if provided RectF and native RectF intersect
-        ; Return            1 = True, 0 = False
-        IntersectsWith(RectF)
-        {
-            Return ((this.left < RectF.right)
-                &&  (this.right > RectF.left)
-                &&  (this.top < RectF.bottom)
-                &&  (this.bottom > RectF.top) ) ? 1 : 0
-        }
-        
-        ; Description       Determines whether this RectFangle is empty.
-        ; Return            1 = Empty, 0 = Not empty
-        IsEmptyArea()
-        {
-            Return (this.width <= 0 || this.height <= 0) ? 1 : 0
-        }
-        
-        ; Offset(PointF)    Moves the RectFangle by float dx horizontally and by float dy vertically.
-        ; Offset(dx, dy)    Moves this RectFangle horizontally a distance of PointF.X and vertically a distance of PointF.Y.
-        ; Return            No return value
-        Offset(dx_obj, dy="U")
-        {
-            (this.is_num(dx_obj) && this.is_num(dy))
-                ? (this.left := this.x += dx_obj    ,this.top := this.y += dy
-                  ,this.right          += dx_obj    ,this.bottom        += dy
-                  ,this._update_struct() )
-            : ((dx_obj == "PointF" || dx_obj == "Point" ) && y == "U")
-                ? (this.left := this.x += dx_obj.x  ,this.top := this.y += dx_obj.y
-                  ,this.right          += dx_obj.x  ,this.bottom        += dx_obj.y
-                  ,this._update_struct() )
-            : this.error_log(A_ThisFunc, "Bad parameter", "PointF object or two Floats", {dx_obj:dx_obj, dy:dy})
-        }
-        
-        ; Description       Creates a new RectF that stores the union of two other RectF objects.
-        ; RectF1, RectF2    The two RectF objects to join
-        ; RectFOut          The RectF output that will contain the unioned RectFs.
-        ; Return            1 = Empty RectF, 0 = Not Empty, Err = Error occurred
-        ; Remark            A union RectF is a RectF big enough to accommodate both RectF objects.
-        Union(ByRef RectFOut, RectF1, RectF2)
-        {
-            status := "err"
-            (RectFOut.type == "RectF" && RectF1.type == "RectF" && RectF2.type == "RectF")
-                ? (RectFOut.left := RectFOut.x := (RectF1.left   < RectF2.left   ? RectF1.left   : RectF2.left)
-                  ,RectFOut.top  := RectFOut.y := (RectF1.top    < RectF2.top    ? RectF1.top    : RectF2.top)
-                  ,RectFOut.right              := (RectF1.right  > RectF2.right  ? RectF1.right  : RectF2.right)
-                  ,RectFOut.bottom             := (RectF1.bottom > RectF2.bottom ? RectF1.bottom : RectF2.bottom)
-                  ,RectFOut.width  := (RectFOut.right - RectFOut.left)
-                  ,RectFOut.height := (RectFOut.bottom - RectFOut.top)
-                  ,RectFOut._update_struct()
-                  ,status := !RectFOut.IsEmptyArea() )
-                : this.error_log(A_ThisFunc, "Bad parameter", "Requires 3 RectF objects."
-                    , {RectFOut:RectFOut, RectF1:RectF1, RectF2:RectF2})
-            Return status
+            Static AliceBlue            = 0xFFF0F8FF             , LightSeaGreen        = 0xFF20B2AA
+                 , AntiqueWhite         = 0xFFFAEBD7             , LightSkyBlue         = 0xFF87CEFA
+                 , Aqua                 = 0xFF00FFFF             , LightSlateGray       = 0xFF778899
+                 , Aquamarine           = 0xFF7FFFD4             , LightSteelBlue       = 0xFFB0C4DE
+                 , Azure                = 0xFFF0FFFF             , LightYellow          = 0xFFFFFFE0
+                 , Beige                = 0xFFF5F5DC             , Lime                 = 0xFF00FF00
+                 , Bisque               = 0xFFFFE4C4             , LimeGreen            = 0xFF32CD32
+                 , Black                = 0xFF000000             , Linen                = 0xFFFAF0E6
+                 , BlanchedAlmond       = 0xFFFFEBCD             , Magenta              = 0xFFFF00FF
+                 , Blue                 = 0xFF0000FF             , Maroon               = 0xFF800000
+                 , BlueViolet           = 0xFF8A2BE2             , MediumAquamarine     = 0xFF66CDAA
+                 , Brown                = 0xFFA52A2A             , MediumBlue           = 0xFF0000CD
+                 , BurlyWood            = 0xFFDEB887             , MediumOrchid         = 0xFFBA55D3
+                 , CadetBlue            = 0xFF5F9EA0             , MediumPurple         = 0xFF9370DB
+                 , Chartreuse           = 0xFF7FFF00             , MediumSeaGreen       = 0xFF3CB371
+                 , Chocolate            = 0xFFD2691E             , MediumSlateBlue      = 0xFF7B68EE
+                 , Coral                = 0xFFFF7F50             , MediumSpringGreen    = 0xFF00FA9A
+                 , CornflowerBlue       = 0xFF6495ED             , MediumTurquoise      = 0xFF48D1CC
+                 , Cornsilk             = 0xFFFFF8DC             , MediumVioletRed      = 0xFFC71585
+                 , Crimson              = 0xFFDC143C             , MidnightBlue         = 0xFF191970
+                 , Cyan                 = 0xFF00FFFF             , MintCream            = 0xFFF5FFFA
+                 , DarkBlue             = 0xFF00008B             , MistyRose            = 0xFFFFE4E1
+                 , DarkCyan             = 0xFF008B8B             , Moccasin             = 0xFFFFE4B5
+                 , DarkGoldenrod        = 0xFFB8860B             , NavajoWhite          = 0xFFFFDEAD
+                 , DarkGray             = 0xFFA9A9A9             , Navy                 = 0xFF000080
+            Static DarkGreen            = 0xFF006400             , OldLace              = 0xFFFDF5E6
+                 , DarkKhaki            = 0xFFBDB76B             , Olive                = 0xFF808000
+                 , DarkMagenta          = 0xFF8B008B             , OliveDrab            = 0xFF6B8E23
+                 , DarkOliveGreen       = 0xFF556B2F             , Orange               = 0xFFFFA500
+                 , DarkOrange           = 0xFFFF8C00             , OrangeRed            = 0xFFFF4500
+                 , DarkOrchid           = 0xFF9932CC             , Orchid               = 0xFFDA70D6
+                 , DarkRed              = 0xFF8B0000             , PaleGoldenrod        = 0xFFEEE8AA
+                 , DarkSalmon           = 0xFFE9967A             , PaleGreen            = 0xFF98FB98
+                 , DarkSeaGreen         = 0xFF8FBC8B             , PaleTurquoise        = 0xFFAFEEEE
+                 , DarkSlateBlue        = 0xFF483D8B             , PaleVioletRed        = 0xFFDB7093
+                 , DarkSlateGray        = 0xFF2F4F4F             , PapayaWhip           = 0xFFFFEFD5
+                 , DarkTurquoise        = 0xFF00CED1             , PeachPuff            = 0xFFFFDAB9
+                 , DarkViolet           = 0xFF9400D3             , Peru                 = 0xFFCD853F
+                 , DeepPink             = 0xFFFF1493             , Pink                 = 0xFFFFC0CB
+                 , DeepSkyBlue          = 0xFF00BFFF             , Plum                 = 0xFFDDA0DD
+                 , DimGray              = 0xFF696969             , PowderBlue           = 0xFFB0E0E6
+                 , DodgerBlue           = 0xFF1E90FF             , Purple               = 0xFF800080
+                 , Firebrick            = 0xFFB22222             , Red                  = 0xFFFF0000
+                 , FloralWhite          = 0xFFFFFAF0             , RosyBrown            = 0xFFBC8F8F
+                 , ForestGreen          = 0xFF228B22             , RoyalBlue            = 0xFF4169E1
+                 , Fuchsia              = 0xFFFF00FF             , SaddleBrown          = 0xFF8B4513
+                 , Gainsboro            = 0xFFDCDCDC             , Salmon               = 0xFFFA8072
+                 , GhostWhite           = 0xFFF8F8FF             , SandyBrown           = 0xFFF4A460
+                 , Gold                 = 0xFFFFD700             , SeaGreen             = 0xFF2E8B57
+                 , Goldenrod            = 0xFFDAA520             , SeaShell             = 0xFFFFF5EE
+            Static Gray                 = 0xFF808080             , Sienna               = 0xFFA0522D
+                 , Green                = 0xFF008000             , Silver               = 0xFFC0C0C0
+                 , GreenYellow          = 0xFFADFF2F             , SkyBlue              = 0xFF87CEEB
+                 , Honeydew             = 0xFFF0FFF0             , SlateBlue            = 0xFF6A5ACD
+                 , HotPink              = 0xFFFF69B4             , SlateGray            = 0xFF708090
+                 , IndianRed            = 0xFFCD5C5C             , Snow                 = 0xFFFFFAFA
+                 , Indigo               = 0xFF4B0082             , SpringGreen          = 0xFF00FF7F
+                 , Ivory                = 0xFFFFFFF0             , SteelBlue            = 0xFF4682B4
+                 , Khaki                = 0xFFF0E68C             , Tan                  = 0xFFD2B48C
+                 , Lavender             = 0xFFE6E6FA             , Teal                 = 0xFF008080
+                 , LavenderBlush        = 0xFFFFF0F5             , Thistle              = 0xFFD8BFD8
+                 , LawnGreen            = 0xFF7CFC00             , Tomato               = 0xFFFF6347
+                 , LemonChiffon         = 0xFFFFFACD             , Transparent          = 0x00FFFFFF
+                 , LightBlue            = 0xFFADD8E6             , Turquoise            = 0xFF40E0D0
+                 , LightCoral           = 0xFFF08080             , Violet               = 0xFFEE82EE
+                 , LightCyan            = 0xFFE0FFFF             , Wheat                = 0xFFF5DEB3
+                 , LightGoldenrodYellow = 0xFFFAFAD2             , White                = 0xFFFFFFFF
+                 , LightGray            = 0xFFD3D3D3             , WhiteSmoke           = 0xFFF5F5F5
+                 , LightGreen           = 0xFF90EE90             , Yellow               = 0xFFFFFF00
+                 , LightPink            = 0xFFFFB6C1             , YellowGreen          = 0xFF9ACD32
+                 , LightSalmon          = 0xFFFFA07A
         }
     }
+    
+    
+    
+    ; gdiplusmetaheader.h
+    
+    ; Placeable WMFs
+    
+    ; Placeable Metafiles were created as a non-standard way of specifying how 
+    ; a metafile is mapped and scaled on an output device.
+    ; Placeable metafiles are quite wide-spread, but not directly supported by
+    ; the Windows API. To playback a placeable metafile using the Windows API,
+    ; you will first need to strip the placeable metafile header from the file.
+    ; This is typically performed by copying the metafile to a temporary file
+    ; starting at file offset 22 (0x16). The contents of the temporary file may
+    ; then be used as input to the Windows GetMetaFile(), PlayMetaFile(),
+    ; CopyMetaFile(), etc. GDI functions.
+    
+    ; Each placeable metafile begins with a 22-byte header,
+    ;  followed by a standard metafile:
+    
+    ;~ Class ENHMETAHEADER3
+    ;~ {
+        ;~ iType          := 4    ; Record type EMR_HEADER
+        ;~ nSize          := 4    ; Record size in bytes.  This may be greater than the sizeof(ENHMETAHEADER).
+        ;~ rclBounds      := 16   ; Inclusive-inclusive bounds in device units
+        ;~ rclFrame       := 16   ; Inclusive-inclusive Picture Frame .01mm unit
+        ;~ dSignature     := 4    ; Signature.  Must be ENHMETA_SIGNATURE.
+        ;~ nVersion       := 4    ; Version number
+        ;~ nBytes         := 4    ; Size of the metafile in bytes
+        ;~ nRecords       := 4    ; Number of records in the metafile
+        ;~ nHandles       := 2    ; Number of handles in the handle table Handle index zero is reserved.
+        ;~ sReserved      := 2    ; Reserved.  Must be zero.
+        ;~ nDescription   := 4    ; Number of chars in the unicode desc string This is 0 if there is no description string
+        ;~ offDescription := 4    ; Offset to the metafile description record. This is 0 if there is no description string
+        ;~ nPalEntries    := 4    ; Number of entries in the metafile palette.
+        ;~ szlDevice      := 8    ; Size of the reference device in pels
+        ;~ szlMillimeters := 8    ; Size of the reference device in millimeters
+    ;~ }
+    
+    ;~ Class PWMFRect16
+    ;~ {
+        ;~ Static Left   := 2
+        ;~ Static Top    := 2
+        ;~ Static Right  := 2
+        ;~ Static Bottom := 2
+    ;~ }
+    
+    ;~ Class WmfPlaceableFileHeader
+    ;~ {
+        ;~ UINT32          Key         := 4   ; GDIP_WMF_PLACEABLEKEY
+        ;~ INT16           Hmf         := 2   ; Metafile HANDLE number (always 0)
+        ;~ PWMFRect16      BoundingBox := 8   ; Coordinates in metafile units
+        ;~ INT16           Inch        := 2   ; Number of metafile units per inch
+        ;~ UINT32          Reserved    := 4   ; Reserved (always 0)
+        ;~ INT16           Checksum    := 2   ; Checksum value for previous 10 WORDs
+    ;~ } 
+    
+    ; Key contains a special identification value that indicates the presence of a placeable metafile header.
+    ; It is always 0x9AC6CDD7.
+    ; Handle is used to stored the handle of the metafile in memory. When written to disk, this field is not used
+    ; and will always contains the value 0.
+    
+    ; Left, Top, Right, and Bottom contain the coordinates of the upper-left and lower-right corners of the image
+    ; on the output device. These are measured in twips.
+    
+    ; A twip (meaning "twentieth of a point") is the logical unit of measurement used in Windows Metafiles.
+    ; A twip is equal to 1/1440 of an inch. Thus 720 twips equal 1/2 inch, while 32,768 twips is 22.75 inches.
+    
+    ; Inch contains the number of twips per inch used to represent the image. Normally, there are 1440 twips per inch;
+    ; however, this number may be changed to scale the image. A value of 720 indicates that the image is double its normal
+    ; size, or scaled to a factor of 2:1. A value of 360 indicates a scale of 4:1, while a value of 2880 indicates that 
+    ; the image is scaled down in size by a factor of two. A value of 1440 indicates a 1:1 scale ratio.
+    
+    ; Reserved is unused and always set to 0.
+    
+    ; Checksum contains a checksum value for the previous 10 WORDs in the header. This value can be used in an attempt
+    ; to detect if the metafile has become corrupted. The checksum is calculated by XORing each WORD value to an initial
+    ; value of 0.
+    
+    ; If the metafile was recorded with a reference Hdc that was a display.
+        
+    class MetafileHeader
+    {
+         ;~ _type              := "MetafileHeader"
+        ;~ ,Type               := ""                     ; MetafileType
+        ;~ ,Size               := ""                     ; UINT               ; Size of the metafile (in bytes)
+        ;~ ,Version            := ""                     ; UINT       ; EMF+, EMF, or WMF version
+        ;~ ,EmfPlusFlags       := ""                     ; UINT 
+        ;~ ,DpiX               := ""                     ; REAL 
+        ;~ ,DpiY               := ""                     ; REAL 
+        ;~ ,X                  := ""                     ; INT         ; Bounds in device units
+        ;~ ,Y                  := ""                     ; INT  
+        ;~ ,Width              := ""                     ; INT  
+        ;~ ,Height             := ""                     ; INT  
+        ;~ ,union              := {METAHEADER     : 0
+                               ;~ ,ENHMETAHEADER3 : 0}
+        ;~ ,EmfPlusHeaderSize  :=                        ; INT size of the EMF+ header in file
+        ;~ ,LogicalDpiX        :=                        ; INT Logical Dpi of reference Hdc
+        ;~ ,LogicalDpiY        :=                        ; INT usually valid only for EMF+
+        
+        ;~ MetafileType GetType() const { return Type; }
+        
+        ;~ UINT GetMetafileSize() const { return Size; }
+        
+        ;~ ; If IsEmfPlus, this is the EMF+ version; else it is the WMF or EMF ver
+        
+        ;~ UINT GetVersion() const { return Version; }
+        
+        ;~ ; Get the EMF+ flags associated with the metafile
+        
+        ;~ UINT GetEmfPlusFlags() const { return EmfPlusFlags; }
+        
+        ;~ REAL GetDpiX() const { return DpiX; }
+        
+        ;~ REAL GetDpiY() const { return DpiY; }
+        
+        ;~ VOID GetBounds (OUT Rect *rect) const
+        ;~ {
+            ;~ rect->X = X;
+            ;~ rect->Y = Y;
+            ;~ rect->Width = Width;
+            ;~ rect->Height = Height;
+        ;~ }
+        
+        ;~ ; Is it any type of WMF (standard or Placeable Metafile)?
+        
+        ;~ BOOL IsWmf() const
+        ;~ {
+           ;~ return ((Type == MetafileTypeWmf) || (Type == MetafileTypeWmfPlaceable));
+        ;~ }
+        
+        ;~ ; Is this an Placeable Metafile?
+        
+        ;~ BOOL IsWmfPlaceable() const { return (Type == MetafileTypeWmfPlaceable); }
+        
+        ;~ ; Is this an EMF (not an EMF+)?
+        
+        ;~ BOOL IsEmf() const { return (Type == MetafileTypeEmf); }
+        
+        ;~ ; Is this an EMF or EMF+ file?
+        
+        ;~ BOOL IsEmfOrEmfPlus() const { return (Type >= MetafileTypeEmf); }
+        
+        ;~ ; Is this an EMF+ file?
+        
+        ;~ BOOL IsEmfPlus() const { return (Type >= MetafileTypeEmfPlusOnly); }
+        
+        ;~ ; Is this an EMF+ dual (has dual, down-level records) file?
+        
+        ;~ BOOL IsEmfPlusDual() const { return (Type == MetafileTypeEmfPlusDual); }
+        
+        ;~ ; Is this an EMF+ only (no dual records) file?
+        
+        ;~ BOOL IsEmfPlusOnly() const { return (Type == MetafileTypeEmfPlusOnly); }
+        
+        ;~ ; If it's an EMF+ file, was it recorded against a display Hdc?
+        
+        ;~ BOOL IsDisplay() const
+        ;~ {
+            ;~ return (IsEmfPlus() &&
+                    ;~ ((EmfPlusFlags & GDIP_EMFPLUSFLAGS_DISPLAY) != 0));
+        ;~ }
+        
+        ;~ ; Get the WMF header of the metafile (if it is a WMF)
+        
+        ;~ const METAHEADER * GetWmfHeader() const
+        ;~ {
+            ;~ if (IsWmf())
+            ;~ {
+                ;~ return &WmfHeader;
+            ;~ }
+            ;~ return NULL;
+        ;~ }
+        
+        ;~ ; Get the EMF header of the metafile (if it is an EMF)
+        
+        ;~ const ENHMETAHEADER3 * GetEmfHeader() const
+        ;~ {
+            ;~ if (IsEmfOrEmfPlus())
+            ;~ {
+                ;~ return &EmfHeader;
+            ;~ }
+            ;~ return NULL;
+        ;~ }
+    }
+
     
     Class gui extends GDIP
     {
@@ -4212,7 +3949,7 @@ Class GDIP
     }
     
     ; ##################
-    ; ##  Validators  ##
+    ; ##  Misc Funcs  ##
     ; ##################
     is_int(num)
     {
@@ -4221,8 +3958,19 @@ Class GDIP
     
     is_num(num)
     {
-        Return (0*num = 0) ? 1 : 0
+        Return (0 * num = 0) ? 1 : 0
     }
+    
+    get_min(n1, n2)
+    {
+        Return (n1 < n2) ? n1 : n2
+    }
+    
+    get_max(n1, n2)
+    {
+        Return (n1 > n2) ? n1 : n2
+    }
+    
     
     ; ########################################
     ; ##  Testing and Troubleshooting Code  ##
@@ -4278,166 +4026,508 @@ Add a "cup" class as a container to hold pens and brushes
     
 
 
-/* Test file
-#SingleInstance, Force
-#Warn
-#NoEnv
-SetBatchLines, -1
-if !A_IsAdmin || !(DllCall("GetCommandLine","Str")~=" /restart(?!\S)")
-    Try Run % "*RunAs """ (A_IsCompiled?A_ScriptFullPath """ /restart":A_AhkPath """ /restart """ A_ScriptFullPath """")
-    Finally ExitApp
+/* Current code
+;   GdiplusImaging.h
+;---------------------------------------------------------------------------
+; Image file format identifiers
+;---------------------------------------------------------------------------
 
-test()
-ExitApp
+DEFINE_GUID(ImageFormatUndefined, 0xb96b3ca9,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatMemoryBMP, 0xb96b3caa,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatBMP, 0xb96b3cab,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatEMF, 0xb96b3cac,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatWMF, 0xb96b3cad,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatJPEG, 0xb96b3cae,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatPNG, 0xb96b3caf,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatGIF, 0xb96b3cb0,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatTIFF, 0xb96b3cb1,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatEXIF, 0xb96b3cb2,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
+DEFINE_GUID(ImageFormatIcon, 0xb96b3cb5,0x0728,0x11d3,0x9d,0x7b,0x00,0x00,0xf8,0x1e,0xf3,0x2e);
 
-*Esc::ExitApp
+;---------------------------------------------------------------------------
+; Predefined multi-frame dimension IDs
+;---------------------------------------------------------------------------
 
-test()
+DEFINE_GUID(FrameDimensionTime, 0x6aedbd6d,0x3fb5,0x418a,0x83,0xa6,0x7f,0x45,0x22,0x9d,0xc8,0x72);
+DEFINE_GUID(FrameDimensionResolution, 0x84236f7b,0x3bd3,0x428f,0x8d,0xab,0x4e,0xa1,0x43,0x9c,0xa3,0x15);
+DEFINE_GUID(FrameDimensionPage, 0x7462dc86,0x6180,0x4c7e,0x8e,0x3f,0xee,0x73,0x33,0xa7,0xa4,0x83);
+
+;---------------------------------------------------------------------------
+; Property sets
+;---------------------------------------------------------------------------
+
+DEFINE_GUID(FormatIDImageInformation, 0xe5836cbe,0x5eef,0x4f1d,0xac,0xde,0xae,0x4c,0x43,0xb6,0x08,0xce);
+DEFINE_GUID(FormatIDJpegAppHeaders, 0x1c4afdcd,0x6177,0x43cf,0xab,0xc7,0x5f,0x51,0xaf,0x39,0xee,0x85);
+
+;---------------------------------------------------------------------------
+; Encoder parameter sets
+;---------------------------------------------------------------------------
+
+DEFINE_GUID(EncoderCompression, 0xe09d739d,0xccd4,0x44ee,0x8e,0xba,0x3f,0xbf,0x8b,0xe4,0xfc,0x58);
+DEFINE_GUID(EncoderColorDepth, 0x66087055,0xad66,0x4c7c,0x9a,0x18,0x38,0xa2,0x31,0x0b,0x83,0x37);
+DEFINE_GUID(EncoderScanMethod, 0x3a4e2661,0x3109,0x4e56,0x85,0x36,0x42,0xc1,0x56,0xe7,0xdc,0xfa);
+DEFINE_GUID(EncoderVersion, 0x24d18c76,0x814a,0x41a4,0xbf,0x53,0x1c,0x21,0x9c,0xcc,0xf7,0x97);
+DEFINE_GUID(EncoderRenderMethod, 0x6d42c53a,0x229a,0x4825,0x8b,0xb7,0x5c,0x99,0xe2,0xb9,0xa8,0xb8);
+DEFINE_GUID(EncoderQuality, 0x1d5be4b5,0xfa4a,0x452d,0x9c,0xdd,0x5d,0xb3,0x51,0x05,0xe7,0xeb);
+DEFINE_GUID(EncoderTransformation,0x8d0eb2d1,0xa58e,0x4ea8,0xaa,0x14,0x10,0x80,0x74,0xb7,0xb6,0xf9);
+DEFINE_GUID(EncoderLuminanceTable,0xedb33bce,0x0266,0x4a77,0xb9,0x04,0x27,0x21,0x60,0x99,0xe7,0x17);
+DEFINE_GUID(EncoderChrominanceTable,0xf2e455dc,0x09b3,0x4316,0x82,0x60,0x67,0x6a,0xda,0x32,0x48,0x1c);
+DEFINE_GUID(EncoderSaveFlag,0x292266fc,0xac40,0x47bf,0x8c, 0xfc, 0xa8, 0x5b, 0x89, 0xa6, 0x55, 0xde);
+
+#if (GDIPVER >= 0x0110)
+DEFINE_GUID(EncoderColorSpace,0xae7a62a0,0xee2c,0x49d8,0x9d,0x7,0x1b,0xa8,0xa9,0x27,0x59,0x6e);
+DEFINE_GUID(EncoderImageItems,0x63875e13,0x1f1d,0x45ab,0x91, 0x95, 0xa2, 0x9b, 0x60, 0x66, 0xa6, 0x50);
+DEFINE_GUID(EncoderSaveAsCMYK,0xa219bbc9, 0xa9d, 0x4005, 0xa3, 0xee, 0x3a, 0x42, 0x1b, 0x8b, 0xb0, 0x6c);
+#endif ;(GDIPVER >= 0x0110)
+
+DEFINE_GUID(CodecIImageBytes,0x025d1823,0x6c7d,0x447b,0xbb, 0xdb, 0xa3, 0xcb, 0xc3, 0xdf, 0xa2, 0xfc);
+
+MIDL_INTERFACE("025D1823-6C7D-447B-BBDB-A3CBC3DFA2FC")
+IImageBytes : public IUnknown
 {
-    p1  := new gdip.point()
-    p2  := new gdip.point(10, 20)
-    p3  := new gdip.point(p2)
-    show(p1)
-    show(p2)
-    show(p3)
-    Return
-}
+public:
+    ; Return total number of bytes in the IStream
 
-show(point)
-{
-    MsgBox, % "point.structP: " point.structP 
-    MsgBox, % "point.width: "   point.width
-        . "`npoint.height: "    point.height 
-        . "`nStruct width: "    NumGet(point.struct,    0, "Int")
-        . "`nStruct height: "   NumGet(point.struct,    0, "Int")
-        . "`nStructP width: "   NumGet(point.structP+0, 0, "Int")
-        . "`nStructP height: "  NumGet(point.structP+0, 0, "Int")
-    Return
-}
-
-Class GDIP
-{
-    ;===================================================================================================================.
-    ; A point objects/structures contain 2 integers representing x and y coordinates.                                   |
-    ; Properties:                                                                                                       |
-    ; .x                X coord (integer)                                                                               |
-    ; .y                Y coord (integer)                                                                               |
-    ; .struct           Actual 8 byte struct                                                                            |
-    ; .structP          Pointer to Point struct                                                                         |
-    ;                                                                                                                   |
-    ; Methods:                                                                                                          |
-    ; equals(point2)    Determines if 2 Points have equal values. Returns true/false                                    |
-    ; sum(point2)       Adds Point2 to the current Point. Returns a new Point object.                                   |
-    ; diff(point2)      Subtracts Point2 from the current Point. Returns a new Point object.                            |
-    ;___________________________________________________________________________________________________________________|
-    Class point extends GDIP
-    {
-        type    := "Point"
-        x       := 0
-        y       := 0
-        struct  := 0
-        structP := 0
-        
-        ; The new creation method is overloaded, giving multiple ways to create a point object
-        ; Point()           Creates a point struct containing all zeroes
-        ; Point(x, y)       Creates a point using an int for x and one for y
-        ; Point(Size)       Creates a point using the 2 values stored in a size struct
-        ; Point(Point)      Clones a point struct
-        __New(obj_x="", y="")0
-        {
-            err := 0
-            (this.is_int(obj_x) && this.is_int(y))  ? (this.width := obj_x, this.height := y)
-                : (obj_x = "" && y = "")            ? (this.width := 0, this.height := 0)
-                : (obj_x.type = "Size")             ? (this.width := obj_x.x, this.height := obj_x.y)
-                : (obj_x.type = "Point")            ? (this.width := obj_x.w, this.height := obj_x.h)
-                :                                     err := 1
-            
-            If (err)
-                this.error_log(A_ThisFunc, "Failed to create point struct.", "Expected", {obj_x:obj_x, y:y})
-            Else 
-            {
-                MsgBox, % "this.structP: " this.structP 
-                this.SetCapacity("struct", 8)           ; Set struct to 8 bytes
-                MsgBox, % "Capacity: " this.GetCapacity("struct")
-                ptr := this.GetAddress("struct")        ; Get struct pointer
-                NumPut(this.width,  ptr+0, 0, "Int")    ; Set first 4 bytes to width
-                NumPut(this.height, ptr+0, 4, "Int")    ; Set last 4 bytes to height
-                this.structP := ptr                     ; Save pointer
-                MsgBox, % "this.structP: " this.structP "`nptr: " ptr
-            }
-        }
-        
-        ;~ ; METHODS
-        ;~ ; Description       Determines whether two PointF objects are equal
-        ;~ Equals(point1, point2)
-        ;~ {
-            ;~ Return (NumGet(point1, 0, "Int64") = NumGet(point1, 0, "Int64")) ? 1 : 0
-        ;~ }
-        
-        ;~ ; The PointF::operator+ method adds the X and Y data members of two PointF objects.
-        ;~ sum(point1, point2)
-        ;~ {
-            ;~ sx := NumGet(point1, 0, "Int") + NumGet(point2, 0, "Int")
-            ;~ sy := NumGet(point1, 4, "Int") + NumGet(point2, 4, "Int")
-            ;~ Return this.Point(sy, sx)
-        ;~ }
-        
-        ;~ ; The PointF::operator- method subtracts the X and Y data members of two PointF objects.
-        ;~ diff(point1, point2)
-        ;~ {
-            ;~ Return
-        ;~ }
-        
-    }
+    STDMETHOD(CountBytes)(
+        OUT UINT *pcb
+        ) = 0;
     
-    Class size extends GDIP
-    {
-        method()
-        {
-            Return
-        }
-    }
-    
-    is_int(num)
-    {
-        Return (Mod(num, 1) = 0) ? 1 : 0
-    }
-    
-    is_float(num)
-    {
-        Return (Mod(num, 1) = 0) ? 0 : 1
-    }
-    
-    is_num(num)
-    {
-        Return (0*num = 0) ? 1 : 0
-    }
-}
+    ; Locks "cb" bytes, starting from "ulOffset" in the stream, and returns the
+    ; pointer to the beginning of the locked memory chunk in "ppvBytes"
 
+    STDMETHOD(LockBytes)(
+        IN UINT cb,
+        IN ULONG ulOffset,
+        OUT const VOID ** ppvBytes
+        ) = 0;
 
+    ; Unlocks "cb" bytes, pointed by "pvBytes", starting from "ulOffset" in the
+    ; stream
 
+    STDMETHOD(UnlockBytes)(
+        IN const VOID *pvBytes,
+        IN UINT cb,
+        IN ULONG ulOffset
+        ) = 0;
+};
 
-
-
-
-
-class testingclass
+;--------------------------------------------------------------------------
+; ImageCodecInfo structure
+;--------------------------------------------------------------------------
+Class ImageCodecInfo
 {
+     Clsid             := ""   ; CLSID
+    ,FormatID          := ""   ; GUID 
+    ,CodecName         := ""   ; const WCHAR* 
+    ,DllName           := ""   ; const WCHAR* 
+    ,FormatDescription := ""   ; const WCHAR* 
+    ,FilenameExtension := ""   ; const WCHAR* 
+    ,MimeType          := ""   ; const WCHAR* 
+    ,Flags             := ""   ; DWORD
+    ,Version           := ""   ; DWORD
+    ,SigCount          := ""   ; DWORD
+    ,SigSize           := ""   ; DWORD
+    ,SigPattern        := ""   ; BYTE* const
+    ,SigMask           := ""   ; BYTE* const
 }
 
-Rounding_Mindfuck()
+;---------------------------------------------------------------------------
+; Information about image pixel data
+;---------------------------------------------------------------------------
+Class BitmapData
 {
-    percent := 50
-    x := 255 * percent / 100
-    y := 255 / 100 * percent
-    MsgBox, % "Percent = " percent
-            . "`nvar`tRounded`tFormula"
-            . "`nx`t" Round(x) "`t255 * percent / 100"
-            . "`ny`t" Round(y) "`t255 / 100 * percent"
-            
-    ;MsgBox, % "x: " x "`nRounded`nx: " Round(x) "`ny: " y "`ny: "Round(y)
-    Return
+    Width       := ""   ; UINT        
+    Height      := ""   ; UINT        
+    Stride      := ""   ; INT         
+    PixelFormat := ""   ; PixelFormat 
+    Scan0       := ""   ; VOID*       
+    Reserved    := ""   ; UINT_PTR    
 }
+
+;---------------------------------------------------------------------------
+; Encoder Parameter structure
+;---------------------------------------------------------------------------
+class EncoderParameter
+{
+    Guid           ; GUID     ; GUID of the parameter
+    NumberOfValues ; ULONG    ; Number of the parameter values
+    Type           ; ULONG    ; Value type, like ValueTypeLONG  etc.
+    Value          ; VOID*    ; A pointer to the parameter values
+}
+
+;---------------------------------------------------------------------------
+; Encoder Parameters structure
+;---------------------------------------------------------------------------
+class EncoderParameters
+{
+public:
+    UINT Count;                      ; Number of parameters in this structure
+    EncoderParameter Parameter[1];   ; Parameter values
+}
+
+enum ItemDataPosition
+{
+    ItemDataPositionAfterHeader    = 0x0,
+    ItemDataPositionAfterPalette   = 0x1,
+    ItemDataPositionAfterBits      = 0x2,
+}
+
+;---------------------------------------------------------------------------
+; External Data Item
+;---------------------------------------------------------------------------
+class ImageItemData
+{
+public:
+    UINT  Size;           ; size of the structure 
+    UINT  Position;       ; flags describing how the data is to be used.
+    VOID *Desc;           ; description on how the data is to be saved.
+                          ; it is different for every codec type.
+    UINT  DescSize;       ; size memory pointed by Desc
+    VOID *Data;           ; pointer to the data that is to be saved in the
+                          ; file, could be anything saved directly.
+    UINT  DataSize;       ; size memory pointed by Data
+    UINT  Cookie;         ; opaque for the apps data member used during
+                          ; enumeration of image data items.
+};
+#endif ;(GDIPVER >= 0x0110)
+
+;---------------------------------------------------------------------------
+; Property Item
+;---------------------------------------------------------------------------
+class PropertyItem
+{
+public:
+    PROPID  id;                 ; ID of this property
+    ULONG   length;             ; Length of the property value, in bytes
+    WORD    type;               ; Type of the value, as one of TAG_TYPE_XXX
+                                ; defined above
+    VOID*   value;              ; property value
+};
+
+;---------------------------------------------------------------------------
+; Image property types 
+;---------------------------------------------------------------------------
+#define PropertyTagTypeByte        1
+#define PropertyTagTypeASCII       2
+#define PropertyTagTypeShort       3
+#define PropertyTagTypeLong        4
+#define PropertyTagTypeRational    5
+#define PropertyTagTypeUndefined   7
+#define PropertyTagTypeSLONG       9
+#define PropertyTagTypeSRational  10
+
+;---------------------------------------------------------------------------
+; Image property ID tags
+;---------------------------------------------------------------------------
+
+#define PropertyTagExifIFD             0x8769
+#define PropertyTagGpsIFD              0x8825
+
+#define PropertyTagNewSubfileType      0x00FE
+#define PropertyTagSubfileType         0x00FF
+#define PropertyTagImageWidth          0x0100
+#define PropertyTagImageHeight         0x0101
+#define PropertyTagBitsPerSample       0x0102
+#define PropertyTagCompression         0x0103
+#define PropertyTagPhotometricInterp   0x0106
+#define PropertyTagThreshHolding       0x0107
+#define PropertyTagCellWidth           0x0108
+#define PropertyTagCellHeight          0x0109
+#define PropertyTagFillOrder           0x010A
+#define PropertyTagDocumentName        0x010D
+#define PropertyTagImageDescription    0x010E
+#define PropertyTagEquipMake           0x010F
+#define PropertyTagEquipModel          0x0110
+#define PropertyTagStripOffsets        0x0111
+#define PropertyTagOrientation         0x0112
+#define PropertyTagSamplesPerPixel     0x0115
+#define PropertyTagRowsPerStrip        0x0116
+#define PropertyTagStripBytesCount     0x0117
+#define PropertyTagMinSampleValue      0x0118
+#define PropertyTagMaxSampleValue      0x0119
+#define PropertyTagXResolution         0x011A   ; Image resolution in width direction
+#define PropertyTagYResolution         0x011B   ; Image resolution in height direction
+#define PropertyTagPlanarConfig        0x011C   ; Image data arrangement
+#define PropertyTagPageName            0x011D
+#define PropertyTagXPosition           0x011E
+#define PropertyTagYPosition           0x011F
+#define PropertyTagFreeOffset          0x0120
+#define PropertyTagFreeByteCounts      0x0121
+#define PropertyTagGrayResponseUnit    0x0122
+#define PropertyTagGrayResponseCurve   0x0123
+#define PropertyTagT4Option            0x0124
+#define PropertyTagT6Option            0x0125
+#define PropertyTagResolutionUnit      0x0128   ; Unit of X and Y resolution
+#define PropertyTagPageNumber          0x0129
+#define PropertyTagTransferFuncition   0x012D
+#define PropertyTagSoftwareUsed        0x0131
+#define PropertyTagDateTime            0x0132
+#define PropertyTagArtist              0x013B
+#define PropertyTagHostComputer        0x013C
+#define PropertyTagPredictor           0x013D
+#define PropertyTagWhitePoint          0x013E
+#define PropertyTagPrimaryChromaticities 0x013F
+#define PropertyTagColorMap            0x0140
+#define PropertyTagHalftoneHints       0x0141
+#define PropertyTagTileWidth           0x0142
+#define PropertyTagTileLength          0x0143
+#define PropertyTagTileOffset          0x0144
+#define PropertyTagTileByteCounts      0x0145
+#define PropertyTagInkSet              0x014C
+#define PropertyTagInkNames            0x014D
+#define PropertyTagNumberOfInks        0x014E
+#define PropertyTagDotRange            0x0150
+#define PropertyTagTargetPrinter       0x0151
+#define PropertyTagExtraSamples        0x0152
+#define PropertyTagSampleFormat        0x0153
+#define PropertyTagSMinSampleValue     0x0154
+#define PropertyTagSMaxSampleValue     0x0155
+#define PropertyTagTransferRange       0x0156
+
+#define PropertyTagJPEGProc            0x0200
+#define PropertyTagJPEGInterFormat     0x0201
+#define PropertyTagJPEGInterLength     0x0202
+#define PropertyTagJPEGRestartInterval 0x0203
+#define PropertyTagJPEGLosslessPredictors  0x0205
+#define PropertyTagJPEGPointTransforms     0x0206
+#define PropertyTagJPEGQTables         0x0207
+#define PropertyTagJPEGDCTables        0x0208
+#define PropertyTagJPEGACTables        0x0209
+
+#define PropertyTagYCbCrCoefficients   0x0211
+#define PropertyTagYCbCrSubsampling    0x0212
+#define PropertyTagYCbCrPositioning    0x0213
+#define PropertyTagREFBlackWhite       0x0214
+
+#define PropertyTagICCProfile          0x8773   ; This TAG is defined by ICC
+                                                ; for embedded ICC in TIFF
+#define PropertyTagGamma               0x0301
+#define PropertyTagICCProfileDescriptor 0x0302
+#define PropertyTagSRGBRenderingIntent 0x0303
+
+#define PropertyTagImageTitle          0x0320
+#define PropertyTagCopyright           0x8298
+
+; Extra TAGs (Like Adobe Image Information tags etc.)
+
+#define PropertyTagResolutionXUnit           0x5001
+#define PropertyTagResolutionYUnit           0x5002
+#define PropertyTagResolutionXLengthUnit     0x5003
+#define PropertyTagResolutionYLengthUnit     0x5004
+#define PropertyTagPrintFlags                0x5005
+#define PropertyTagPrintFlagsVersion         0x5006
+#define PropertyTagPrintFlagsCrop            0x5007
+#define PropertyTagPrintFlagsBleedWidth      0x5008
+#define PropertyTagPrintFlagsBleedWidthScale 0x5009
+#define PropertyTagHalftoneLPI               0x500A
+#define PropertyTagHalftoneLPIUnit           0x500B
+#define PropertyTagHalftoneDegree            0x500C
+#define PropertyTagHalftoneShape             0x500D
+#define PropertyTagHalftoneMisc              0x500E
+#define PropertyTagHalftoneScreen            0x500F
+#define PropertyTagJPEGQuality               0x5010
+#define PropertyTagGridSize                  0x5011
+#define PropertyTagThumbnailFormat           0x5012  ; 1 = JPEG, 0 = RAW RGB
+#define PropertyTagThumbnailWidth            0x5013
+#define PropertyTagThumbnailHeight           0x5014
+#define PropertyTagThumbnailColorDepth       0x5015
+#define PropertyTagThumbnailPlanes           0x5016
+#define PropertyTagThumbnailRawBytes         0x5017
+#define PropertyTagThumbnailSize             0x5018
+#define PropertyTagThumbnailCompressedSize   0x5019
+#define PropertyTagColorTransferFunction     0x501A
+#define PropertyTagThumbnailData             0x501B; RAW thumbnail bits in
+                                                   ; JPEG format or RGB format
+                                                   ; depends on
+                                                   ; PropertyTagThumbnailFormat
+
+; Thumbnail related TAGs
+                                                
+#define PropertyTagThumbnailImageWidth       0x5020  ; Thumbnail width
+#define PropertyTagThumbnailImageHeight      0x5021  ; Thumbnail height
+#define PropertyTagThumbnailBitsPerSample    0x5022  ; Number of bits per
+                                                     ; component
+#define PropertyTagThumbnailCompression      0x5023  ; Compression Scheme
+#define PropertyTagThumbnailPhotometricInterp 0x5024 ; Pixel composition
+#define PropertyTagThumbnailImageDescription 0x5025  ; Image Tile
+#define PropertyTagThumbnailEquipMake        0x5026  ; Manufacturer of Image
+                                                     ; Input equipment
+#define PropertyTagThumbnailEquipModel       0x5027  ; Model of Image input
+                                                     ; equipment
+#define PropertyTagThumbnailStripOffsets     0x5028  ; Image data location
+#define PropertyTagThumbnailOrientation      0x5029  ; Orientation of image
+#define PropertyTagThumbnailSamplesPerPixel  0x502A  ; Number of components
+#define PropertyTagThumbnailRowsPerStrip     0x502B  ; Number of rows per strip
+#define PropertyTagThumbnailStripBytesCount  0x502C  ; Bytes per compressed
+                                                     ; strip
+#define PropertyTagThumbnailResolutionX      0x502D  ; Resolution in width
+                                                     ; direction
+#define PropertyTagThumbnailResolutionY      0x502E  ; Resolution in height
+                                                     ; direction
+#define PropertyTagThumbnailPlanarConfig     0x502F  ; Image data arrangement
+#define PropertyTagThumbnailResolutionUnit   0x5030  ; Unit of X and Y
+                                                     ; Resolution
+#define PropertyTagThumbnailTransferFunction 0x5031  ; Transfer function
+#define PropertyTagThumbnailSoftwareUsed     0x5032  ; Software used
+#define PropertyTagThumbnailDateTime         0x5033  ; File change date and
+                                                     ; time
+#define PropertyTagThumbnailArtist           0x5034  ; Person who created the
+                                                     ; image
+#define PropertyTagThumbnailWhitePoint       0x5035  ; White point chromaticity
+#define PropertyTagThumbnailPrimaryChromaticities 0x5036 
+                                                     ; Chromaticities of
+                                                     ; primaries
+#define PropertyTagThumbnailYCbCrCoefficients 0x5037 ; Color space transforma-
+                                                     ; tion coefficients
+#define PropertyTagThumbnailYCbCrSubsampling 0x5038  ; Subsampling ratio of Y
+                                                     ; to C
+#define PropertyTagThumbnailYCbCrPositioning 0x5039  ; Y and C position
+#define PropertyTagThumbnailRefBlackWhite    0x503A  ; Pair of black and white
+                                                     ; reference values
+#define PropertyTagThumbnailCopyRight        0x503B  ; CopyRight holder
+
+#define PropertyTagLuminanceTable            0x5090
+#define PropertyTagChrominanceTable          0x5091
+
+#define PropertyTagFrameDelay                0x5100
+#define PropertyTagLoopCount                 0x5101
+
+#if (GDIPVER >= 0x0110)
+#define PropertyTagGlobalPalette             0x5102
+#define PropertyTagIndexBackground           0x5103
+#define PropertyTagIndexTransparent          0x5104
+#endif ;(GDIPVER >= 0x0110)
+
+#define PropertyTagPixelUnit         0x5110  ; Unit specifier for pixel/unit
+#define PropertyTagPixelPerUnitX     0x5111  ; Pixels per unit in X
+#define PropertyTagPixelPerUnitY     0x5112  ; Pixels per unit in Y
+#define PropertyTagPaletteHistogram  0x5113  ; Palette histogram
+
+; EXIF specific tag
+
+#define PropertyTagExifExposureTime  0x829A
+#define PropertyTagExifFNumber       0x829D
+
+#define PropertyTagExifExposureProg  0x8822
+#define PropertyTagExifSpectralSense 0x8824
+#define PropertyTagExifISOSpeed      0x8827
+#define PropertyTagExifOECF          0x8828
+
+#define PropertyTagExifVer            0x9000
+#define PropertyTagExifDTOrig         0x9003 ; Date & time of original
+#define PropertyTagExifDTDigitized    0x9004 ; Date & time of digital data generation
+
+#define PropertyTagExifCompConfig     0x9101
+#define PropertyTagExifCompBPP        0x9102
+
+#define PropertyTagExifShutterSpeed   0x9201
+#define PropertyTagExifAperture       0x9202
+#define PropertyTagExifBrightness     0x9203
+#define PropertyTagExifExposureBias   0x9204
+#define PropertyTagExifMaxAperture    0x9205
+#define PropertyTagExifSubjectDist    0x9206
+#define PropertyTagExifMeteringMode   0x9207
+#define PropertyTagExifLightSource    0x9208
+#define PropertyTagExifFlash          0x9209
+#define PropertyTagExifFocalLength    0x920A
+#define PropertyTagExifSubjectArea    0x9214  ; exif 2.2 Subject Area
+#define PropertyTagExifMakerNote      0x927C
+#define PropertyTagExifUserComment    0x9286
+#define PropertyTagExifDTSubsec       0x9290  ; Date & Time subseconds
+#define PropertyTagExifDTOrigSS       0x9291  ; Date & Time original subseconds
+#define PropertyTagExifDTDigSS        0x9292  ; Date & TIme digitized subseconds
+
+#define PropertyTagExifFPXVer         0xA000
+#define PropertyTagExifColorSpace     0xA001
+#define PropertyTagExifPixXDim        0xA002
+#define PropertyTagExifPixYDim        0xA003
+#define PropertyTagExifRelatedWav     0xA004  ; related sound file
+#define PropertyTagExifInterop        0xA005
+#define PropertyTagExifFlashEnergy    0xA20B
+#define PropertyTagExifSpatialFR      0xA20C  ; Spatial Frequency Response
+#define PropertyTagExifFocalXRes      0xA20E  ; Focal Plane X Resolution
+#define PropertyTagExifFocalYRes      0xA20F  ; Focal Plane Y Resolution
+#define PropertyTagExifFocalResUnit   0xA210  ; Focal Plane Resolution Unit
+#define PropertyTagExifSubjectLoc     0xA214
+#define PropertyTagExifExposureIndex  0xA215
+#define PropertyTagExifSensingMethod  0xA217
+#define PropertyTagExifFileSource     0xA300
+#define PropertyTagExifSceneType      0xA301
+#define PropertyTagExifCfaPattern     0xA302
+
+; New EXIF 2.2 properties
+
+#define PropertyTagExifCustomRendered           0xA401
+#define PropertyTagExifExposureMode             0xA402
+#define PropertyTagExifWhiteBalance             0xA403
+#define PropertyTagExifDigitalZoomRatio         0xA404
+#define PropertyTagExifFocalLengthIn35mmFilm    0xA405
+#define PropertyTagExifSceneCaptureType         0xA406
+#define PropertyTagExifGainControl              0xA407
+#define PropertyTagExifContrast                 0xA408
+#define PropertyTagExifSaturation               0xA409
+#define PropertyTagExifSharpness                0xA40A
+#define PropertyTagExifDeviceSettingDesc        0xA40B
+#define PropertyTagExifSubjectDistanceRange     0xA40C
+#define PropertyTagExifUniqueImageID            0xA420
+
+
+#define PropertyTagGpsVer             0x0000
+#define PropertyTagGpsLatitudeRef     0x0001
+#define PropertyTagGpsLatitude        0x0002
+#define PropertyTagGpsLongitudeRef    0x0003
+#define PropertyTagGpsLongitude       0x0004
+#define PropertyTagGpsAltitudeRef     0x0005
+#define PropertyTagGpsAltitude        0x0006
+#define PropertyTagGpsGpsTime         0x0007
+#define PropertyTagGpsGpsSatellites   0x0008
+#define PropertyTagGpsGpsStatus       0x0009
+#define PropertyTagGpsGpsMeasureMode  0x00A
+#define PropertyTagGpsGpsDop          0x000B  ; Measurement precision
+#define PropertyTagGpsSpeedRef        0x000C
+#define PropertyTagGpsSpeed           0x000D
+#define PropertyTagGpsTrackRef        0x000E
+#define PropertyTagGpsTrack           0x000F
+#define PropertyTagGpsImgDirRef       0x0010
+#define PropertyTagGpsImgDir          0x0011
+#define PropertyTagGpsMapDatum        0x0012
+#define PropertyTagGpsDestLatRef      0x0013
+#define PropertyTagGpsDestLat         0x0014
+#define PropertyTagGpsDestLongRef     0x0015
+#define PropertyTagGpsDestLong        0x0016
+#define PropertyTagGpsDestBearRef     0x0017
+#define PropertyTagGpsDestBear        0x0018
+#define PropertyTagGpsDestDistRef     0x0019
+#define PropertyTagGpsDestDist        0x001A
+#define PropertyTagGpsProcessingMethod 0x001B
+#define PropertyTagGpsAreaInformation 0x001C
+#define PropertyTagGpsDate            0x001D
+#define PropertyTagGpsDifferential    0x001E
+
+#if _MSC_VER >= 1200
+#pragma warning(pop)
+#endif
+
+#endif /* WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) */
+#pragma endregion
+
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 to_hex(num){
     Return Format("{1:#x}", num)
@@ -4453,66 +4543,4 @@ qpx(N=0) {  ; Wrapper for QueryPerformanceCounter() by SKAN  | CD: 06/Dec/2009
     DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
     Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
 }
-
-/*
-Extra code fromm work:
-GDIP.Graphics.DrawImage()
-
-
-
-; INT VARIANTS
-; Draw image at specified x/y coordinate but use original img width & height
-GdipDrawImage(graphicP, imoP)
-
-GdipDrawImageI(graphicP, imoP, INT x, INT y)
-GdipDrawImage(graphicP, imoP, REAL x, REAL y)
-
-; Draw image at specified x/y coord and make image width by height.
-GdipDrawImageRectI(graphicP, imoP, INT x, INT y, INT width, INT height)
-GdipDrawImageRect(graphicP, imoP, REAL x, REAL y, REAL width, REAL height)
-
-; Draws an image.
-;~ * Affine or perspective blt
-;~ *  destPoints.length = 3:
-;~ *      rect => parallelogram
-;~ *      destPoints[0] <=> top-left corner of the source rectangle
-;~ *      destPoints[1] <=> top-right corner
-;~ *      destPoints[2] <=> bottom-left corner
-;~ *  destPoints.length = 4:
-;~ *      rect => quad
-;~ *      destPoints[3] <=> bottom-right corner
-; Draw image
-; Description       Draw image using the dest_point_arr provided.
-; dest_point_arr    An array containing 3-4 Point objects
-; count             Number of elements in dest_point_arr
-; Remark            Count is number of elements in dp_arr and must be 3 (parallelogram) or 4 (quad).
-GdipDrawImagePointsI(graphicP, imoP, dest_point_arr, INT count)
-GdipDrawImagePoints(graphicP, imoP, GDIPCONST GpPointF *dstpoints, INT count)
-
-; Capture part of an image using srcx, srcy, srcwidth, and srcheight then draw that image at the x/y coordinates.
-GdipDrawImagePointRectI(graphicP, imoP, INT x, INT y, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit)
-GdipDrawImagePointRect(graphicP, imoP, REAL x, REAL y, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit)
-
-; Description       Capture part of an image using src_x/y/w/h and draw image at dst_x/y with src_width/height.
-; src_x/y/w/h       The source WHXY that you want captured
-; dst_x/y/w/h       The destination you want to draw the captured part of the image
-; src_unit          A number from the Unit type enumeration
-; img_attributes    
-; callback          
-; callback_data     
-; Remark            In the flat function, the dstx, dsty, dstwidth, and dstheight parameters specify a rectangle that corresponds to the dstRect parameter in the wrapper method.
-
-GdipDrawImageRectRectI(graphicP, imoP
-                      , INT dstx, INT dsty, INT dstwidth, INT dstheight
-                      , INT srcx, INT srcy, INT srcwidth, INT srcheight
-                      , GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
-GdipDrawImageRectRect(graphicP, imoP, REAL dstx, REAL dsty, REAL dstwidth, REAL dstheight   , REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
-
-; Draws an image.
-GdipDrawImagePointsRectI(graphicP, imoP, GDIPCONST GpPoint *points, INT count, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
-GdipDrawImagePointsRect(graphicP, imoP, GDIPCONST GpPointF *points, INT count, REAL srcx, REAL srcy, REAL srcwidth, REAL srcheight, GpUnit srcUnit, GDIPCONST GpImageAttributes* imageAttributes, DrawImageAbort callback, VOID * callbackData)
-
-; OTHER
-; Draws a portion of an image after applying a specified effect.
-GdipDrawImageFX(graphicP, imoP, GpRectF *source, GpMatrix *xForm, CGpEffect *effect, GpImageAttributes *imageAttributes, GpUnit srcUnit)
 
