@@ -62,7 +62,6 @@
         Started on gdiplusimaging
         
 */
-
 GDIP.Startup()
 
 Class GDIP
@@ -177,6 +176,90 @@ Class GDIP
     {
         bf := ObjBindMethod(this, method_name, params*)
         Return bf
+    }
+    
+    ; Error log expects the call where the error happened
+    ; The type of value or what was expected
+    ; Stores byte size of different data_type
+    data_type_size(type)
+    {
+        Static dt  := ""
+        If !IsObject(dt)
+        {
+            p  := A_PtrSize
+            h  := (A_PtrSize = 8) ? 4 : 2
+            u  := A_IsUnicode     ? 2 : 1
+            dt := {}
+            
+            dt.__int8     := 1    ,dt.int                 := 4    ,dt["unsigned __int16"]    := 2
+            dt.__int16    := 2    ,dt.long                := 4    ,dt["unsigned __int32"]    := 4
+            dt.__int32    := 4    ,dt.short               := 2    ,dt["unsigned __int64"]    := 8
+            dt.__int64    := 8    ,dt.wchar_t             := 2    ,dt["unsigned char"]       := 1
+            dt.__wchar_t  := 2    ,dt["long double"]      := 8    ,dt["unsigned short"]      := 2
+            dt.bool       := 1    ,dt["long long"]        := 8    ,dt["unsigned long"]       := 4
+            dt.char       := 1    ,dt["unsigned int"]     := 4    ,dt["unsigned long long"]  := 8
+            dt.double     := 8    ,dt["unsigned __int8"]  := 1    ,dt["signed char"]         := 1
+            dt.float      := 4
+            
+            dt.ATOM          := 2    ,dt.INT_PTR           := p    ,dt.PSHORT                 := p
+            dt.BOOL          := 4    ,dt.LANGID            := 2    ,dt.PSIZE_T                := p
+            dt.BOOLEAN       := 1    ,dt.LCID              := 4    ,dt.PSSIZE_T               := p
+            dt.BYTE          := 1    ,dt.LCTYPE            := 4    ,dt.PSTR                   := p
+            dt.CCHAR         := 1    ,dt.LGRPID            := 4    ,dt.PTBYTE                 := p
+            dt.CHAR          := 1    ,dt.LONG              := 4    ,dt.PTCHAR                 := p
+            dt.COLORREF      := 4    ,dt.LONG32            := 4    ,dt.PTSTR                  := p
+            dt.DWORD         := 4    ,dt.LONG64            := 8    ,dt.PUCHAR                 := p
+            dt.DWORD32       := 4    ,dt.LONG_PTR          := p    ,dt.PUHALF_PTR             := p
+            dt.DWORD64       := 8    ,dt.LONGLONG          := 8    ,dt.PUINT                  := p
+            dt.DWORD_PTR     := p    ,dt.LPARAM            := p    ,dt.PUINT16                := p
+            dt.DWORDLONG     := 8    ,dt.LPBOOL            := p    ,dt.PUINT32                := p
+            dt.HACCEL        := p    ,dt.LPBYTE            := p    ,dt.PUINT64                := p
+            dt.HALF_PTR      := h    ,dt.LPCOLORREF        := p    ,dt.PUINT8                 := p
+            dt.HANDLE        := p    ,dt.LPCSTR            := p    ,dt.PUINT_PTR              := p
+            dt.HBITMAP       := p    ,dt.LPCTSTR           := p    ,dt.PULONG                 := p
+            dt.HBRUSH        := p    ,dt.LPCVOID           := 0    ,dt.PULONG32               := p
+            dt.HCOLORSPACE   := p    ,dt.LPDWORD           := 4    ,dt.PULONG64               := p
+            dt.HCONV         := p    ,dt.LPHANDLE          := p    ,dt.PULONG_PTR             := p
+            dt.HCONVLIST     := p    ,dt.LPINT             := 4    ,dt.PULONGLONG             := p
+            dt.HCURSOR       := p    ,dt.LPLONG            := 4    ,dt.PUSHORT                := p
+            dt.HDC           := p    ,dt.LPVOID            := p    ,dt.PVOID                  := p
+            dt.HDDEDATA      := p    ,dt.LPWORD            := 2    ,dt.PWCHAR                 := p
+            dt.HDESK         := p    ,dt.LRESULT           := p    ,dt.PWORD                  := p
+            dt.HDROP         := p    ,dt.PBOOL             := p    ,dt.PWSTR                  := p
+            dt.HDWP          := p    ,dt.PBOOLEAN          := p    ,dt.QWORD                  := 8
+            dt.HENHMETAFILE  := p    ,dt.PBYTE             := p    ,dt.REAL                   := 4
+            dt.HFILE         := 4    ,dt.PCHAR             := p    ,dt.SC_HANDLE              := p
+            dt.HFONT         := p    ,dt.PDWORD            := p    ,dt.SC_LOCK                := p
+            dt.HGDIOBJ       := p    ,dt.PDWORD32          := p    ,dt.SERVICE_STATUS_HANDLE  := p
+            dt.HGLOBAL       := p    ,dt.PDWORD64          := p    ,dt.SIZE_T                 := p
+            dt.HHOOK         := p    ,dt.PDWORD_PTR        := p    ,dt.SSIZE_T                := p
+            dt.HICON         := p    ,dt.PDWORDLONG        := p    ,dt.TBYTE                  := u
+            dt.HINSTANCE     := p    ,dt.PFLOAT            := p    ,dt.TCHAR                  := u
+            dt.HKEY          := p    ,dt.PHALF_PTR         := p    ,dt.UCHAR                  := 1
+            dt.HKL           := p    ,dt.PHANDLE           := p    ,dt.UHALF_PTR              := h
+            dt.HLOCAL        := p    ,dt.PHKEY             := p    ,dt.UINT                   := 4
+            dt.HMENU         := p    ,dt.PINT              := p    ,dt.UINT16                 := 2
+            dt.HMETAFILE     := p    ,dt.PINT16            := p    ,dt.UINT32                 := 4
+            dt.HMODULE       := p    ,dt.PINT32            := p    ,dt.UINT64                 := 8
+            dt.HMONITOR      := p    ,dt.PINT64            := p    ,dt.UINT8                  := 1
+            dt.HPALETTE      := p    ,dt.PINT8             := p    ,dt.UINT_PTR               := p
+            dt.HPEN          := p    ,dt.PINT_PTR          := p    ,dt.ULONG                  := 4
+            dt.HRESULT       := 4    ,dt.PLCID             := p    ,dt.ULONG32                := 4
+            dt.HRGN          := p    ,dt.PLONG             := p    ,dt.ULONG64                := 8
+            dt.HRSRC         := p    ,dt.PLONG32           := p    ,dt.ULONG_PTR              := p
+            dt.HSZ           := p    ,dt.PLONG64           := p    ,dt.ULONGLONG              := 8
+            dt.HWINSTA       := p    ,dt.PLONG_PTR         := p    ,dt.USHORT                 := 2
+            dt.HWND          := p    ,dt.PLONGLONG         := p    ,dt.USN                    := 8
+            dt.INT16         := 2    ,dt.POINTER_32        := p    ,dt.VOID                   := 0
+            dt.INT32         := 4    ,dt.POINTER_64        := p    ,dt.WCHAR                  := 2
+            dt.INT64         := 8    ,dt.POINTER_SIGNED    := p    ,dt.WORD                   := 2
+            dt.INT8          := 1    ,dt.POINTER_UNSIGNED  := p    ,dt.WPARAM                 := p                               
+        }
+        bytes := dt[type]
+        If (bytes != "")
+            Return bytes
+        GDIP.error_log(A_ThisFunc, "No valid datatype found.", type, "See 'data_type_size' function for list of data types.")
+        Return "err"
     }
     
     ;####################################################################################################################
@@ -3263,22 +3346,23 @@ Class GDIP
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Point()           Set X and Y to 0                                                                                |
-    ; Point(num1, num2) Set X to num1 and Y to num2                                                                     |
+    ; Point(x, y)       Set X and Y to number                                                                           |
     ; Point(Size)       Set X to Size.width and Y to Size.height                                                        |
     ; Point(Point)      Set X to Point.X and Y to Point.Y                                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Return pointer to struct. type = expected data type (Int, Float, ...) No param = Int            |
+    ; .Struct(type)     Create struct with current values and return pointer to it. type can be any 4 byte data type.   |
     ; .Plus(Point)      Return a new Point object with sum of Point and NativePoint values                              |
     ; .Minus(Point)     Return a new Point object with difference of NativePoint and Point values                       |
     ; .Equals(Point)    Return True if Point and NativePoint have equal values                                          |
     ;                                                                                                                   |
-    ; Remarks           Struct type is updated to the requested type at .Struct() call.                                 |
-    ;                   There is no way to use the + and - operators between Points. Use .plus(p) or .minus(p).         |
+    ; Remarks           To set a struct data type permanently, set the _dt to the preferred type. Point._dt := "Int"    |
+    ;                   There is no way to use the + and - operators between Points. Use: .plus(p) or .minus(p)         |
     ;___________________________________________________________________________________________________________________|
     Class Point
     {
         _type   := "Point"
+        _dt     := "UInt"
         Width   := ""
         Height  := ""
         
@@ -3306,9 +3390,10 @@ Class GDIP
                 , {p1:w, p2:h})
         }
         
-        Show(type="Int")
+        Show(type="")
         {
             ptr := this.Struct()
+            type := (type = "") ? this._dt : type
             MsgBox, % this._type " Object:"
                 . "`nthis.X: "       this.X
                 . "`nthis.Y: "       this.Y
@@ -3326,9 +3411,10 @@ Class GDIP
         
         ; type      Pass expected structure type
         ; Return    Pointer to struct
-        Struct(type="Int")
+        Struct(type="")
         {
-             NumPut(this.X, this.structP+0, 0, type)
+            type := (type = "") ? this._dt : type
+            ,NumPut(this.X, this.structP+0, 0, type)
             ,NumPut(this.Y, this.structP+0, 4, type)
             Return structP+0
         }
@@ -3363,18 +3449,19 @@ Class GDIP
     ; Size(Size)        Set Width to Size.Width and Height to Size.Height                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Return pointer to struct. type = expected data type (Int, Float, ...) No param = Int            |
+    ; .Struct(type)     Create struct with current values and return pointer to it. type can be any 4 byte data type.   |
     ; .Plus(Size)       Return a new Size object with sum of Size and NativeSize values                                 |
     ; .Minus(Size)      Return a new Size object with difference of NativeSize and Size values                          |
     ; .Equals(Size)     Return True if Size and NativeSize have equal values                                            |
     ; .Empty()          Return true if width or height <= 0                                                             |
     ;                                                                                                                   |
-    ; Remarks           Struct type is updated to the requested type at .Struct() call.                                 |
-    ;                   There is no way to use the + and - operators between Sizes. Use .plus(s) or .minus(s).          |
+    ; Remarks           To set a struct data type permanently, set _dt to the preferred type. Size._dt := "Int"         |
+    ;                   There is no way to use the + and - operators between Sizes. Use: .plus(s) or .minus(p)          |
     ;___________________________________________________________________________________________________________________|
     Class Size
     {
         _type   := "Size"
+        _dt     := "UInt"
         Width   := ""
         Height  := ""
         
@@ -3398,9 +3485,10 @@ Class GDIP
                   . "`nFrom another Size: Size(Size)", {p1:w, p2:h})
         }
         
-        Show(type="Int")
+        Show(type="")
         {
             ptr := this.Struct()
+            type := (type = "") ? this._dt : type
             MsgBox, % "Size Object:"
                 . "`nthis.Width: "    this.Width
                 . "`nthis.Height: "   this.Height
@@ -3417,9 +3505,10 @@ Class GDIP
         }
         
         ; type      Pass expected structure type
-        Struct(type="Int")
+        Struct(type="")
         {
-             NumPut(this.Width,  this.structP+0, 0, type)
+            type := (type = "") ? this._dt : type
+            ,NumPut(this.Width,  this.structP+0, 0, type)
             ,NumPut(this.Height, this.structP+0, 4, type)
             Return structP+0
         }
@@ -3448,7 +3537,7 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------.
     ; Rect Class - Represents a rectangle in a 2D coordinate system                                                     |
     ;-------------------------------------------------------------------------------------------------------------------|
-    ; A Rect object contains X, Y, Width, and Height values. It also stores left, right, top, and bottom edge coords.   |
+    ; A Rect object contains X, Y, Width, and Height values as well as left, right, top, and bottom edge coords.        |
     ; Properties:                                                                                                       |
     ; .X                X location                                                                                      |
     ; .Y                Y location                                                                                      |
@@ -3465,7 +3554,7 @@ Class GDIP
     ; Rect(Point, Size) X=Point.X, Y=Point.Y, Width=Size.Width, Height=Size.Height                                      |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Return pointer to struct. type = expected data type (Int, Float, ...). No param = Int.          |
+    ; .Struct(type)     Create struct with current values and return pointer to it. type can be any 4 byte data type.   |
     ; .Clone()          Return new Rect object with copy of NativeRect's values.                                        |
     ; .GetLocation(Point) Store X and Y values of NativeRect into Point object.                                         |
     ; .GetSize(Size)    Store Width and Height values of Rect into Size object.                                         |
@@ -3482,7 +3571,7 @@ Class GDIP
     ; .Inflate(Point)   Increases width by Point.X and Height by Point.Y. Sizes decreases if negative.                  |
     ; .Intersect(Rect)  Update NativeRect values to the intersect values of NativeRect and Rect.                        |
     ; .Intersect(R1, R2 Update ROut values to the intersect values of R1 and R2.                                        |
-    ;           , ROut) Return 1=                                                                                       |
+    ;           , ROut)                                                                                                 |
     ; .IntersectsWith(Rect) Return true if Rect intersects with NativeRect                                              |
     ; .Union(Rect1)     Update NativeRect to the values needed to unionize Rect1 and NativeRect.                        |
     ; .Union(R1, R2     Update RectOut to the values needed to unionize R1 and R2.                                      |
@@ -3495,11 +3584,12 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Class Rect
     {
-         _type   := "Rect"
-        ,X       := Left   := ""
-        ,Y       := Top    := ""
-        ,Width   := Right  := ""
-        ,Height  := Bottom := ""
+         _type  := "Rect"
+        ,_dt    := "UInt"
+        ,X      := Left   := ""
+        ,Y      := Top    := ""
+        ,Width  := Right  := ""
+        ,Height := Bottom := ""
         
         ; ## Constructor ##
         ; Rect()
@@ -3539,18 +3629,20 @@ Class GDIP
         
         ; type      Pass expected structure type
         ; Return    Pointer to struct
-        Struct(type="Int")
+        Struct(type="")
         {
-             NumPut(this.X,      this.structP+0,  0, type)
+            type := (type = "") ? this._dt : type
+            ,NumPut(this.X,      this.structP+0,  0, type)
             ,NumPut(this.Y,      this.structP+0,  4, type)
             ,NumPut(this.Width,  this.structP+0,  8, type)
             ,NumPut(this.Height, this.structP+0, 12, type)
             Return structP+0
         }
         
-        Show(type="Int") ; Used for testing purposes
+        Show(type="") ; Used for testing purposes
         {
             ptr := this.Struct()
+            type := (type = "") ? this._dt : type
             MsgBox, % this._type " object:"
                 . "`nthis.structP: "  this.structP
                 . "`nthis.X: "        this.X
@@ -3640,15 +3732,15 @@ Class GDIP
         Intersect(Rect1, Rect2="", ByRef RectOut="")
         {
             (Rect1._type == "Rect" && Rect2 = "" && RectOut = "") ; Rect object
-                ? (this._set_edge(this.get_max(this.Left  , Rect1.Left  )
-                                 ,this.get_max(this.Top   , Rect1.Top   )
-                                 ,this.get_min(this.Right , Rect1.Right )
-                                 ,this.get_min(this.Bottom, Rect1.Bottom) )
+                ? (this._set_edge(GDIP.get_max(this.Left  , Rect1.Left  )
+                                 ,GDIP.get_max(this.Top   , Rect1.Top   )
+                                 ,GDIP.get_min(this.Right , Rect1.Right )
+                                 ,GDIP.get_min(this.Bottom, Rect1.Bottom) )
                   ,status := !this.IsEmptyArea() )
-                : (RectOut._set_edge(this.get_max(Rect1.Left  , Rect2.Left  )
-                                    ,this.get_max(Rect1.Top   , Rect2.Top   )
-                                    ,this.get_min(Rect1.Right , Rect2.Right )
-                                    ,this.get_min(Rect1.Bottom, Rect2.Bottom) )
+                : (RectOut._set_edge(GDIP.get_max(Rect1.Left  , Rect2.Left  )
+                                    ,GDIP.get_max(Rect1.Top   , Rect2.Top   )
+                                    ,GDIP.get_min(Rect1.Right , Rect2.Right )
+                                    ,GDIP.get_min(Rect1.Bottom, Rect2.Bottom) )
                   ,status := !RectOut.IsEmptyArea() )
             
             Return status
@@ -3666,15 +3758,15 @@ Class GDIP
         Union(Rect1, Rect2="", ByRef RectOut="")
         {
             (Rect1._type == "Rect" && Rect2 = "" && RectOut = "") ; Rect object
-                ? (this._set_edge(this.get_min(this.Left  , Rect1.Left  )
-                                 ,this.get_min(this.Top   , Rect1.Top   )
-                                 ,this.get_max(this.Right , Rect1.Right )
-                                 ,this.get_max(this.Bottom, Rect1.Bottom) )
+                ? (this._set_edge(GDIP.get_min(this.Left  , Rect1.Left  )
+                                 ,GDIP.get_min(this.Top   , Rect1.Top   )
+                                 ,GDIP.get_max(this.Right , Rect1.Right )
+                                 ,GDIP.get_max(this.Bottom, Rect1.Bottom) )
                   ,status := !this.IsEmptyArea() )
-                : (RectOut._set_edge(this.get_min(Rect1.Left  , Rect2.Left  )
-                                    ,this.get_min(Rect1.Top   , Rect2.Top   )
-                                    ,this.get_max(Rect1.Right , Rect2.Right )
-                                    ,this.get_max(Rect1.Bottom, Rect2.Bottom) )
+                : (RectOut._set_edge(GDIP.get_min(Rect1.Left  , Rect2.Left  )
+                                    ,GDIP.get_min(Rect1.Top   , Rect2.Top   )
+                                    ,GDIP.get_max(Rect1.Right , Rect2.Right )
+                                    ,GDIP.get_max(Rect1.Bottom, Rect2.Bottom) )
                   ,status := !this.IsEmptyArea() )
             
             Return status
@@ -4171,9 +4263,22 @@ Class GDIP
             hwnd := this.gui.new_layered_window(A_ScreenWidth, A_ScreenHeight)
             
         }
+        
     }
-    
 }
+
+; Used for performance testing. Also, SKAN is a pretty awesome dude.
+; qpx(1) starts it and qpx() stops timer and returns time
+qpx(N=0) {  ; QueryPerformanceCounter() wrapper originally by SKAN  | Created: 06Dec2009
+    Local   ; My version | Modified: 15Jan2020
+    Static F:="", A:="", Q:="", P:="", X:=""
+    If (N && !P)
+        Return DllCall("QueryPerformanceFrequency",Int64P,F) + (X:=A:=0)
+             + DllCall("QueryPerformanceCounter",Int64P,P)
+    DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
+    Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
+}
+
 
 ; Helpful links:
 ; https://pdfium.googlesource.com/pdfium/+/5110c4743751145c4ae1934cd1d83bc6c55bb43f/core/src/fxge/Microsoft%20SDK/include?autodive=0/
@@ -4407,15 +4512,4 @@ public:
 
 to_hex(num){
     Return Format("{1:#x}", num)
-}
-
-; qpx(1) starts it and qpx() stops timer and returns time
-qpx(N=0) {  ; Wrapper for QueryPerformanceCounter() by SKAN  | CD: 06/Dec/2009
-    Local   ; www.autohotkey.com/forum/viewtopic.php?t=52083 | LM: 10/Dec/2009
-    Static F:="", A:="", Q:="", P:="", X:=""
-    If (N && !P)
-        Return DllCall("QueryPerformanceFrequency",Int64P,F) + (X:=A:=0)
-             + DllCall("QueryPerformanceCounter",Int64P,P)
-    DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
-    Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
 }
