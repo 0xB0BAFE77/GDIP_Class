@@ -60,7 +60,13 @@
         Finished Color Class (ARBG)
         Collected MetaHeader 
         Started on gdiplusimaging
-        
+    20210816
+        Added GUID class
+        Added colormatrix.h info
+        Addded imaging.h info
+            Incomplete
+        Started on effects class
+            This is what spawned the need for a GUID Class
 */
 GDIP.Startup()
 
@@ -2382,6 +2388,15 @@ Class GDIP
     ;####################################################################################################################
     Class Enum
     {
+        Class ColorAdjustType {                 ; Color Adjust Type
+            Static ColorAdjustTypeDefault = 0   ; 
+                 , ColorAdjustTypeBitmap  = 1   ; 
+                 , ColorAdjustTypeBrush   = 2   ; 
+                 , ColorAdjustTypePen     = 3   ; 
+                 , ColorAdjustTypeText    = 4   ; 
+                 , ColorAdjustTypeCount   = 5   ; 
+                 , ColorAdjustTypeAny     = 6 } ; Reserved
+        
         Class ColorChannelFlags {              ; Specifies individual channels in the CMYK (cyan, magenta, yellow, black) color space.
             Static ColorChannelFlagsC    = 0   ; Cyan
                  , ColorChannelFlagsM    = 1   ; Magenta
@@ -3221,6 +3236,23 @@ Class GDIP
                  , WrapModeClamp      = 4   ; No tiling takes place.
         }
     }
+    
+    ;----------------------------------------------------------------------------
+    ; Color matrix
+    Class ColorMatrix
+    {
+        _type   := "ColorMatrix"
+        _dt     := "Float"
+        __New()
+        {
+            this.matrix := {0:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,1:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,2:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,3:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,4:{0:0, 1:0, 2:0, 3:0, 4:0}}
+            Return
+        }
+    }    
     
     ;####################################################################################################################
     ;  Generators                                                                                                       |
@@ -4246,6 +4278,15 @@ Class GDIP
         Return (n1 > n2) ? n1 : n2
     }
     
+    ; Kudos to jNizM and Coco for their posts on GUIDs
+    str_to_guid(guidStr, ByRef guidP)
+    {
+        VarSetCapacity(guidP, 16, 0)
+        DllCall("ole32\CLSIDFromString"
+            , "WStr"    , guidStr
+            , this.PtrA , guidP)
+        Return
+    }
     
     ; ########################################
     ; ##  Testing and Troubleshooting Code  ##
@@ -4261,7 +4302,6 @@ Class GDIP
         show_img(image_p)
         {
             hwnd := this.gui.new_layered_window(A_ScreenWidth, A_ScreenHeight)
-            
         }
         
     }
@@ -4494,22 +4534,69 @@ public:
 
 
 
+/* current code: working on GUID class
+test()
+{
+    g_string := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
+    my guid := new guid(g_string)
+    
+    Return
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-to_hex(num){
-    Return Format("{1:#x}", num)
+; GUID must be 32 hex digits long. Opening/closing brackets {} are optional. Hyphens are optional.
+; Expected form: "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
+Class GUID
+{
+    Static _rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
+         , _rgx_hex  := "[\d|A-F|a-f]+"
+    str     := ""
+    ptr     := ""
+    
+    __New(guid="")
+    {
+        m := ""
+        ,this.SetCapacity("_guid", 16)
+        ,this.ptr := this.GetAddress("_guid")
+        
+        ,(guid = "")
+            ? guid := ComObjCreate("Scriptlet.TypeLib").GUID
+            : err := 1
+        
+        , RegExMatch(guid, this._rgx_guid, m)
+            ?  err := DllCall("ole32\CLSIDFromString"
+                             ,"WStr"  ,(this.str := guid)
+                             ,"Ptr"   ,this.ptr)
+        : RegExMatch(guid, this._rgx_hex)
+            ? err := DllCall("ole32\StringFromCLSID"
+                            ,this.Ptr  ,this.Str
+                            ,this.Ptr   ,(this.ptr := &guid)+0 )
+        : err := 1
+        
+        ,(err)
+            ? this.error_log(A_ThisFunc, "Error creating GUID"
+                , "GUID String`nPointer to GUID"
+                , {guid:guid, str:this.str, ptr:this.ptr})
+            : ""
+    }
+    
+    new_guid()
+    {
+        this.str := 
+        ,this.set_guid(this.str)
+        Return
+    }
+    
+    get_str()
+    {
+        Return this.str
+    }
+    
+    get_GUID()
+    {
+        Return this.ptr+0
+    }
+    
+    error_log(dummy, params, for, testing){
+        Return
+    }
 }
