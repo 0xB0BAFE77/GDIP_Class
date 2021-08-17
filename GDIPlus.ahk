@@ -5083,28 +5083,19 @@ public:
 
 
 
-/* GUID class for generating guids
-#SingleInstance, Force
+/*
+
+#SingleInstance Force
 #Warn
-#NoEnv
-SetBatchLines, -1
-;#Include GDIP_Class\GDIPlus.ahk
-
-if !A_IsAdmin || !(DllCall("GetCommandLine","Str")~=" /restart(?!\S)")
-    Try Run % "*RunAs """ (A_IsCompiled?A_ScriptFullPath """ /restart":A_AhkPath """ /restart """ A_ScriptFullPath """")
-    Finally ExitApp
-test()
-ExitApp
-
-*Esc::ExitApp
 
 test()
 {
     g_string := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
-    my guid := new guid(g_string)
-    
     Return
 }
+ExitApp
+
+*Escape::ExitApp
 
 ; GUID must be 32 hex digits long. Opening/closing brackets {} are optional. Hyphens are optional.
 ; Expected form: "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
@@ -5121,43 +5112,55 @@ Class GUID
         m := ""
         ,this.SetCapacity("_guid", 16)
         ,this.ptr := this.GetAddress("_guid")
-        
-        ,(guid = "")
-            ? guid := ComObjCreate("Scriptlet.TypeLib").GUID
-            : err := 1
-        
-        , RegExMatch(guid, this._rgx_guid, m)
-            ?  err := DllCall("ole32\CLSIDFromString"
-                             ,"WStr"  ,(this.str := guid)
-                             ,"Ptr"   ,this.ptr)
+        ,err := (guid = "")
+            ? this.new_guid()
+        : RegExMatch(guid, this._rgx_guid, m)
+            ? this.set_guid(guid)
         : RegExMatch(guid, this._rgx_hex)
-            ? err := DllCall("ole32\StringFromCLSID"
-                            ,this.Ptr  ,this.Str
-                            ,this.Ptr  ,(this.ptr := &guid)+0)
-        : err := 1
-        
-        ,(err)
-            ? this.error_log(A_ThisFunc, "Error creating GUID"
-                , "GUID String `nPointer to GUID"
-                , {guid:guid, str:this.str, ptr:this.ptr})
-            : ""
+            ? this.set_string(guid)
+        : this.error_log(A_ThisFunc, "Error creating GUID"
+                            ,"GUID String `nPointer to GUID" ,{guid:guid})
     }
     
-    to_string(guid)
+    ; Description       Creates a GUID string using a GUID
+    ; Return            0 = Success, 1 = Failure
+    set_string(guid)
     {
         err := DllCall("ole32\StringFromCLSID"
-                      ,this.Ptr  ,this.Str
-                      ,this.Ptr  ,guid+0)
-        Return ()
+               ,"Ptr"    ,guid+0        ; ,this.Ptr  ,guid+0
+               ,"PtrA"   ,(strP:=""))   ; ,this.PtrA ,strP)
+            
+        (err)
+            ? this.error_log(A_ThisFunc, "Error setting GUID string"
+                , "Pointer to GUID", {guid:guid})
+            : this.str := StrGet(strP, "UTF-16")
+        
+        Return err
+    }
+    
+    ; Description       Creates a GUID using a GUID string
+    ; Return            0 = Success, 1 = Failure
+    set_guid(str)
+    {
+        this.SetCapacity("_guid", 16)
+        , this.ptr := this.GetAddress("_guid")
+        err := DllCall("ole32\CLSIDFromString"
+                      ,"WStr"  , str
+                      ,"Ptr"   , this.ptr+0)
+        Return (err) ? 1 : 0
+    }
+    
+    new_guid()
+    {
+        this.str := ComObjCreate("Scriptlet.TypeLib").GUID
+        ,this.set_guid(this.str)
+        Return 0
     }
     
     string[]
     {
         get {
             Return this.str
-        }
-        set {
-            Return
         }
     }
     
@@ -5166,9 +5169,11 @@ Class GUID
         get {
             Return this.ptr
         }
-        set {
-            Return
-        }
+    }
+    
+    __Delete()
+    {
+        Return
     }
     
     error_log(dummy, params, for, testing){
@@ -5177,34 +5182,6 @@ Class GUID
 }
 
 
-Rounding_Mindfuck()
-{
-    percent := 50
-    x := 255 * percent / 100
-    y := 255 / 100 * percent
-    MsgBox, % "Percent = " percent
-            . "`nvar`tRounded`tFormula"
-            . "`nx`t" Round(x) "`t255 * percent / 100"
-            . "`ny`t" Round(y) "`t255 / 100 * percent"
-            
-    ;MsgBox, % "x: " x "`nRounded`nx: " Round(x) "`ny: " y "`ny: "Round(y)
-    Return
-}
-
-to_hex(num){
-    Return Format("{1:#x}", num)
-}
-
-; qpx(1) starts it and qpx() stops timer and returns time
-qpx(N=0) {  ; Wrapper for QueryPerformanceCounter() by SKAN  | CD: 06/Dec/2009
-    Local   ; www.autohotkey.com/forum/viewtopic.php?t=52083 | LM: 10/Dec/2009
-    Static F:="", A:="", Q:="", P:="", X:=""
-    If (N && !P)
-        Return DllCall("QueryPerformanceFrequency",Int64P,F) + (X:=A:=0)
-             + DllCall("QueryPerformanceCounter",Int64P,P)
-    DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
-    Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
-}
 
 
 
@@ -5683,4 +5660,3 @@ public:
 #pragma endregion
 
 #endif
-
