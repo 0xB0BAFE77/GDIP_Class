@@ -2382,19 +2382,19 @@ Class GDIP
         
         ;~ The Graphics::TranslateTransform method updates this Graphics object's world transformation matrix with the product of itself and a translation matrix.
     }
-
+    
     ;####################################################################################################################
     ;  Enumerations (Enum)                                                                                              |
     ;####################################################################################################################
     Class Enum
     {
-        Class ColorAdjustType {                 ; Color Adjust Type
-            Static ColorAdjustTypeDefault = 0   ; 
-                 , ColorAdjustTypeBitmap  = 1   ; 
-                 , ColorAdjustTypeBrush   = 2   ; 
-                 , ColorAdjustTypePen     = 3   ; 
-                 , ColorAdjustTypeText    = 4   ; 
-                 , ColorAdjustTypeCount   = 5   ; 
+        Class ColorAdjustType {                 ; Specifies which GDI+ objects the color adjustment information is for
+            Static ColorAdjustTypeDefault = 0   ; Default GDI+ object color adjustment for all 
+                 , ColorAdjustTypeBitmap  = 1   ; Color adjustment for Bitmap objects
+                 , ColorAdjustTypeBrush   = 2   ; Color adjustment for Brush objects
+                 , ColorAdjustTypePen     = 3   ; Color adjustment for Pen objects
+                 , ColorAdjustTypeText    = 4   ; Color adjustment for Text objects
+                 , ColorAdjustTypeCount   = 5   ; Number of types specified
                  , ColorAdjustTypeAny     = 6 } ; Reserved
         
         Class ColorChannelFlags {              ; Specifies individual channels in the CMYK (cyan, magenta, yellow, black) color space.
@@ -2405,9 +2405,9 @@ Class GDIP
                  , ColorChannelFlagsLast = 4   ; Undefined
         }
         
-        Class ColorMode {                ; 
-            Static ColorModeARGB32 = 0   ;
-                 , ColorModeARGB64 = 1   ;
+        Class ColorMode {                ; Specifies two modes for color component values
+            Static ColorModeARGB32 = 0   ; Integer values supplied are 32-bit
+                 , ColorModeARGB64 = 1   ; Integer values supplied are 64-bit
         }
         
         Class ColorMatrixFlags {                   ; Specifies the types of images and colors that will be affected by the color and grayscale adjustment settings of an ImageAttributes object.
@@ -2504,272 +2504,272 @@ Class GDIP
                  , DriverStringOptionsLimitSubpixel   = 8   ; Less memory should be used for cache of antialiased glyphs.
         }
         
-        Class EmfPlusRecordType {                                    ; Identifies metafile record types used in Windows Metafile Format (WMF), Enhanced Metafile (EMF), and EMF+ files. 
-            Static WmfRecordTypeSetBkColor                  = 16897  ; TBD
-                 , WmfRecordTypeSetBkMode                   = 16642  ; TBD
-                 , WmfRecordTypeSetMapMode                  = 16643  ; TBD
-                 , WmfRecordTypeSetROP2                     = 16644  ; TBD
-                 , WmfRecordTypeSetRelAbs                   = 16645  ; TBD
-                 , WmfRecordTypeSetPolyFillMode             = 16646  ; TBD
-                 , WmfRecordTypeSetStretchBltMode           = 16647  ; TBD
-                 , WmfRecordTypeSetTextCharExtra            = 16648  ; TBD
-                 , WmfRecordTypeSetTextColor                = 16905  ; TBD
-                 , WmfRecordTypeSetTextJustification        = 16906  ; TBD
-                 , WmfRecordTypeSetWindowOrg                = 16907  ; TBD
-                 , WmfRecordTypeSetWindowExt                = 16908  ; TBD
-                 , WmfRecordTypeSetViewportOrg              = 16909  ; TBD
-                 , WmfRecordTypeSetViewportExt              = 16910  ; TBD
-                 , WmfRecordTypeOffsetWindowOrg             = 16911  ; TBD
-                 , WmfRecordTypeScaleWindowExt              = 17424  ; TBD
-                 , WmfRecordTypeOffsetViewportOrg           = 16913  ; TBD
-                 , WmfRecordTypeScaleViewportExt            = 17426  ; TBD
-                 , WmfRecordTypeLineTo                      = 16915  ; TBD
-                 , WmfRecordTypeMoveTo                      = 16916  ; TBD
-                 , WmfRecordTypeExcludeClipRect             = 17429  ; TBD
-                 , WmfRecordTypeIntersectClipRect           = 17430  ; TBD
-                 , WmfRecordTypeArc                         = 18455  ; TBD
-                 , WmfRecordTypeEllipse                     = 17432  ; TBD
-                 , WmfRecordTypeFloodFill                   = 17433  ; TBD
-                 , WmfRecordTypePie                         = 18458  ; TBD
-                 , WmfRecordTypeRectangle                   = 17435  ; TBD
-                 , WmfRecordTypeRoundRect                   = 17948  ; TBD
-                 , WmfRecordTypePatBlt                      = 17949  ; TBD
-                 , WmfRecordTypeSaveDC                      = 16414  ; TBD
-                 , WmfRecordTypeSetPixel                    = 17439  ; TBD
-                 , WmfRecordTypeOffsetClipRgn               = 16928  ; TBD
-                 , WmfRecordTypeTextOut                     = 17697  ; TBD
-                 , WmfRecordTypeBitBlt                      = 18722  ; TBD
-                 , WmfRecordTypeStretchBlt                  = 19235  ; TBD
-                 , WmfRecordTypePolygon                     = 17188  ; TBD
-                 , WmfRecordTypePolyline                    = 17189  ; TBD
-                 , WmfRecordTypeEscape                      = 17958  ; TBD
-                 , WmfRecordTypeRestoreDC                   = 16679  ; TBD
-                 , WmfRecordTypeFillRegion                  = 16936  ; TBD
-                 , WmfRecordTypeFrameRegion                 = 17449  ; TBD
-                 , WmfRecordTypeInvertRegion                = 16682  ; TBD
-                 , WmfRecordTypePaintRegion                 = 16683  ; TBD
-                 , WmfRecordTypeSelectClipRegion            = 16684  ; TBD
-                 , WmfRecordTypeSelectObject                = 16685  ; TBD
-                 , WmfRecordTypeSetTextAlign                = 16686  ; TBD
-                 , WmfRecordTypeDrawText                    = 17967  ; TBD
-                 , WmfRecordTypeChord                       = 18480  ; TBD
-                 , WmfRecordTypeSetMapperFlags              = 16945  ; TBD
-                 , WmfRecordTypeExtTextOut                  = 18994  ; TBD
-            Static WmfRecordTypeSetDIBToDev                 = 19763  ; TBD
-                 , WmfRecordTypeSelectPalette               = 16948  ; TBD
-                 , WmfRecordTypeRealizePalette              = 16437  ; TBD
-                 , WmfRecordTypeAnimatePalette              = 17462  ; TBD
-                 , WmfRecordTypeSetPalEntries               = 16439  ; TBD
-                 , WmfRecordTypePolyPolygon                 = 17720  ; TBD
-                 , WmfRecordTypeResizePalette               = 16697  ; TBD
-                 , WmfRecordTypeDIBBitBlt                   = 18752  ; TBD
-                 , WmfRecordTypeDIBStretchBlt               = 19265  ; TBD
-                 , WmfRecordTypeDIBCreatePatternBrush       = 16706  ; TBD
-                 , WmfRecordTypeStretchDIB                  = 20291  ; TBD
-                 , WmfRecordTypeExtFloodFill                = 17736  ; TBD
-                 , WmfRecordTypeSetLayout                   = 16713  ; TBD
-                 , WmfRecordTypeResetDC                     = 16716  ; TBD
-                 , WmfRecordTypeStartDoc                    = 16717  ; TBD
-                 , WmfRecordTypeStartPage                   = 16463  ; TBD
-                 , WmfRecordTypeEndPage                     = 16464  ; TBD
-                 , WmfRecordTypeAbortDoc                    = 16466  ; TBD
-                 , WmfRecordTypeEndDoc                      = 16478  ; TBD
-                 , WmfRecordTypeDeleteObject                = 16880  ; TBD
-                 , WmfRecordTypeCreatePalette               = 16631  ; TBD
-                 , WmfRecordTypeCreateBrush                 = 16632  ; TBD
-                 , WmfRecordTypeCreatePatternBrush          = 16889  ; TBD
-                 , WmfRecordTypeCreatePenIndirect           = 17146  ; TBD
-                 , WmfRecordTypeCreateFontIndirect          = 17147  ; TBD
-                 , WmfRecordTypeCreateBrushIndirect         = 17148  ; TBD
-                 , WmfRecordTypeCreateBitmapIndirect        = 17149  ; TBD
-                 , WmfRecordTypeCreateBitmap                = 18174  ; TBD
-                 , WmfRecordTypeCreateRegion                = 18175  ; TBD
-                 , EmfRecordTypeHeader                      = 1      ; TBD
-                 , EmfRecordTypePolyBezier                  = 2      ; TBD
-                 , EmfRecordTypePolygon                     = 3      ; TBD
-                 , EmfRecordTypePolyline                    = 4      ; TBD
-                 , EmfRecordTypePolyBezierTo                = 5      ; TBD
-                 , EmfRecordTypePolyLineTo                  = 6      ; TBD
-                 , EmfRecordTypePolyPolyline                = 7      ; TBD
-                 , EmfRecordTypePolyPolygon                 = 8      ; TBD
-                 , EmfRecordTypeSetWindowExtEx              = 9      ; TBD
-                 , EmfRecordTypeSetWindowOrgEx              = 10     ; TBD
-                 , EmfRecordTypeSetViewportExtEx            = 11     ; TBD
-                 , EmfRecordTypeSetViewportOrgEx            = 12     ; TBD
-                 , EmfRecordTypeSetBrushOrgEx               = 13     ; TBD
-                 , EmfRecordTypeEOF                         = 14     ; TBD
-                 , EmfRecordTypeSetPixelV                   = 15     ; TBD
-                 , EmfRecordTypeSetMapperFlags              = 16     ; TBD
-                 , EmfRecordTypeSetMapMode                  = 17     ; TBD
-                 , EmfRecordTypeSetBkMode                   = 18     ; TBD
-                 , EmfRecordTypeSetPolyFillMode             = 19     ; TBD
-                 , EmfRecordTypeSetROP2                     = 20     ; TBD
-                 , EmfRecordTypeSetStretchBltMode           = 21     ; TBD
-            Static EmfRecordTypeSetTextAlign                = 22     ; TBD
-                 , EmfRecordTypeSetColorAdjustment          = 23     ; TBD
-                 , EmfRecordTypeSetTextColor                = 24     ; TBD
-                 , EmfRecordTypeSetBkColor                  = 25     ; TBD
-                 , EmfRecordTypeOffsetClipRgn               = 26     ; TBD
-                 , EmfRecordTypeMoveToEx                    = 27     ; TBD
-                 , EmfRecordTypeSetMetaRgn                  = 28     ; TBD
-                 , EmfRecordTypeExcludeClipRect             = 29     ; TBD
-                 , EmfRecordTypeIntersectClipRect           = 30     ; TBD
-                 , EmfRecordTypeScaleViewportExtEx          = 31     ; TBD
-                 , EmfRecordTypeScaleWindowExtEx            = 32     ; TBD
-                 , EmfRecordTypeSaveDC                      = 33     ; TBD
-                 , EmfRecordTypeRestoreDC                   = 34     ; TBD
-                 , EmfRecordTypeSetWorldTransform           = 35     ; TBD
-                 , EmfRecordTypeModifyWorldTransform        = 36     ; TBD
-                 , EmfRecordTypeSelectObject                = 37     ; TBD
-                 , EmfRecordTypeCreatePen                   = 38     ; TBD
-                 , EmfRecordTypeCreateBrushIndirect         = 39     ; TBD
-                 , EmfRecordTypeDeleteObject                = 40     ; TBD
-                 , EmfRecordTypeAngleArc                    = 41     ; TBD
-                 , EmfRecordTypeEllipse                     = 42     ; TBD
-                 , EmfRecordTypeRectangle                   = 43     ; TBD
-                 , EmfRecordTypeRoundRect                   = 44     ; TBD
-                 , EmfRecordTypeArc                         = 45     ; TBD
-                 , EmfRecordTypeChord                       = 46     ; TBD
-                 , EmfRecordTypePie                         = 47     ; TBD
-                 , EmfRecordTypeSelectPalette               = 48     ; TBD
-                 , EmfRecordTypeCreatePalette               = 49     ; TBD
-                 , EmfRecordTypeSetPaletteEntries           = 50     ; TBD
-                 , EmfRecordTypeResizePalette               = 51     ; TBD
-                 , EmfRecordTypeRealizePalette              = 52     ; TBD
-                 , EmfRecordTypeExtFloodFill                = 53     ; TBD
-                 , EmfRecordTypeLineTo                      = 54     ; TBD
-                 , EmfRecordTypeArcTo                       = 55     ; TBD
-                 , EmfRecordTypePolyDraw                    = 56     ; TBD
-                 , EmfRecordTypeSetArcDirection             = 57     ; TBD
-                 , EmfRecordTypeSetMiterLimit               = 58     ; TBD
-                 , EmfRecordTypeBeginPath                   = 59     ; TBD
-                 , EmfRecordTypeEndPath                     = 60     ; TBD
-                 , EmfRecordTypeCloseFigure                 = 61     ; TBD
-                 , EmfRecordTypeFillPath                    = 62     ; TBD
-                 , EmfRecordTypeStrokeAndFillPath           = 63     ; TBD
-                 , EmfRecordTypeStrokePath                  = 64     ; TBD
-                 , EmfRecordTypeFlattenPath                 = 65     ; TBD
-                 , EmfRecordTypeWidenPath                   = 66     ; TBD
-                 , EmfRecordTypeSelectClipPath              = 67     ; TBD
-                 , EmfRecordTypeAbortPath                   = 68     ; TBD
-                 , EmfRecordTypeReserved_069                = 69     ; TBD
-                 , EmfRecordTypeGdiComment                  = 70     ; TBD
-                 , EmfRecordTypeFillRgn                     = 71     ; TBD
-            Static EmfRecordTypeFrameRgn                    = 72     ; TBD
-                 , EmfRecordTypeInvertRgn                   = 73     ; TBD
-                 , EmfRecordTypePaintRgn                    = 74     ; TBD
-                 , EmfRecordTypeExtSelectClipRgn            = 75     ; TBD
-                 , EmfRecordTypeBitBlt                      = 76     ; TBD
-                 , EmfRecordTypeStretchBlt                  = 77     ; TBD
-                 , EmfRecordTypeMaskBlt                     = 78     ; TBD
-                 , EmfRecordTypePlgBlt                      = 79     ; TBD
-                 , EmfRecordTypeSetDIBitsToDevice           = 80     ; TBD
-                 , EmfRecordTypeStretchDIBits               = 81     ; TBD
-                 , EmfRecordTypeExtCreateFontIndirect       = 82     ; TBD
-                 , EmfRecordTypeExtTextOutA                 = 83     ; TBD
-                 , EmfRecordTypeExtTextOutW                 = 84     ; TBD
-                 , EmfRecordTypePolyBezier16                = 85     ; TBD
-                 , EmfRecordTypePolygon16                   = 86     ; TBD
-                 , EmfRecordTypePolyline16                  = 87     ; TBD
-                 , EmfRecordTypePolyBezierTo16              = 88     ; TBD
-                 , EmfRecordTypePolylineTo16                = 89     ; TBD
-                 , EmfRecordTypePolyPolyline16              = 90     ; TBD
-                 , EmfRecordTypePolyPolygon16               = 91     ; TBD
-                 , EmfRecordTypePolyDraw16                  = 92     ; TBD
-                 , EmfRecordTypeCreateMonoBrush             = 93     ; TBD
-                 , EmfRecordTypeCreateDIBPatternBrushPt     = 94     ; TBD
-                 , EmfRecordTypeExtCreatePen                = 95     ; TBD
-                 , EmfRecordTypePolyTextOutA                = 96     ; TBD
-                 , EmfRecordTypePolyTextOutW                = 97     ; TBD
-                 , EmfRecordTypeSetICMMode                  = 98     ; TBD
-                 , EmfRecordTypeCreateColorSpace            = 99     ; TBD
-                 , EmfRecordTypeSetColorSpace               = 100    ; TBD
-                 , EmfRecordTypeDeleteColorSpace            = 101    ; TBD
-                 , EmfRecordTypeGLSRecord                   = 102    ; TBD
-                 , EmfRecordTypeGLSBoundedRecord            = 103    ; TBD
-                 , EmfRecordTypePixelFormat                 = 104    ; TBD
-                 , EmfRecordTypeDrawEscape                  = 105    ; TBD
-                 , EmfRecordTypeExtEscape                   = 106    ; TBD
-                 , EmfRecordTypeStartDoc                    = 107    ; TBD
-                 , EmfRecordTypeSmallTextOut                = 108    ; TBD
-                 , EmfRecordTypeForceUFIMapping             = 109    ; TBD
-                 , EmfRecordTypeNamedEscape                 = 110    ; TBD
-                 , EmfRecordTypeColorCorrectPalette         = 111    ; TBD
-                 , EmfRecordTypeSetICMProfileA              = 112    ; TBD
-                 , EmfRecordTypeSetICMProfileW              = 113    ; TBD
-                 , EmfRecordTypeAlphaBlend                  = 114    ; TBD
-                 , EmfRecordTypeSetLayout                   = 115    ; TBD
-                 , EmfRecordTypeTransparentBlt              = 116    ; TBD
-                 , EmfRecordTypeReserved_117                = 117    ; TBD
-                 , EmfRecordTypeGradientFill                = 118    ; TBD
-                 , EmfRecordTypeSetLinkedUFIs               = 119    ; TBD
-                 , EmfRecordTypeSetTextJustification        = 120    ; TBD
-                 , EmfRecordTypeColorMatchToTargetW         = 121    ; TBD
-            Static EmfRecordTypeCreateColorSpaceW           = 122    ; TBD
-                 , EmfRecordTypeMax                         = 122    ; TBD
-                 , EmfRecordTypeMin                         = 1      ; TBD
-                 , EmfPlusRecordTypeInvalid                 = 16384  ; TBD
-                 , EmfPlusRecordTypeHeader                  = 16385  ; Identifies a record that is the EMF+ header.
-                 , EmfPlusRecordTypeEndOfFile               = 16386  ; Identifies a record that marks the last EMF+ record of a metafile.
-                 , EmfPlusRecordTypeComment                 = 16387  ; this.Graphics.AddMetafileComment()
-                 , EmfPlusRecordTypeGetDC                   = 16388  ; this.Graphics.GetHDC()
-                 , EmfPlusRecordTypeMultiFormatStart        = 16389  ; Identifies the start of a multiple-format block.
-                 , EmfPlusRecordTypeMultiFormatSection      = 16390  ; Identifies a section in a multiple-format block.
-                 , EmfPlusRecordTypeMultiFormatEnd          = 16391  ; Identifies the end of a multiple-format block.
-                 , EmfPlusRecordTypeObject                  = 16392  ; TBD
-                 , EmfPlusRecordTypeClear                   = 16393  ; this.Graphics.Clear()
-                 , EmfPlusRecordTypeFillRects               = 16394  ; FillRectangles Methods
-                 , EmfPlusRecordTypeDrawRects               = 16395  ; DrawRectangles Methods
-                 , EmfPlusRecordTypeFillPolygon             = 16396  ; FillPolygon Methods
-                 , EmfPlusRecordTypeDrawLines               = 16397  ; DrawLines Methods
-                 , EmfPlusRecordTypeFillEllipse             = 16398  ; FillEllipse Methods
-                 , EmfPlusRecordTypeDrawEllipse             = 16399  ; DrawEllipse Methods
-                 , EmfPlusRecordTypeFillPie                 = 16400  ; FillPie Methods
-                 , EmfPlusRecordTypeDrawPie                 = 16401  ; DrawPie Methods
-                 , EmfPlusRecordTypeDrawArc                 = 16402  ; DrawArc Methods
-                 , EmfPlusRecordTypeFillRegion              = 16403  ; this.Graphics.()
-                 , EmfPlusRecordTypeFillPath                = 16404  ; this.Graphics.()
-                 , EmfPlusRecordTypeDrawPath                = 16405  ; this.Graphics.()
-                 , EmfPlusRecordTypeFillClosedCurve         = 16406  ; FillClosedCurve Methods
-                 , EmfPlusRecordTypeDrawClosedCurve         = 16407  ; DrawClosedCurve Methods
-                 , EmfPlusRecordTypeDrawCurve               = 16408  ; DrawCurve Methods
-                 , EmfPlusRecordTypeDrawBeziers             = 16409  ; DrawBeziers Methods
-                 , EmfPlusRecordTypeDrawImage               = 16410  ; DrawImage Methods
-                 , EmfPlusRecordTypeDrawImagePoints         = 16411  ; DrawImage Methods (destination point arrays)
-                 , EmfPlusRecordTypeDrawString              = 16412  ; DrawString Methods
-                 , EmfPlusRecordTypeSetRenderingOrigin      = 16413  ; this.Graphics.SetRenderingOrigin()
-                 , EmfPlusRecordTypeSetAntiAliasMode        = 16414  ; this.Graphics.SetSmoothingMode()
-                 , EmfPlusRecordTypeSetTextRenderingHint    = 16415  ; this.Graphics.SetTextRenderingHint()
-                 , EmfPlusRecordTypeSetTextContrast         = 16416  ; this.Graphics.SetTextContrast()
-                 , EmfPlusRecordTypeSetInterpolationMode    = 16417  ; this.Graphics.SetInterpolationMode()
-                 , EmfPlusRecordTypeSetPixelOffsetMode      = 16418  ; this.Graphics.SetPixelOffsetMode()
-                 , EmfPlusRecordTypeSetCompositingMode      = 16419  ; this.Graphics.SetCompositingMode()
-                 , EmfPlusRecordTypeSetCompositingQuality   = 16420  ; this.Graphics.SetCompositingQuality()
-                 , EmfPlusRecordTypeSave                    = 16421  ; this.Graphics.Save()
-                 , EmfPlusRecordTypeRestore                 = 16422  ; this.Graphics.Restore()
-                 , EmfPlusRecordTypeBeginContainer          = 16423  ; this.Graphics.BeginContainer()
-                 , EmfPlusRecordTypeBeginContainerNoParams  = 16424  ; this.Graphics.BeginContainer()
-                 , EmfPlusRecordTypeEndContainer            = 16425  ; this.Graphics.EndContainer()
-                 , EmfPlusRecordTypeSetWorldTransform       = 16426  ; this.Graphics.SetTransform()
-                 , EmfPlusRecordTypeResetWorldTransform     = 16427  ; this.Graphics.ResetTransform()
-                 , EmfPlusRecordTypeMultiplyWorldTransform  = 16428  ; this.Graphics.MultiplyTransform()
-                 , EmfPlusRecordTypeTranslateWorldTransform = 16429  ; this.Graphics.TranslateTransform()
-                 , EmfPlusRecordTypeScaleWorldTransform     = 16430  ; this.Graphics.ScaleTransform()
-            Static EmfPlusRecordTypeRotateWorldTransform    = 16431  ; this.Graphics.RotateTransform()
-                 , EmfPlusRecordTypeSetPageTransform        = 16432  ; this.Graphics.SetPageScale() and this.Graphics.SetPageUnit()
-                 , EmfPlusRecordTypeResetClip               = 16433  ; this.Graphics.ResetClip()
-                 , EmfPlusRecordTypeSetClipRect             = 16434  ; this.Graphics.SetClip()
-                 , EmfPlusRecordTypeSetClipPath             = 16435  ; this.Graphics.SetClip()
-                 , EmfPlusRecordTypeSetClipRegion           = 16436  ; this.Graphics.SetClip()
-                 , EmfPlusRecordTypeOffsetClip              = 16437  ; TranslateClip Methods
-                 , EmfPlusRecordTypeDrawDriverString        = 16438  ; this.Graphics.DrawDriverString()
-                 , EmfPlusRecordTypeStrokeFillPath          = 16439  ; TBD
-                 , EmfPlusRecordTypeSerializableObject      = 16440  ; TBD
-                 , EmfPlusRecordTypeSetTSGraphics           = 16441  ; TBD
-                 , EmfPlusRecordTypeSetTSClip               = 16442  ; TBD
-                 , EmfPlusRecordTotal                       = 16443  ; TBD
-                 , EmfPlusRecordTypeMax                     = -1     ; TBD
-                 , EmfPlusRecordTypeMin                     = 16385  ; TBD
+        Class EmfPlusRecordType {                                     ; Identifies metafile record types used in Windows Metafile Format (WMF), Enhanced Metafile (EMF), and EMF+ files. 
+            Static EmfPlusRecordTypeMax                     = -1      ; TBD 
+                 , EmfRecordTypeMin                         = 1       ; TBD 
+                 , EmfRecordTypeHeader                      = 1       ; TBD 
+                 , EmfRecordTypePolyBezier                  = 2       ; TBD 
+                 , EmfRecordTypePolygon                     = 3       ; TBD 
+                 , EmfRecordTypePolyline                    = 4       ; TBD 
+                 , EmfRecordTypePolyBezierTo                = 5       ; TBD 
+                 , EmfRecordTypePolyLineTo                  = 6       ; TBD 
+                 , EmfRecordTypePolyPolyline                = 7       ; TBD 
+                 , EmfRecordTypePolyPolygon                 = 8       ; TBD 
+                 , EmfRecordTypeSetWindowExtEx              = 9       ; TBD 
+                 , EmfRecordTypeSetWindowOrgEx              = 10      ; TBD           
+                 , EmfRecordTypeSetViewportExtEx            = 11      ; TBD           
+                 , EmfRecordTypeSetViewportOrgEx            = 12      ; TBD           
+                 , EmfRecordTypeSetBrushOrgEx               = 13      ; TBD 
+                 , EmfRecordTypeEOF                         = 14      ; TBD 
+                 , EmfRecordTypeSetPixelV                   = 15      ; TBD 
+                 , EmfRecordTypeSetMapperFlags              = 16      ; TBD           
+                 , EmfRecordTypeSetMapMode                  = 17      ; TBD 
+                 , EmfRecordTypeSetBkMode                   = 18      ; TBD 
+                 , EmfRecordTypeSetPolyFillMode             = 19      ; TBD           
+                 , EmfRecordTypeSetROP2                     = 20      ; TBD 
+                 , EmfRecordTypeSetStretchBltMode           = 21      ; TBD           
+                 , EmfRecordTypeSetTextAlign                = 22      ; TBD 
+                 , EmfRecordTypeSetColorAdjustment          = 23      ; TBD           
+                 , EmfRecordTypeSetTextColor                = 24      ; TBD 
+                 , EmfRecordTypeSetBkColor                  = 25      ; TBD 
+                 , EmfRecordTypeOffsetClipRgn               = 26      ; TBD 
+                 , EmfRecordTypeMoveToEx                    = 27      ; TBD 
+                 , EmfRecordTypeSetMetaRgn                  = 28      ; TBD 
+                 , EmfRecordTypeExcludeClipRect             = 29      ; TBD           
+                 , EmfRecordTypeIntersectClipRect           = 30      ; TBD           
+                 , EmfRecordTypeScaleViewportExtEx          = 31      ; TBD           
+                 , EmfRecordTypeScaleWindowExtEx            = 32      ; TBD           
+                 , EmfRecordTypeSaveDC                      = 33      ; TBD 
+                 , EmfRecordTypeRestoreDC                   = 34      ; TBD 
+                 , EmfRecordTypeSetWorldTransform           = 35      ; TBD           
+                 , EmfRecordTypeModifyWorldTransform        = 36      ; TBD           
+                 , EmfRecordTypeSelectObject                = 37      ; TBD 
+                 , EmfRecordTypeCreatePen                   = 38      ; TBD 
+                 , EmfRecordTypeCreateBrushIndirect         = 39      ; TBD           
+                 , EmfRecordTypeDeleteObject                = 40      ; TBD 
+                 , EmfRecordTypeAngleArc                    = 41      ; TBD 
+                 , EmfRecordTypeEllipse                     = 42      ; TBD 
+                 , EmfRecordTypeRectangle                   = 43      ; TBD 
+                 , EmfRecordTypeRoundRect                   = 44      ; TBD 
+                 , EmfRecordTypeArc                         = 45      ; TBD 
+                 , EmfRecordTypeChord                       = 46      ; TBD 
+                 , EmfRecordTypePie                         = 47      ; TBD 
+                 , EmfRecordTypeSelectPalette               = 48      ; TBD 
+            Static EmfRecordTypeCreatePalette               = 49      ; TBD 
+                 , EmfRecordTypeSetPaletteEntries           = 50      ; TBD           
+                 , EmfRecordTypeResizePalette               = 51      ; TBD 
+                 , EmfRecordTypeRealizePalette              = 52      ; TBD           
+                 , EmfRecordTypeExtFloodFill                = 53      ; TBD 
+                 , EmfRecordTypeLineTo                      = 54      ; TBD 
+                 , EmfRecordTypeArcTo                       = 55      ; TBD 
+                 , EmfRecordTypePolyDraw                    = 56      ; TBD 
+                 , EmfRecordTypeSetArcDirection             = 57      ; TBD           
+                 , EmfRecordTypeSetMiterLimit               = 58      ; TBD 
+                 , EmfRecordTypeBeginPath                   = 59      ; TBD 
+                 , EmfRecordTypeEndPath                     = 60      ; TBD 
+                 , EmfRecordTypeCloseFigure                 = 61      ; TBD 
+                 , EmfRecordTypeFillPath                    = 62      ; TBD 
+                 , EmfRecordTypeStrokeAndFillPath           = 63      ; TBD           
+                 , EmfRecordTypeStrokePath                  = 64      ; TBD 
+                 , EmfRecordTypeFlattenPath                 = 65      ; TBD 
+                 , EmfRecordTypeWidenPath                   = 66      ; TBD 
+                 , EmfRecordTypeSelectClipPath              = 67      ; TBD           
+                 , EmfRecordTypeAbortPath                   = 68      ; TBD 
+                 , EmfRecordTypeReserved_069                = 69      ; TBD 
+                 , EmfRecordTypeGdiComment                  = 70      ; TBD 
+                 , EmfRecordTypeFillRgn                     = 71      ; TBD 
+                 , EmfRecordTypeFrameRgn                    = 72      ; TBD 
+                 , EmfRecordTypeInvertRgn                   = 73      ; TBD 
+                 , EmfRecordTypePaintRgn                    = 74      ; TBD 
+                 , EmfRecordTypeExtSelectClipRgn            = 75      ; TBD           
+                 , EmfRecordTypeBitBlt                      = 76      ; TBD 
+                 , EmfRecordTypeStretchBlt                  = 77      ; TBD 
+                 , EmfRecordTypeMaskBlt                     = 78      ; TBD 
+                 , EmfRecordTypePlgBlt                      = 79      ; TBD 
+                 , EmfRecordTypeSetDIBitsToDevice           = 80      ; TBD           
+                 , EmfRecordTypeStretchDIBits               = 81      ; TBD 
+                 , EmfRecordTypeExtCreateFontIndirect       = 82      ; TBD           
+                 , EmfRecordTypeExtTextOutA                 = 83      ; TBD 
+                 , EmfRecordTypeExtTextOutW                 = 84      ; TBD 
+                 , EmfRecordTypePolyBezier16                = 85      ; TBD 
+                 , EmfRecordTypePolygon16                   = 86      ; TBD 
+                 , EmfRecordTypePolyline16                  = 87      ; TBD 
+                 , EmfRecordTypePolyBezierTo16              = 88      ; TBD           
+                 , EmfRecordTypePolylineTo16                = 89      ; TBD 
+                 , EmfRecordTypePolyPolyline16              = 90      ; TBD           
+                 , EmfRecordTypePolyPolygon16               = 91      ; TBD 
+                 , EmfRecordTypePolyDraw16                  = 92      ; TBD 
+                 , EmfRecordTypeCreateMonoBrush             = 93      ; TBD           
+                 , EmfRecordTypeCreateDIBPatternBrushPt     = 94      ; TBD           
+                 , EmfRecordTypeExtCreatePen                = 95      ; TBD 
+                 , EmfRecordTypePolyTextOutA                = 96      ; TBD 
+                 , EmfRecordTypePolyTextOutW                = 97      ; TBD 
+                 , EmfRecordTypeSetICMMode                  = 98      ; TBD 
+            Static EmfRecordTypeCreateColorSpace            = 99      ; TBD           
+                 , EmfRecordTypeSetColorSpace               = 100     ; TBD           
+                 , EmfRecordTypeDeleteColorSpace            = 101     ; TBD           
+                 , EmfRecordTypeGLSRecord                   = 102     ; TBD 
+                 , EmfRecordTypeGLSBoundedRecord            = 103     ; TBD           
+                 , EmfRecordTypePixelFormat                 = 104     ; TBD 
+                 , EmfRecordTypeDrawEscape                  = 105     ; TBD 
+                 , EmfRecordTypeExtEscape                   = 106     ; TBD 
+                 , EmfRecordTypeStartDoc                    = 107     ; TBD 
+                 , EmfRecordTypeSmallTextOut                = 108     ; TBD 
+                 , EmfRecordTypeForceUFIMapping             = 109     ; TBD           
+                 , EmfRecordTypeNamedEscape                 = 110     ; TBD 
+                 , EmfRecordTypeColorCorrectPalette         = 111     ; TBD           
+                 , EmfRecordTypeSetICMProfileA              = 112     ; TBD           
+                 , EmfRecordTypeSetICMProfileW              = 113     ; TBD           
+                 , EmfRecordTypeAlphaBlend                  = 114     ; TBD 
+                 , EmfRecordTypeSetLayout                   = 115     ; TBD 
+                 , EmfRecordTypeTransparentBlt              = 116     ; TBD           
+                 , EmfRecordTypeReserved_117                = 117     ; TBD 
+                 , EmfRecordTypeGradientFill                = 118     ; TBD 
+                 , EmfRecordTypeSetLinkedUFIs               = 119     ; TBD           
+                 , EmfRecordTypeSetTextJustification        = 120     ; TBD           
+                 , EmfRecordTypeColorMatchToTargetW         = 121     ; TBD           
+                 , EmfRecordTypeCreateColorSpaceW           = 122     ; TBD           
+                 , EmfRecordTypeMax                         = 122     ; TBD 
+                 , EmfPlusRecordTypeInvalid                 = 16384   ; TBD           
+                 , EmfPlusRecordTypeHeader                  = 16385   ; Identifies a record that is the EMF+ header.    
+                 , EmfPlusRecordTypeMin                     = 16385   ; TBD 
+                 , EmfPlusRecordTypeEndOfFile               = 16386   ; Identifies a record that marks the last EMF+ record of a metafile.
+                 , EmfPlusRecordTypeComment                 = 16387   ; this.Graphics.AddMetafileComment()           
+                 , EmfPlusRecordTypeGetDC                   = 16388   ; this.Graphics.GetHDC()           
+                 , EmfPlusRecordTypeMultiFormatStart        = 16389   ; Identifies the start of a multiple-format block.     
+                 , EmfPlusRecordTypeMultiFormatSection      = 16390   ; Identifies a section in a multiple-format block.     
+                 , EmfPlusRecordTypeMultiFormatEnd          = 16391   ; Identifies the end of a multiple-format block.     
+                 , EmfPlusRecordTypeObject                  = 16392   ; TBD 
+                 , EmfPlusRecordTypeClear                   = 16393   ; this.Graphics.Clear()           
+                 , EmfPlusRecordTypeFillRects               = 16394   ; FillRectangles Methods          
+                 , EmfPlusRecordTypeDrawRects               = 16395   ; DrawRectangles Methods          
+                 , EmfPlusRecordTypeFillPolygon             = 16396   ; FillPolygon Methods          
+                 , EmfPlusRecordTypeDrawLines               = 16397   ; DrawLines Methods          
+                 , EmfPlusRecordTypeFillEllipse             = 16398   ; FillEllipse Methods          
+                 , EmfPlusRecordTypeDrawEllipse             = 16399   ; DrawEllipse Methods          
+                 , EmfPlusRecordTypeFillPie                 = 16400   ; FillPie Methods          
+                 , EmfPlusRecordTypeDrawPie                 = 16401   ; DrawPie Methods          
+                 , EmfPlusRecordTypeDrawArc                 = 16402   ; DrawArc Methods          
+                 , EmfPlusRecordTypeFillRegion              = 16403   ; this.Graphics.()           
+                 , EmfPlusRecordTypeFillPath                = 16404   ; this.Graphics.()           
+                 , EmfPlusRecordTypeDrawPath                = 16405   ; this.Graphics.()           
+                 , EmfPlusRecordTypeFillClosedCurve         = 16406   ; FillClosedCurve Methods          
+                 , EmfPlusRecordTypeDrawClosedCurve         = 16407   ; DrawClosedCurve Methods          
+            Static EmfPlusRecordTypeDrawCurve               = 16408   ; DrawCurve Methods          
+                 , EmfPlusRecordTypeDrawBeziers             = 16409   ; DrawBeziers Methods          
+                 , EmfPlusRecordTypeDrawImage               = 16410   ; DrawImage Methods          
+                 , EmfPlusRecordTypeDrawImagePoints         = 16411   ; DrawImage Methods (destination point arrays)       
+                 , EmfPlusRecordTypeDrawString              = 16412   ; DrawString Methods          
+                 , EmfPlusRecordTypeSetRenderingOrigin      = 16413   ; this.Graphics.SetRenderingOrigin()           
+                 , EmfPlusRecordTypeSetAntiAliasMode        = 16414   ; this.Graphics.SetSmoothingMode()           
+                 , WmfRecordTypeSaveDC                      = 16414   ; TBD 
+                 , EmfPlusRecordTypeSetTextRenderingHint    = 16415   ; this.Graphics.SetTextRenderingHint()           
+                 , EmfPlusRecordTypeSetTextContrast         = 16416   ; this.Graphics.SetTextContrast()           
+                 , EmfPlusRecordTypeSetInterpolationMode    = 16417   ; this.Graphics.SetInterpolationMode()           
+                 , EmfPlusRecordTypeSetPixelOffsetMode      = 16418   ; this.Graphics.SetPixelOffsetMode()           
+                 , EmfPlusRecordTypeSetCompositingMode      = 16419   ; this.Graphics.SetCompositingMode()           
+                 , EmfPlusRecordTypeSetCompositingQuality   = 16420   ; this.Graphics.SetCompositingQuality()           
+                 , EmfPlusRecordTypeSave                    = 16421   ; this.Graphics.Save()           
+                 , EmfPlusRecordTypeRestore                 = 16422   ; this.Graphics.Restore()           
+                 , EmfPlusRecordTypeBeginContainer          = 16423   ; this.Graphics.BeginContainer()           
+                 , EmfPlusRecordTypeBeginContainerNoParams  = 16424   ; this.Graphics.BeginContainer()           
+                 , EmfPlusRecordTypeEndContainer            = 16425   ; this.Graphics.EndContainer()           
+                 , EmfPlusRecordTypeSetWorldTransform       = 16426   ; this.Graphics.SetTransform()           
+                 , EmfPlusRecordTypeResetWorldTransform     = 16427   ; this.Graphics.ResetTransform()           
+                 , EmfPlusRecordTypeMultiplyWorldTransform  = 16428   ; this.Graphics.MultiplyTransform()           
+                 , EmfPlusRecordTypeTranslateWorldTransform = 16429   ; this.Graphics.TranslateTransform()           
+                 , EmfPlusRecordTypeScaleWorldTransform     = 16430   ; this.Graphics.ScaleTransform()           
+                 , EmfPlusRecordTypeRotateWorldTransform    = 16431   ; this.Graphics.RotateTransform()           
+                 , EmfPlusRecordTypeSetPageTransform        = 16432   ; this.Graphics.SetPageScale() and this.Graphics.SetPageUnit()         
+                 , EmfPlusRecordTypeResetClip               = 16433   ; this.Graphics.ResetClip()           
+                 , EmfPlusRecordTypeSetClipRect             = 16434   ; this.Graphics.SetClip()           
+                 , EmfPlusRecordTypeSetClipPath             = 16435   ; this.Graphics.SetClip()           
+                 , EmfPlusRecordTypeSetClipRegion           = 16436   ; this.Graphics.SetClip()           
+                 , EmfPlusRecordTypeOffsetClip              = 16437   ; TranslateClip Methods          
+                 , WmfRecordTypeRealizePalette              = 16437   ; TBD           
+                 , EmfPlusRecordTypeDrawDriverString        = 16438   ; this.Graphics.DrawDriverString()           
+                 , EmfPlusRecordTypeStrokeFillPath          = 16439   ; TBD           
+                 , WmfRecordTypeSetPalEntries               = 16439   ; TBD           
+                 , EmfPlusRecordTypeSerializableObject      = 16440   ; TBD           
+                 , EmfPlusRecordTypeSetTSGraphics           = 16441   ; TBD           
+                 , EmfPlusRecordTypeSetTSClip               = 16442   ; TBD           
+                 , EmfPlusRecordTotal                       = 16443   ; TBD 
+                 , WmfRecordTypeStartPage                   = 16463   ; TBD 
+                 , WmfRecordTypeEndPage                     = 16464   ; TBD 
+                 , WmfRecordTypeAbortDoc                    = 16466   ; TBD 
+                 , WmfRecordTypeEndDoc                      = 16478   ; TBD 
+                 , WmfRecordTypeCreatePalette               = 16631   ; TBD           
+                 , WmfRecordTypeCreateBrush                 = 16632   ; TBD           
+                 , WmfRecordTypeSetBkMode                   = 16642   ; TBD 
+                 , WmfRecordTypeSetMapMode                  = 16643   ; TBD 
+                 , WmfRecordTypeSetROP2                     = 16644   ; TBD 
+                 , WmfRecordTypeSetRelAbs                   = 16645   ; TBD 
+                 , WmfRecordTypeSetPolyFillMode             = 16646   ; TBD           
+            Static WmfRecordTypeSetStretchBltMode           = 16647   ; TBD           
+                 , WmfRecordTypeSetTextCharExtra            = 16648   ; TBD           
+                 , WmfRecordTypeRestoreDC                   = 16679   ; TBD 
+                 , WmfRecordTypeInvertRegion                = 16682   ; TBD           
+                 , WmfRecordTypePaintRegion                 = 16683   ; TBD           
+                 , WmfRecordTypeSelectClipRegion            = 16684   ; TBD           
+                 , WmfRecordTypeSelectObject                = 16685   ; TBD           
+                 , WmfRecordTypeSetTextAlign                = 16686   ; TBD           
+                 , WmfRecordTypeResizePalette               = 16697   ; TBD           
+                 , WmfRecordTypeDIBCreatePatternBrush       = 16706   ; TBD           
+                 , WmfRecordTypeSetLayout                   = 16713   ; TBD 
+                 , WmfRecordTypeResetDC                     = 16716   ; TBD 
+                 , WmfRecordTypeStartDoc                    = 16717   ; TBD 
+                 , WmfRecordTypeDeleteObject                = 16880   ; TBD           
+                 , WmfRecordTypeCreatePatternBrush          = 16889   ; TBD           
+                 , WmfRecordTypeSetBkColor                  = 16897   ; TBD 
+                 , WmfRecordTypeSetTextColor                = 16905   ; TBD           
+                 , WmfRecordTypeSetTextJustification        = 16906   ; TBD           
+                 , WmfRecordTypeSetWindowOrg                = 16907   ; TBD           
+                 , WmfRecordTypeSetWindowExt                = 16908   ; TBD           
+                 , WmfRecordTypeSetViewportOrg              = 16909   ; TBD           
+                 , WmfRecordTypeSetViewportExt              = 16910   ; TBD           
+                 , WmfRecordTypeOffsetWindowOrg             = 16911   ; TBD           
+                 , WmfRecordTypeOffsetViewportOrg           = 16913   ; TBD           
+                 , WmfRecordTypeLineTo                      = 16915   ; TBD 
+                 , WmfRecordTypeMoveTo                      = 16916   ; TBD 
+                 , WmfRecordTypeOffsetClipRgn               = 16928   ; TBD           
+                 , WmfRecordTypeFillRegion                  = 16936   ; TBD 
+                 , WmfRecordTypeSetMapperFlags              = 16945   ; TBD           
+                 , WmfRecordTypeSelectPalette               = 16948   ; TBD           
+                 , WmfRecordTypeCreatePenIndirect           = 17146   ; TBD           
+                 , WmfRecordTypeCreateFontIndirect          = 17147   ; TBD           
+                 , WmfRecordTypeCreateBrushIndirect         = 17148   ; TBD           
+                 , WmfRecordTypeCreateBitmapIndirect        = 17149   ; TBD           
+                 , WmfRecordTypePolygon                     = 17188   ; TBD 
+                 , WmfRecordTypePolyline                    = 17189   ; TBD 
+                 , WmfRecordTypeScaleWindowExt              = 17424   ; TBD           
+                 , WmfRecordTypeScaleViewportExt            = 17426   ; TBD           
+                 , WmfRecordTypeExcludeClipRect             = 17429   ; TBD           
+                 , WmfRecordTypeIntersectClipRect           = 17430   ; TBD           
+                 , WmfRecordTypeEllipse                     = 17432   ; TBD 
+                 , WmfRecordTypeFloodFill                   = 17433   ; TBD 
+                 , WmfRecordTypeRectangle                   = 17435   ; TBD 
+                 , WmfRecordTypeSetPixel                    = 17439   ; TBD 
+                 , WmfRecordTypeFrameRegion                 = 17449   ; TBD           
+                 , WmfRecordTypeAnimatePalette              = 17462   ; TBD           
+                 , WmfRecordTypeTextOut                     = 17697   ; TBD 
+                 , WmfRecordTypePolyPolygon                 = 17720   ; TBD           
+                 , WmfRecordTypeExtFloodFill                = 17736   ; TBD           
+                 , WmfRecordTypeRoundRect                   = 17948   ; TBD 
+            Static WmfRecordTypePatBlt                      = 17949   ; TBD 
+                 , WmfRecordTypeEscape                      = 17958   ; TBD 
+                 , WmfRecordTypeDrawText                    = 17967   ; TBD 
+                 , WmfRecordTypeCreateBitmap                = 18174   ; TBD           
+                 , WmfRecordTypeCreateRegion                = 18175   ; TBD           
+                 , WmfRecordTypeArc                         = 18455   ; TBD 
+                 , WmfRecordTypePie                         = 18458   ; TBD 
+                 , WmfRecordTypeChord                       = 18480   ; TBD 
+                 , WmfRecordTypeBitBlt                      = 18722   ; TBD 
+                 , WmfRecordTypeDIBBitBlt                   = 18752   ; TBD 
+                 , WmfRecordTypeExtTextOut                  = 18994   ; TBD 
+                 , WmfRecordTypeStretchBlt                  = 19235   ; TBD 
+                 , WmfRecordTypeDIBStretchBlt               = 19265   ; TBD           
+                 , WmfRecordTypeSetDIBToDev                 = 19763   ; TBD           
+                 , WmfRecordTypeStretchDIB                  = 20291   ; TBD 
         }
         
         Class EmfToWmfBitsFlags {                          ; Specifies options for the this.Metafile.EmfToWmfBits() method.
@@ -4667,6 +4667,609 @@ Class GUID
     ;~ static const GUID RedEyeCorrectionEffectGuid := { 0x74d29d05, 0x69a4, 0x4266, { 0x95, 0x49, 0x3c, 0xc5, 0x28, 0x36, 0xb6, 0x32 } }
     ;~ ; ColorCurveEffectGuid {DD6A0022-58E4-4a67-9D9B-D48EB881A53D}
     ;~ static const GUID ColorCurveEffectGuid := { 0xdd6a0022, 0x58e4, 0x4a67, { 0x9d, 0x9b, 0xd4, 0x8e, 0xb8, 0x81, 0xa5, 0x3d } }
+}
+;-----------------------------------------------------------------------------
+
+struct SharpenParams
+{
+    float radius;
+    float amount;
+};
+
+struct BlurParams
+{
+    float radius;
+    BOOL expandEdge;
+};
+
+struct BrightnessContrastParams
+{
+    INT brightnessLevel;
+    INT contrastLevel;
+};
+
+struct RedEyeCorrectionParams
+{
+    UINT numberOfAreas;
+    RECT *areas;
+};
+
+struct HueSaturationLightnessParams
+{
+    INT hueLevel;
+    INT saturationLevel;
+    INT lightnessLevel;
+};
+
+struct TintParams
+{
+    INT hue;
+    INT amount;
+};
+
+struct LevelsParams
+{
+    INT highlight;
+    INT midtone;
+    INT shadow;
+};
+
+struct ColorBalanceParams
+{
+    INT cyanRed;
+    INT magentaGreen;
+    INT yellowBlue;
+};
+
+struct ColorLUTParams
+{
+    ; look up tables for each color channel.
+    
+    ColorChannelLUT lutB;
+    ColorChannelLUT lutG;
+    ColorChannelLUT lutR;
+    ColorChannelLUT lutA;
+};
+
+enum CurveAdjustments
+{
+    AdjustExposure,
+    AdjustDensity,
+    AdjustContrast,
+    AdjustHighlight,
+    AdjustShadow,
+    AdjustMidtone,
+    AdjustWhiteSaturation,
+    AdjustBlackSaturation
+};
+
+enum CurveChannel
+{
+    CurveChannelAll,
+    CurveChannelRed,
+    CurveChannelGreen,
+    CurveChannelBlue
+};
+
+struct ColorCurveParams
+{
+    CurveAdjustments adjustment;
+    CurveChannel channel;
+    INT adjustValue;
+};
+
+class Effect
+{
+    SetParameters(const void *params, const UINT size)
+    {
+        return GdipSetEffectParameters(nativeEffect, params, size);
+    }
+
+    GetParameters(UINT *size, void *params)
+    {
+        return GdipGetEffectParameters(nativeEffect, size, params);
+    }
+
+    ; protected data members.
+    
+    CGpEffect   *nativeEffect;
+    INT         auxDataSize;
+    VOID        *auxData;
+    BOOL        useAuxData;
+    
+public:
+
+    Effect()
+    {
+        auxDataSize = 0;
+        auxData = NULL;
+        nativeEffect = NULL;
+        useAuxData = FALSE;
+    }
+    
+    __Delete()
+    {
+        DllExports::GdipFree(auxData)   ; pvData is allocated by ApplyEffect. Return the pointer so that it can be freed by the appropriate memory manager.
+        GdipDeleteEffect(nativeEffect)  ; Release the native Effect.
+    }
+    
+    UseAuxData(const BOOL useAuxDataFlag)
+    {
+        useAuxData = useAuxDataFlag;
+    }
+
+    GetParameterSize(UINT *size)
+    {
+        return GdipGetEffectParameterSize(nativeEffect, size);
+    }
+};
+
+; Blur
+
+class Blur : public Effect
+{
+    public:
+    
+    ; constructors cannot return an error code.
+    
+    Blur()
+    { 
+        GdipCreateEffect(BlurEffectGuid, &nativeEffect);
+    }
+
+    Status SetParameters(const BlurParams *parameters)
+    {
+        UINT size = sizeof(BlurParams);
+        return Effect::SetParameters(parameters, size);
+    }
+
+    Status GetParameters(UINT *size, BlurParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; Sharpen
+
+class Sharpen : public Effect
+{
+public:
+    
+    Sharpen()
+    { 
+        GdipCreateEffect(SharpenEffectGuid, &nativeEffect);
+    }
+
+    Status SetParameters(const SharpenParams *parameters)
+    {
+        UINT size = sizeof(SharpenParams);
+        return Effect::SetParameters(parameters, size);
+    }
+
+    Status GetParameters(UINT *size, SharpenParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; RedEye Correction
+
+class RedEyeCorrection : public Effect
+{
+public:
+    
+    ; constructors cannot return an error code.
+    
+    RedEyeCorrection()
+    { 
+        GdipCreateEffect(RedEyeCorrectionEffectGuid, &nativeEffect);
+    }
+    
+    Status SetParameters(const RedEyeCorrectionParams *parameters)
+    {
+        Status status = InvalidParameter;
+
+        if (parameters)
+        {
+            RedEyeCorrectionParams *inputParam =
+                (RedEyeCorrectionParams*)parameters;
+
+            UINT size = sizeof(RedEyeCorrectionParams) +
+                inputParam->numberOfAreas * sizeof(RECT);
+
+            status = Effect::SetParameters(parameters, size);
+        }
+
+        return status;
+    }    
+    
+    Status GetParameters(UINT *size, RedEyeCorrectionParams *parameters)
+    {
+        return Effect::GetParameters(size,(VOID*)parameters);
+    }
+};
+
+; Brightness/Contrast
+class BrightnessContrast : public Effect
+{
+public:
+    BrightnessContrast()
+    {
+        GdipCreateEffect(BrightnessContrastEffectGuid, &nativeEffect);
+    }
+
+    Status SetParameters(const BrightnessContrastParams *parameters)
+    {
+        UINT size = sizeof(BrightnessContrastParams);
+        return Effect::SetParameters((VOID*)parameters, size);
+    }
+    
+    Status GetParameters(UINT *size, BrightnessContrastParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; Hue/Saturation/Lightness
+
+class HueSaturationLightness : public Effect
+{
+public:
+    HueSaturationLightness()
+    {
+        GdipCreateEffect(HueSaturationLightnessEffectGuid, &nativeEffect);
+    }
+
+    Status SetParameters(const HueSaturationLightnessParams *parameters)
+    {
+        UINT size = sizeof(HueSaturationLightnessParams);
+        return Effect::SetParameters((VOID*)parameters, size);
+    }
+
+    Status GetParameters(UINT *size, HueSaturationLightnessParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; Highlight/Midtone/Shadow curves
+
+class Levels : public Effect
+{
+public:
+    Levels()
+    {
+        GdipCreateEffect(LevelsEffectGuid, &nativeEffect);
+    }
+    
+    Status SetParameters(const LevelsParams *parameters)
+    {
+        UINT size = sizeof(LevelsParams);
+        return Effect::SetParameters((VOID*)parameters, size);
+    }
+
+    Status GetParameters(UINT *size, LevelsParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; Tint
+
+class Tint : public Effect
+{
+public:
+    Tint()
+    {
+        GdipCreateEffect(TintEffectGuid, &nativeEffect);
+    }
+    
+    Status SetParameters(const TintParams *parameters)
+    {
+        UINT size = sizeof(TintParams);
+        return Effect::SetParameters((VOID*)parameters, size);
+    }
+
+    Status GetParameters(UINT *size, TintParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; ColorBalance
+
+class ColorBalance : public Effect
+{
+public:
+    ColorBalance()
+    {
+        GdipCreateEffect(ColorBalanceEffectGuid, &nativeEffect);
+    }
+    
+    Status SetParameters(const ColorBalanceParams *parameters)
+    {
+        UINT size = sizeof(ColorBalanceParams);
+        return Effect::SetParameters((VOID*)parameters, size);
+    }
+
+    Status GetParameters(UINT *size, ColorBalanceParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+; ColorMatrix
+
+class ColorMatrixEffect : public Effect
+{
+public:
+    
+    ; constructors cannot return an error code.
+    
+    ColorMatrixEffect()
+    { 
+        GdipCreateEffect(ColorMatrixEffectGuid, &nativeEffect);
+    }
+    
+    Status SetParameters(const ColorMatrix *matrix)
+    {
+        UINT size = sizeof(ColorMatrix);
+        return Effect::SetParameters(matrix, size);
+    }
+
+    Status GetParameters(UINT *size, ColorMatrix *matrix)
+    {
+        return Effect::GetParameters(size, (VOID*)matrix);
+    }
+};
+
+
+; ColorLUT
+
+class ColorLUT : public Effect
+{
+    public:
+    
+    ; constructors cannot return an error code.
+    
+    ColorLUT()
+    { 
+        GdipCreateEffect(ColorLUTEffectGuid, &nativeEffect);
+    }
+
+    Status SetParameters(const ColorLUTParams *lut)
+    {
+        UINT size = sizeof(ColorLUTParams);
+        return Effect::SetParameters(lut, size);
+    }
+
+    Status GetParameters(UINT *size, ColorLUTParams *lut)
+    {
+        return Effect::GetParameters(size, (VOID*)lut);
+    }
+};
+
+; Color Curve
+
+class ColorCurve : public Effect
+{
+public:
+    ColorCurve()
+    {
+        GdipCreateEffect(ColorCurveEffectGuid, &nativeEffect);
+    }
+
+    Status SetParameters(const ColorCurveParams *parameters)
+    {
+        UINT size = sizeof(ColorCurveParams);
+        return Effect::SetParameters((VOID*)parameters, size);
+    }
+
+    Status GetParameters(UINT *size, ColorCurveParams *parameters)
+    {
+        return Effect::GetParameters(size, (VOID*)parameters);
+    }
+};
+
+#endif ; _GDIPLUSEFFECTS_EXCLUDEEOBJECTS
+
+#endif ;(GDIPVER >= 0x0110)
+
+
+#endif /* WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) */
+#pragma endregion
+
+#endif
+
+
+
+/* GUID class for generating guids
+#SingleInstance, Force
+#Warn
+#NoEnv
+SetBatchLines, -1
+;#Include GDIP_Class\GDIPlus.ahk
+
+if !A_IsAdmin || !(DllCall("GetCommandLine","Str")~=" /restart(?!\S)")
+    Try Run % "*RunAs """ (A_IsCompiled?A_ScriptFullPath """ /restart":A_AhkPath """ /restart """ A_ScriptFullPath """")
+    Finally ExitApp
+test()
+ExitApp
+
+*Esc::ExitApp
+
+test()
+{
+    g_string := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
+    my guid := new guid(g_string)
+    
+    Return
+}
+
+; GUID must be 32 hex digits long. Opening/closing brackets {} are optional. Hyphens are optional.
+; Expected form: "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
+; GUID
+Class GUID
+{
+    Static _rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
+         , _rgx_hex  := "[\d|A-F|a-f]+"
+    str     := ""
+    ptr     := ""
+    
+    __New(guid="")
+    {
+        m := ""
+        ,this.SetCapacity("_guid", 16)
+        ,this.ptr := this.GetAddress("_guid")
+        
+        ,(guid = "")
+            ? guid := ComObjCreate("Scriptlet.TypeLib").GUID
+            : err := 1
+        
+        , RegExMatch(guid, this._rgx_guid, m)
+            ?  err := DllCall("ole32\CLSIDFromString"
+                             ,"WStr"  ,(this.str := guid)
+                             ,"Ptr"   ,this.ptr)
+        : RegExMatch(guid, this._rgx_hex)
+            ? err := DllCall("ole32\StringFromCLSID"
+                            ,this.Ptr  ,this.Str
+                            ,this.Ptr  ,(this.ptr := &guid)+0)
+        : err := 1
+        
+        ,(err)
+            ? this.error_log(A_ThisFunc, "Error creating GUID"
+                , "GUID String `nPointer to GUID"
+                , {guid:guid, str:this.str, ptr:this.ptr})
+            : ""
+    }
+    
+    to_string(guid)
+    {
+        err := DllCall("ole32\StringFromCLSID"
+                      ,this.Ptr  ,this.Str
+                      ,this.Ptr  ,guid+0)
+        Return ()
+    }
+    
+    string[]
+    {
+        get {
+            Return this.str
+        }
+        set {
+            Return
+        }
+    }
+    
+    Pointer[]
+    {
+        get {
+            Return this.ptr
+        }
+        set {
+            Return
+        }
+    }
+    
+    error_log(dummy, params, for, testing){
+        Return
+    }
+}
+
+
+Rounding_Mindfuck()
+{
+    percent := 50
+    x := 255 * percent / 100
+    y := 255 / 100 * percent
+    MsgBox, % "Percent = " percent
+            . "`nvar`tRounded`tFormula"
+            . "`nx`t" Round(x) "`t255 * percent / 100"
+            . "`ny`t" Round(y) "`t255 / 100 * percent"
+            
+    ;MsgBox, % "x: " x "`nRounded`nx: " Round(x) "`ny: " y "`ny: "Round(y)
+    Return
+}
+
+to_hex(num){
+    Return Format("{1:#x}", num)
+}
+
+; qpx(1) starts it and qpx() stops timer and returns time
+qpx(N=0) {  ; Wrapper for QueryPerformanceCounter() by SKAN  | CD: 06/Dec/2009
+    Local   ; www.autohotkey.com/forum/viewtopic.php?t=52083 | LM: 10/Dec/2009
+    Static F:="", A:="", Q:="", P:="", X:=""
+    If (N && !P)
+        Return DllCall("QueryPerformanceFrequency",Int64P,F) + (X:=A:=0)
+             + DllCall("QueryPerformanceCounter",Int64P,P)
+    DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
+    Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Effects code
+;   Gdiplus effect objects.
+
+;-----------------------------------------------------------------------------
+; GDI+ effect GUIDs
+;-----------------------------------------------------------------------------
+Class GUID
+{
+    ; BrightnessContrastEffectGuid
+    ; ColorBalanceEffectGuid
+    ; ColorCurveEffectGuid
+    ; ColorLookupTableEffectGuid
+    ; ColorMatrixEffectGuid
+    ; HueSaturationLightnessEffectGuid
+    ; LevelsEffectGuid
+    ; RedEyeCorrectionEffectGuid
+    ; SharpenEffectGuid
+    ; TintEffectGuid
+    
+    _generate()
+    {
+        ; Effect GUIDs   xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        GDIP.CreateGUID("633C80A4-1843-482b-9EF2-BE2834C5FDD4", this.BlurEffectGuid)
+        GDIP.CreateGUID("D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D", this.BrightnessContrastEffectGuid)
+        GDIP.CreateGUID("537E597D-251E-48DA-9664-29CA496B70F8", this.ColorBalanceEffectGuid)
+        GDIP.CreateGUID("DD6A0022-58E4-4A67-9D9B-D48EB881A53D", this.ColorCurveEffectGuid)
+        GDIP.CreateGUID("A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212", this.ColorLookupTableEffectGuid)
+        GDIP.CreateGUID("718F2615-7933-40E3-A511-5F68FE14DD74", this.ColorMatrixEffectGuid)
+        GDIP.CreateGUID("8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F", this.HueSaturationLightnessEffectGuid)
+        GDIP.CreateGUID("99C354EC-2A31-4F3A-8C34-17A803B33A25", this.LevelsEffectGuid)
+        GDIP.CreateGUID("74D29D05-69A4-4266-9549-3CC52836B632", this.RedEyeCorrectionEffectGuid)
+        GDIP.CreateGUID("63CBF3EE-C526-402C-8F71-62C540BF5142", this.SharpenEffectGuid)
+        GDIP.CreateGUID("1077AF00-2848-4441-9489-44AD4C2D7A2C", this.TintEffectGuid)
+        Return
+    }
 }
 ;-----------------------------------------------------------------------------
 
