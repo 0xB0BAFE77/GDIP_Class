@@ -69,6 +69,8 @@
             This is what spawned the need for a GUID Class
     20210817
         Finished GUID class
+    20210818
+        Worked heavily on effect class and the 11 related effect classes
 */
 GDIP.Startup()
 
@@ -128,6 +130,7 @@ Class GDIP
         this.GdiplusStartup()
         GDIP.TypeDef._Create()                          ; Create typedefs
         GDIP.generate_colorName()                       ; Generate color object
+        GDIP.Effect._generate_guids()                   ; Creates GUIDs needed for effect objects
         ;add other generators here
     }
     
@@ -4650,11 +4653,14 @@ public:
 
 
 
-/* Effect class - Current WIP
+/* current WIP code
+; Effect Class - Current WIP
+
 #SingleInstance Force
 #Warn
 test()
 ExitApp
+
 test()
 {
     myguid := new gdip.guid()
@@ -4670,20 +4676,41 @@ test()
 ;-----------------------------------------------------------------------------
 Class Effect
 {
-    ; Effect GUID List                           xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    Static BlurEffectGuid                   := "{633C80A4-1843-482b-9EF2-BE2834C5FDD4}"
-         , BrightnessContrastEffectGuid     := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
-         , ColorBalanceEffectGuid           := "{537E597D-251E-48DA-9664-29CA496B70F8}"
-         , ColorCurveEffectGuid             := "{DD6A0022-58E4-4A67-9D9B-D48EB881A53D}"
-         , ColorLookupTableEffectGuid       := "{A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212}"
-         , ColorMatrixEffectGuid            := "{718F2615-7933-40E3-A511-5F68FE14DD74}"
-         , HueSaturationLightnessEffectGuid := "{8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F}"
-         , LevelsEffectGuid                 := "{99C354EC-2A31-4F3A-8C34-17A803B33A25}"
-         , RedEyeCorrectionEffectGuid       := "{74D29D05-69A4-4266-9549-3CC52836B632}"
-         , SharpenEffectGuid                := "{63CBF3EE-C526-402C-8F71-62C540BF5142}"
-         , TintEffectGuid                   := "{1077AF00-2848-4441-9489-44AD4C2D7A2C}"
-    Return
-
+    Static BlurEffectGuid                   := ""
+         , BrightnessContrastEffectGuid     := ""
+         , ColorBalanceEffectGuid           := ""
+         , ColorCurveEffectGuid             := ""
+         , ColorLookupTableEffectGuid       := ""
+         , ColorMatrixEffectGuid            := ""
+         , HueSaturationLightnessEffectGuid := ""
+         , LevelsEffectGuid                 := ""
+         , RedEyeCorrectionEffectGuid       := ""
+         , SharpenEffectGuid                := ""
+         , TintEffectGuid                   := ""
+    
+    _generate_guids()
+    {
+        this.BlurEffectGuid                   := new GDIP.GUID("{633C80A4-1843-482b-9EF2-BE2834C5FDD4}")
+        this.BrightnessContrastEffectGuid     := new GDIP.GUID("{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}")
+        this.ColorBalanceEffectGuid           := new GDIP.GUID("{537E597D-251E-48DA-9664-29CA496B70F8}")
+        this.ColorCurveEffectGuid             := new GDIP.GUID("{DD6A0022-58E4-4A67-9D9B-D48EB881A53D}")
+        this.ColorLookupTableEffectGuid       := new GDIP.GUID("{A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212}")
+        this.ColorMatrixEffectGuid            := new GDIP.GUID("{718F2615-7933-40E3-A511-5F68FE14DD74}")
+        this.HueSaturationLightnessEffectGuid := new GDIP.GUID("{8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F}")
+        this.LevelsEffectGuid                 := new GDIP.GUID("{99C354EC-2A31-4F3A-8C34-17A803B33A25}")
+        this.RedEyeCorrectionEffectGuid       := new GDIP.GUID("{74D29D05-69A4-4266-9549-3CC52836B632}")
+        this.SharpenEffectGuid                := new GDIP.GUID("{63CBF3EE-C526-402C-8F71-62C540BF5142}")
+        this.TintEffectGuid                   := new GDIP.GUID("{1077AF00-2848-4441-9489-44AD4C2D7A2C}")
+    }
+    
+    ; ## CONSTRUCTOR ##
+    __New()
+    {
+        ; ?
+        Return
+    }
+    
+    ; ## METHODS ##
     SetParameters(const void *params, const UINT size)
     {
         return GdipSetEffectParameters(nativeEffect, params, size);
@@ -4705,12 +4732,13 @@ public:
 
     Effect()
     {
-        auxDataSize = 0;
-        auxData = NULL;
+        auxDataSize  = 0;
+        auxData      = NULL;
         nativeEffect = NULL;
-        useAuxData = FALSE;
+        useAuxData   = FALSE;
     }
     
+    ; virtual ~Effect()
     __Delete()
     {
         DllExports::GdipFree(auxData)   ; pvData is allocated by ApplyEffect. Return the pointer so that it can be freed by the appropriate memory manager.
@@ -4803,17 +4831,16 @@ struct ColorCurveParams
 
 ; Blur
 
-class Blur : public Effect
+; Blur class
+Class Blur Extends Effect
 {
-    public:
-    
-    ; constructors cannot return an error code.
-    
-    Blur()
+    ; ## CONSTRUCTOR ##
+    __New()
     { 
-        GdipCreateEffect(BlurEffectGuid, &nativeEffect);
+        GdipCreateEffect(BlurEffectGuid, &nativeEffect)
     }
-
+    
+    ; ## METHODS ##
     Status SetParameters(const BlurParams *parameters)
     {
         UINT size = sizeof(BlurParams);
@@ -4828,7 +4855,7 @@ class Blur : public Effect
 
 ; Sharpen
 
-class Sharpen : public Effect
+Class Sharpen Extends Effect
 {
 public:
     
@@ -4851,7 +4878,7 @@ public:
 
 ; RedEye Correction
 
-class RedEyeCorrection : public Effect
+Class RedEyeCorrection Extends Effect
 {
 public:
     
@@ -4887,7 +4914,7 @@ public:
 };
 
 ; Brightness/Contrast
-class BrightnessContrast : public Effect
+Class BrightnessContrast Extends Effect
 {
 public:
     BrightnessContrast()
@@ -4909,7 +4936,7 @@ public:
 
 ; Hue/Saturation/Lightness
 
-class HueSaturationLightness : public Effect
+Class HueSaturationLightness Extends Effect
 {
 public:
     HueSaturationLightness()
@@ -4931,7 +4958,7 @@ public:
 
 ; Highlight/Midtone/Shadow curves
 
-class Levels : public Effect
+Class Levels Extends Effect
 {
 public:
     Levels()
@@ -4953,7 +4980,7 @@ public:
 
 ; Tint
 
-class Tint : public Effect
+Class Tint Extends Effect
 {
 public:
     Tint()
@@ -4975,7 +5002,7 @@ public:
 
 ; ColorBalance
 
-class ColorBalance : public Effect
+Class ColorBalance Extends Effect
 {
 public:
     ColorBalance()
@@ -4997,7 +5024,7 @@ public:
 
 ; ColorMatrix
 
-class ColorMatrixEffect : public Effect
+Class ColorMatrixEffect Extends Effect
 {
 public:
     
@@ -5023,7 +5050,7 @@ public:
 
 ; ColorLUT
 
-class ColorLUT : public Effect
+Class ColorLUT Extends Effect
 {
     public:
     
@@ -5048,7 +5075,7 @@ class ColorLUT : public Effect
 
 ; Color Curve
 
-class ColorCurve : public Effect
+Class ColorCurve Extends Effect
 {
 public:
     ColorCurve()
