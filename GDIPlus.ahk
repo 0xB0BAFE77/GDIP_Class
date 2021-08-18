@@ -61,12 +61,14 @@
         Collected MetaHeader 
         Started on gdiplusimaging
     20210816
-        Added GUID class
         Added colormatrix.h info
         Addded imaging.h info
             Incomplete
+        Started GUID class
         Started on effects class
             This is what spawned the need for a GUID Class
+    20210817
+        Finished GUID class
 */
 GDIP.Startup()
 
@@ -107,24 +109,6 @@ Class GDIP
     ;####################################################################################################################
     ;  Initialize/Terminate GDI+                                                                                        |
     ;####################################################################################################################
-    
-    ;___________________________________________________________________________________________________________________|
-    ; Call                                                                                                              |
-    ; Description                                                                                                       |
-    ; Params                                                                                                            |
-    ; Return                                                                                                            |
-    ;___________________________________________________________________________________________________________________|
-    __New()
-    {
-    }
-    
-    ExitGDIP()
-    {
-        this.Shutdown()
-        , this.gdip_token := ""
-        Return
-    }
-    
     ;___________________________________________________________________________________________________________________|
     ; Call          Startup()                                                                                           |
     ; Description   Initializes GDI+ and stores token in the main GDIP class under GDIP.token                           |
@@ -141,6 +125,21 @@ Class GDIP
         OnExit(this._method("ExitGDIP"))                ; Ensure shutdown runs at script exit
         
         ; Start up GDIPlus
+        this.GdiplusStartup()
+        GDIP.TypeDef._Create()                          ; Create typedefs
+        GDIP.generate_colorName()                       ; Generate color object
+        ;add other generators here
+    }
+    
+    ExitGDIP()
+    {
+         this.GdiplusShutdown()
+        ,this.gdip_token := ""
+        Return
+    }
+    
+    GdiplusStartup()
+    {
         If (this.gdip_token = "")
             DllCall("GetModuleHandle", "str", "gdiplus")    ; Check if GDIPlus is loaded
                 ? "" : DllCall("LoadLibrary", "str", "gdiplus")
@@ -148,28 +147,17 @@ Class GDIP
             ,VarSetCapacity(gdip_si, (A_PtrSize = 8) ? 24 : 16, 0)
             ,NumPut(1, gdip_si)
             ,estat := DllCall("gdiplus\GdiplusStartup"
-                            , this.PtrA , token         ; Pointer to GDIP token
-                            , this.Ptr  , &gdip_si      ; Startup Input
-                            , this.Ptr  , 0)            ; Startup Output 0 = null
+                             ,this.PtrA , token      ; Pointer to GDIP token
+                             ,this.Ptr  , &gdip_si   ; Startup Input
+                             ,this.Ptr  , 0)         ; Startup Output 0 = null
             ,this.gdip_token := token
         
-        (estat > 0)                                     ; Error checking
+        (estat > 0)   ; Error checking
             ? GDIP.error_log(A_ThisFunc, "Startup has failed.", "Estat Error: " estat , {estat:estat})
             : ""
-        
-        GDIP.TypeDef._Create()                          ; Create typedefs
-        GDIP.generate_colorName()                       ; Generate color object
-        ;add other generators here
-        Return estat
     }
     
-    ;___________________________________________________________________________________________________________________|
-    ; Call              Shutdown()                                                                                      |
-    ; Description       Cleans up resources used by Windows GDI+ and clears GDIP token.                                 |
-    ;                                                                                                                   |
-    ; Return            None                                                                                            |
-    ;___________________________________________________________________________________________________________________|
-    Shutdown()
+    GdiplusShutdown()
     {
         DllCall("gdiplus\GdiplusShutdown", "UInt", this.gdip_token)
     }
@@ -275,8 +263,8 @@ Class GDIP
     Class TypeDef
     {
         Static GraphicsState     := "UInt"
-        Static GraphicsContainer := "UInt"
-        Static REAL              := "Float"
+             , GraphicsContainer := "UInt"
+             , REAL              := "Float"
     }
     
     ;####################################################################################################################
@@ -3817,6 +3805,120 @@ Class GDIP
     
     
     ;-------------------------------------------------------------------------------------------------------------------.
+    ; GUID (Globally Unique Identifier) Class - Used to create and get information about a GUID.                        |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; A GUID object stores a native GUID, a pointer to that GUID, and the string version of it.                         |
+    ; Properties:                                                                                                       |
+    ; .pointer          Pointer to the native GUID                                                                      |
+    ; .string           String of the native GUID                                                                       |
+    ; .ptr              Same as .pointer                                                                                |
+    ; .str              Same as .string                                                                                 |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; GUID()            Create a new and unique GUID object                                                             |
+    ; GUID(guidStr)     Create a new GUID object based on the provided string                                           |
+    ; GUID(guidPtr)     Create a new GUID object using the provided GUID pointer                                        |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; get_string(ptr)   Returns GUID string if success or a blank string if fail                                        |
+    ; get_pointer(str)     Returns GUID pointer if success or a blank string if fail                                       |
+    ;                                                                                                                   |
+    ; Remark            Opening/closing brackets {} and hyphens - are optional.                                         |
+    ;                   GUID strings must be 32 hex digits long.                                                        |
+    ;                   Expected GUID string format: {D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}                             |
+    ;___________________________________________________________________________________________________________________|
+    Class GUID
+    {
+        Static _rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
+            , _rgx_hex  := "[\d|A-F|a-f]+"
+        
+        _type   := "GUID"
+        ,_str   := ""
+        ,_ptr   := ""
+        
+        __New(guid="")
+        {
+            m := ""
+            ,(guid = "")
+                ? this.new_guid()
+            : RegExMatch(guid, this._rgx_guid, m)
+                ? (this._str := "{" m1 "-" m2 "-" m3 "-" m4 "-" m5 "}"
+                  ,this._ptr := this.get_pointer(this._str) )
+            : RegExMatch(guid, this._rgx_hex)
+                ? (this._ptr := guid+0
+                  ,this._str := this.get_string(this._ptr) )
+            : this.error_log(A_ThisFunc, "Error creating GUID"
+                            ,"GUID String `nPointer to GUID" ,{guid:guid})
+        }
+        
+        ; Return        GUID string if success or a blank string if fail
+        get_string(ptr)
+        {
+            strP := ""
+            ,err := DllCall("ole32\StringFromCLSID"
+                           ,GDIP.Ptr     ,ptr+0
+                           ,GDIP.PtrA    ,strP )
+            ,(err)
+                ? this.error_log(A_ThisFunc, "Error setting GUID string from provided pointer."
+                    , "Pointer to GUID", {ptr:ptr, err:err, stringPointer:strP})
+                : ""
+            Return (err) ? "" : StrGet(strP, , "UTF-16")
+        }
+        
+        ; Description   Creates a GUID using a GUID string
+        ; Return        Pointer to GUID if success or a blank string if fail
+        get_pointer(str)
+        {
+            VarSetCapacity(_ptr, 16)
+            ,err := DllCall("ole32\CLSIDFromString"
+                        ,"WStr"     , str
+                        ,GDIP.Ptr   , &_ptr)
+            ,(err)
+                ? this.error_log(A_ThisFunc, "Error setting GUID from provided string."
+                    , "GUID String", {str:str, err:err})
+                : ""
+            Return (err) ? "" : &_ptr
+        }
+        
+        new_guid()
+        {
+            this._str := ComObjCreate("Scriptlet.TypeLib").GUID
+            ,this._ptr := this.get_pointer(this._str)
+            
+        }
+        
+        string
+        {
+            get {
+                Return this._str
+            }
+        }
+        
+        str
+        {
+            get {
+                Return this._str
+            }
+        }
+        
+        pointer
+        {
+            get {
+                Return this._ptr+0
+            }
+        }
+        
+        ptr
+        {
+            get {
+                Return this._ptr+0
+            }
+        }
+    }
+    
+    
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
     ; GdiplusColor.h                                                                                                    |
     ;___________________________________________________________________________________________________________________|
     
@@ -4301,9 +4403,7 @@ Class GDIP
         
         show_img(image_p)
         {
-            hwnd := this.gui.new_layered_window(A_ScreenWidth, A_ScreenHeight)
         }
-        
     }
 }
 
@@ -4534,72 +4634,7 @@ public:
 
 
 
-/* current code: working on GUID class
-test()
-{
-    g_string := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
-    my guid := new guid(g_string)
-    
-    Return
-}
 
-; GUID must be 32 hex digits long. Opening/closing brackets {} are optional. Hyphens are optional.
-; Expected form: "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
-Class GUID
-{
-    Static _rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
-         , _rgx_hex  := "[\d|A-F|a-f]+"
-    str     := ""
-    ptr     := ""
-    
-    __New(guid="")
-    {
-        m := ""
-        ,this.SetCapacity("_guid", 16)
-        ,this.ptr := this.GetAddress("_guid")
-        
-        ,(guid = "")
-            ? guid := ComObjCreate("Scriptlet.TypeLib").GUID
-            : err := 1
-        
-        , RegExMatch(guid, this._rgx_guid, m)
-            ?  err := DllCall("ole32\CLSIDFromString"
-                             ,"WStr"  ,(this.str := guid)
-                             ,"Ptr"   ,this.ptr)
-        : RegExMatch(guid, this._rgx_hex)
-            ? err := DllCall("ole32\StringFromCLSID"
-                            ,this.Ptr  ,this.Str
-                            ,this.Ptr   ,(this.ptr := &guid)+0 )
-        : err := 1
-        
-        ,(err)
-            ? this.error_log(A_ThisFunc, "Error creating GUID"
-                , "GUID String`nPointer to GUID"
-                , {guid:guid, str:this.str, ptr:this.ptr})
-            : ""
-    }
-    
-    new_guid()
-    {
-        this.str := 
-        ,this.set_guid(this.str)
-        Return
-    }
-    
-    get_str()
-    {
-        Return this.str
-    }
-    
-    get_GUID()
-    {
-        Return this.ptr+0
-    }
-    
-    error_log(dummy, params, for, testing){
-        Return
-    }
-}
 
 
 
@@ -4608,648 +4643,92 @@ Class GUID
 
 
 
-/* Also, this is the effect file I was working on:
-;   Gdiplus effect objects.
 
-;-----------------------------------------------------------------------------
-; GDI+ effect GUIDs
-;-----------------------------------------------------------------------------
-Class GUID
-{
-    ; BrightnessContrastEffectGuid
-    ; ColorBalanceEffectGuid
-    ; ColorCurveEffectGuid
-    ; ColorLookupTableEffectGuid
-    ; ColorMatrixEffectGuid
-    ; HueSaturationLightnessEffectGuid
-    ; LevelsEffectGuid
-    ; RedEyeCorrectionEffectGuid
-    ; SharpenEffectGuid
-    ; TintEffectGuid
-    
-    _generate()
-    {
-        ; Effect GUIDs   xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-        GDIP.CreateGUID("D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D", this.BrightnessContrastEffectGuid)
-        GDIP.CreateGUID("537E597D-251E-48DA-9664-29CA496B70F8", this.ColorBalanceEffectGuid)
-        GDIP.CreateGUID("DD6A0022-58E4-4A67-9D9B-D48EB881A53D", this.ColorCurveEffectGuid)
-        GDIP.CreateGUID("A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212", this.ColorLookupTableEffectGuid)
-        GDIP.CreateGUID("718F2615-7933-40E3-A511-5F68FE14DD74", this.ColorMatrixEffectGuid)
-        GDIP.CreateGUID("8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F", this.HueSaturationLightnessEffectGuid)
-        GDIP.CreateGUID("99C354EC-2A31-4F3A-8C34-17A803B33A25", this.LevelsEffectGuid)
-        GDIP.CreateGUID("74D29D05-69A4-4266-9549-3CC52836B632", this.RedEyeCorrectionEffectGuid)
-        GDIP.CreateGUID("63CBF3EE-C526-402C-8F71-62C540BF5142", this.SharpenEffectGuid)
-        GDIP.CreateGUID("1077AF00-2848-4441-9489-44AD4C2D7A2C", this.TintEffectGuid)                    
-        Return
-    }
-    
-    
-    
-    ;~ ; BlurEffectGuid {633C80A4-1843-482b-9EF2-BE2834C5FDD4}
-    ;~ static const GUID BlurEffectGuid := { 0x633c80a4, 0x1843, 0x482b, { 0x9e, 0xf2, 0xbe, 0x28, 0x34, 0xc5, 0xfd, 0xd4 } }
-    ;~ ; SharpenEffectGuid {63CBF3EE-C526-402c-8F71-62C540BF5142}
-    ;~ static const GUID SharpenEffectGuid := { 0x63cbf3ee, 0xc526, 0x402c, { 0x8f, 0x71, 0x62, 0xc5, 0x40, 0xbf, 0x51, 0x42 } }
-    ;~ ; ColorMatrixEffectGuid {718F2615-7933-40e3-A511-5F68FE14DD74}
-    ;~ static const GUID ColorMatrixEffectGuid := { 0x718f2615, 0x7933, 0x40e3, { 0xa5, 0x11, 0x5f, 0x68, 0xfe, 0x14, 0xdd, 0x74 } }
-    ;~ ; ColorLUTEffectGuid {A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}
-    ;~ static const GUID ColorLUTEffectGuid := { 0xa7ce72a9, 0xf7f, 0x40d7, { 0xb3, 0xcc, 0xd0, 0xc0, 0x2d, 0x5c, 0x32, 0x12 } }
-    ;~ ; BrightnessContrastEffectGuid {D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}
-    ;~ static const GUID BrightnessContrastEffectGuid := { 0xd3a1dbe1, 0x8ec4, 0x4c17, { 0x9f, 0x4c, 0xea, 0x97, 0xad, 0x1c, 0x34, 0x3d } }
-    ;~ ; HueSaturationLightnessEffectGuid {8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}
-    ;~ static const GUID HueSaturationLightnessEffectGuid := { 0x8b2dd6c3, 0xeb07, 0x4d87, { 0xa5, 0xf0, 0x71, 0x8, 0xe2, 0x6a, 0x9c, 0x5f } }
-    ;~ ; LevelsEffectGuid {99C354EC-2A31-4f3a-8C34-17A803B33A25}
-    ;~ static const GUID LevelsEffectGuid := { 0x99c354ec, 0x2a31, 0x4f3a, { 0x8c, 0x34, 0x17, 0xa8, 0x3, 0xb3, 0x3a, 0x25 } }
-    ;~ ; TintEffectGuid {1077AF00-2848-4441-9489-44AD4C2D7A2C}
-    ;~ static const GUID TintEffectGuid := { 0x1077af00, 0x2848, 0x4441, { 0x94, 0x89, 0x44, 0xad, 0x4c, 0x2d, 0x7a, 0x2c } }
-    ;~ ; ColorBalanceEffectGuid {537E597D-251E-48da-9664-29CA496B70F8}
-    ;~ static const GUID ColorBalanceEffectGuid := { 0x537e597d, 0x251e, 0x48da, { 0x96, 0x64, 0x29, 0xca, 0x49, 0x6b, 0x70, 0xf8 } }
-    ;~ ; RedEyeCorrectionEffectGuid {74D29D05-69A4-4266-9549-3CC52836B632}
-    ;~ static const GUID RedEyeCorrectionEffectGuid := { 0x74d29d05, 0x69a4, 0x4266, { 0x95, 0x49, 0x3c, 0xc5, 0x28, 0x36, 0xb6, 0x32 } }
-    ;~ ; ColorCurveEffectGuid {DD6A0022-58E4-4a67-9D9B-D48EB881A53D}
-    ;~ static const GUID ColorCurveEffectGuid := { 0xdd6a0022, 0x58e4, 0x4a67, { 0x9d, 0x9b, 0xd4, 0x8e, 0xb8, 0x81, 0xa5, 0x3d } }
-}
-;-----------------------------------------------------------------------------
 
-struct SharpenParams
-{
-    float radius;
-    float amount;
-};
 
-struct BlurParams
-{
-    float radius;
-    BOOL expandEdge;
-};
 
-struct BrightnessContrastParams
-{
-    INT brightnessLevel;
-    INT contrastLevel;
-};
 
-struct RedEyeCorrectionParams
-{
-    UINT numberOfAreas;
-    RECT *areas;
-};
 
-struct HueSaturationLightnessParams
-{
-    INT hueLevel;
-    INT saturationLevel;
-    INT lightnessLevel;
-};
 
-struct TintParams
-{
-    INT hue;
-    INT amount;
-};
-
-struct LevelsParams
-{
-    INT highlight;
-    INT midtone;
-    INT shadow;
-};
-
-struct ColorBalanceParams
-{
-    INT cyanRed;
-    INT magentaGreen;
-    INT yellowBlue;
-};
-
-struct ColorLUTParams
-{
-    ; look up tables for each color channel.
-    
-    ColorChannelLUT lutB;
-    ColorChannelLUT lutG;
-    ColorChannelLUT lutR;
-    ColorChannelLUT lutA;
-};
-
-enum CurveAdjustments
-{
-    AdjustExposure,
-    AdjustDensity,
-    AdjustContrast,
-    AdjustHighlight,
-    AdjustShadow,
-    AdjustMidtone,
-    AdjustWhiteSaturation,
-    AdjustBlackSaturation
-};
-
-enum CurveChannel
-{
-    CurveChannelAll,
-    CurveChannelRed,
-    CurveChannelGreen,
-    CurveChannelBlue
-};
-
-struct ColorCurveParams
-{
-    CurveAdjustments adjustment;
-    CurveChannel channel;
-    INT adjustValue;
-};
-
-class Effect
-{
-    SetParameters(const void *params, const UINT size)
-    {
-        return GdipSetEffectParameters(nativeEffect, params, size);
-    }
-
-    GetParameters(UINT *size, void *params)
-    {
-        return GdipGetEffectParameters(nativeEffect, size, params);
-    }
-
-    ; protected data members.
-    
-    CGpEffect   *nativeEffect;
-    INT         auxDataSize;
-    VOID        *auxData;
-    BOOL        useAuxData;
-    
-public:
-
-    Effect()
-    {
-        auxDataSize = 0;
-        auxData = NULL;
-        nativeEffect = NULL;
-        useAuxData = FALSE;
-    }
-    
-    __Delete()
-    {
-        DllExports::GdipFree(auxData)   ; pvData is allocated by ApplyEffect. Return the pointer so that it can be freed by the appropriate memory manager.
-        GdipDeleteEffect(nativeEffect)  ; Release the native Effect.
-    }
-    
-    UseAuxData(const BOOL useAuxDataFlag)
-    {
-        useAuxData = useAuxDataFlag;
-    }
-
-    GetParameterSize(UINT *size)
-    {
-        return GdipGetEffectParameterSize(nativeEffect, size);
-    }
-};
-
-; Blur
-
-class Blur : public Effect
-{
-    public:
-    
-    ; constructors cannot return an error code.
-    
-    Blur()
-    { 
-        GdipCreateEffect(BlurEffectGuid, &nativeEffect);
-    }
-
-    Status SetParameters(const BlurParams *parameters)
-    {
-        UINT size = sizeof(BlurParams);
-        return Effect::SetParameters(parameters, size);
-    }
-
-    Status GetParameters(UINT *size, BlurParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; Sharpen
-
-class Sharpen : public Effect
-{
-public:
-    
-    Sharpen()
-    { 
-        GdipCreateEffect(SharpenEffectGuid, &nativeEffect);
-    }
-
-    Status SetParameters(const SharpenParams *parameters)
-    {
-        UINT size = sizeof(SharpenParams);
-        return Effect::SetParameters(parameters, size);
-    }
-
-    Status GetParameters(UINT *size, SharpenParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; RedEye Correction
-
-class RedEyeCorrection : public Effect
-{
-public:
-    
-    ; constructors cannot return an error code.
-    
-    RedEyeCorrection()
-    { 
-        GdipCreateEffect(RedEyeCorrectionEffectGuid, &nativeEffect);
-    }
-    
-    Status SetParameters(const RedEyeCorrectionParams *parameters)
-    {
-        Status status = InvalidParameter;
-
-        if (parameters)
-        {
-            RedEyeCorrectionParams *inputParam =
-                (RedEyeCorrectionParams*)parameters;
-
-            UINT size = sizeof(RedEyeCorrectionParams) +
-                inputParam->numberOfAreas * sizeof(RECT);
-
-            status = Effect::SetParameters(parameters, size);
-        }
-
-        return status;
-    }    
-    
-    Status GetParameters(UINT *size, RedEyeCorrectionParams *parameters)
-    {
-        return Effect::GetParameters(size,(VOID*)parameters);
-    }
-};
-
-; Brightness/Contrast
-class BrightnessContrast : public Effect
-{
-public:
-    BrightnessContrast()
-    {
-        GdipCreateEffect(BrightnessContrastEffectGuid, &nativeEffect);
-    }
-
-    Status SetParameters(const BrightnessContrastParams *parameters)
-    {
-        UINT size = sizeof(BrightnessContrastParams);
-        return Effect::SetParameters((VOID*)parameters, size);
-    }
-    
-    Status GetParameters(UINT *size, BrightnessContrastParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; Hue/Saturation/Lightness
-
-class HueSaturationLightness : public Effect
-{
-public:
-    HueSaturationLightness()
-    {
-        GdipCreateEffect(HueSaturationLightnessEffectGuid, &nativeEffect);
-    }
-
-    Status SetParameters(const HueSaturationLightnessParams *parameters)
-    {
-        UINT size = sizeof(HueSaturationLightnessParams);
-        return Effect::SetParameters((VOID*)parameters, size);
-    }
-
-    Status GetParameters(UINT *size, HueSaturationLightnessParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; Highlight/Midtone/Shadow curves
-
-class Levels : public Effect
-{
-public:
-    Levels()
-    {
-        GdipCreateEffect(LevelsEffectGuid, &nativeEffect);
-    }
-    
-    Status SetParameters(const LevelsParams *parameters)
-    {
-        UINT size = sizeof(LevelsParams);
-        return Effect::SetParameters((VOID*)parameters, size);
-    }
-
-    Status GetParameters(UINT *size, LevelsParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; Tint
-
-class Tint : public Effect
-{
-public:
-    Tint()
-    {
-        GdipCreateEffect(TintEffectGuid, &nativeEffect);
-    }
-    
-    Status SetParameters(const TintParams *parameters)
-    {
-        UINT size = sizeof(TintParams);
-        return Effect::SetParameters((VOID*)parameters, size);
-    }
-
-    Status GetParameters(UINT *size, TintParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; ColorBalance
-
-class ColorBalance : public Effect
-{
-public:
-    ColorBalance()
-    {
-        GdipCreateEffect(ColorBalanceEffectGuid, &nativeEffect);
-    }
-    
-    Status SetParameters(const ColorBalanceParams *parameters)
-    {
-        UINT size = sizeof(ColorBalanceParams);
-        return Effect::SetParameters((VOID*)parameters, size);
-    }
-
-    Status GetParameters(UINT *size, ColorBalanceParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-; ColorMatrix
-
-class ColorMatrixEffect : public Effect
-{
-public:
-    
-    ; constructors cannot return an error code.
-    
-    ColorMatrixEffect()
-    { 
-        GdipCreateEffect(ColorMatrixEffectGuid, &nativeEffect);
-    }
-    
-    Status SetParameters(const ColorMatrix *matrix)
-    {
-        UINT size = sizeof(ColorMatrix);
-        return Effect::SetParameters(matrix, size);
-    }
-
-    Status GetParameters(UINT *size, ColorMatrix *matrix)
-    {
-        return Effect::GetParameters(size, (VOID*)matrix);
-    }
-};
-
-
-; ColorLUT
-
-class ColorLUT : public Effect
-{
-    public:
-    
-    ; constructors cannot return an error code.
-    
-    ColorLUT()
-    { 
-        GdipCreateEffect(ColorLUTEffectGuid, &nativeEffect);
-    }
-
-    Status SetParameters(const ColorLUTParams *lut)
-    {
-        UINT size = sizeof(ColorLUTParams);
-        return Effect::SetParameters(lut, size);
-    }
-
-    Status GetParameters(UINT *size, ColorLUTParams *lut)
-    {
-        return Effect::GetParameters(size, (VOID*)lut);
-    }
-};
-
-; Color Curve
-
-class ColorCurve : public Effect
-{
-public:
-    ColorCurve()
-    {
-        GdipCreateEffect(ColorCurveEffectGuid, &nativeEffect);
-    }
-
-    Status SetParameters(const ColorCurveParams *parameters)
-    {
-        UINT size = sizeof(ColorCurveParams);
-        return Effect::SetParameters((VOID*)parameters, size);
-    }
-
-    Status GetParameters(UINT *size, ColorCurveParams *parameters)
-    {
-        return Effect::GetParameters(size, (VOID*)parameters);
-    }
-};
-
-#endif ; _GDIPLUSEFFECTS_EXCLUDEEOBJECTS
-
-#endif ;(GDIPVER >= 0x0110)
-
-
-#endif /* WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) */
-#pragma endregion
-
-#endif
-
-
-
-/*
-
+/* Effect class - Current WIP
 #SingleInstance Force
 #Warn
-
+test()
+ExitApp
 test()
 {
-    g_string := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
+    myguid := new gdip.guid()
     Return
 }
-ExitApp
 
 *Escape::ExitApp
 
-; GUID must be 32 hex digits long. Opening/closing brackets {} are optional. Hyphens are optional.
-; Expected form: "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
-; GUID
-Class GUID
-{
-    Static _rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
-         , _rgx_hex  := "[\d|A-F|a-f]+"
-    str     := ""
-    ptr     := ""
-    
-    __New(guid="")
-    {
-        m := ""
-        ,this.SetCapacity("_guid", 16)
-        ,this.ptr := this.GetAddress("_guid")
-        ,err := (guid = "")
-            ? this.new_guid()
-        : RegExMatch(guid, this._rgx_guid, m)
-            ? this.set_guid(guid)
-        : RegExMatch(guid, this._rgx_hex)
-            ? this.set_string(guid)
-        : this.error_log(A_ThisFunc, "Error creating GUID"
-                            ,"GUID String `nPointer to GUID" ,{guid:guid})
-    }
-    
-    ; Description       Creates a GUID string using a GUID
-    ; Return            0 = Success, 1 = Failure
-    set_string(guid)
-    {
-        err := DllCall("ole32\StringFromCLSID"
-               ,"Ptr"    ,guid+0        ; ,this.Ptr  ,guid+0
-               ,"PtrA"   ,(strP:=""))   ; ,this.PtrA ,strP)
-            
-        (err)
-            ? this.error_log(A_ThisFunc, "Error setting GUID string"
-                , "Pointer to GUID", {guid:guid})
-            : this.str := StrGet(strP, "UTF-16")
-        
-        Return err
-    }
-    
-    ; Description       Creates a GUID using a GUID string
-    ; Return            0 = Success, 1 = Failure
-    set_guid(str)
-    {
-        this.SetCapacity("_guid", 16)
-        , this.ptr := this.GetAddress("_guid")
-        err := DllCall("ole32\CLSIDFromString"
-                      ,"WStr"  , str
-                      ,"Ptr"   , this.ptr+0)
-        Return (err) ? 1 : 0
-    }
-    
-    new_guid()
-    {
-        this.str := ComObjCreate("Scriptlet.TypeLib").GUID
-        ,this.set_guid(this.str)
-        Return 0
-    }
-    
-    string[]
-    {
-        get {
-            Return this.str
-        }
-    }
-    
-    Pointer[]
-    {
-        get {
-            Return this.ptr
-        }
-    }
-    
-    __Delete()
-    {
-        Return
-    }
-    
-    error_log(dummy, params, for, testing){
-        Return
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Effects code
 ;   Gdiplus effect objects.
 
 ;-----------------------------------------------------------------------------
 ; GDI+ effect GUIDs
 ;-----------------------------------------------------------------------------
-Class GUID
+Class Effect
 {
-    ; BrightnessContrastEffectGuid
-    ; ColorBalanceEffectGuid
-    ; ColorCurveEffectGuid
-    ; ColorLookupTableEffectGuid
-    ; ColorMatrixEffectGuid
-    ; HueSaturationLightnessEffectGuid
-    ; LevelsEffectGuid
-    ; RedEyeCorrectionEffectGuid
-    ; SharpenEffectGuid
-    ; TintEffectGuid
-    
-    _generate()
+    ; Effect GUID List                           xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    Static BlurEffectGuid                   := "{633C80A4-1843-482b-9EF2-BE2834C5FDD4}"
+         , BrightnessContrastEffectGuid     := "{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}"
+         , ColorBalanceEffectGuid           := "{537E597D-251E-48DA-9664-29CA496B70F8}"
+         , ColorCurveEffectGuid             := "{DD6A0022-58E4-4A67-9D9B-D48EB881A53D}"
+         , ColorLookupTableEffectGuid       := "{A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212}"
+         , ColorMatrixEffectGuid            := "{718F2615-7933-40E3-A511-5F68FE14DD74}"
+         , HueSaturationLightnessEffectGuid := "{8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F}"
+         , LevelsEffectGuid                 := "{99C354EC-2A31-4F3A-8C34-17A803B33A25}"
+         , RedEyeCorrectionEffectGuid       := "{74D29D05-69A4-4266-9549-3CC52836B632}"
+         , SharpenEffectGuid                := "{63CBF3EE-C526-402C-8F71-62C540BF5142}"
+         , TintEffectGuid                   := "{1077AF00-2848-4441-9489-44AD4C2D7A2C}"
+    Return
+
+    SetParameters(const void *params, const UINT size)
     {
-        ; Effect GUIDs   xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-        GDIP.CreateGUID("633C80A4-1843-482b-9EF2-BE2834C5FDD4", this.BlurEffectGuid)
-        GDIP.CreateGUID("D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D", this.BrightnessContrastEffectGuid)
-        GDIP.CreateGUID("537E597D-251E-48DA-9664-29CA496B70F8", this.ColorBalanceEffectGuid)
-        GDIP.CreateGUID("DD6A0022-58E4-4A67-9D9B-D48EB881A53D", this.ColorCurveEffectGuid)
-        GDIP.CreateGUID("A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212", this.ColorLookupTableEffectGuid)
-        GDIP.CreateGUID("718F2615-7933-40E3-A511-5F68FE14DD74", this.ColorMatrixEffectGuid)
-        GDIP.CreateGUID("8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F", this.HueSaturationLightnessEffectGuid)
-        GDIP.CreateGUID("99C354EC-2A31-4F3A-8C34-17A803B33A25", this.LevelsEffectGuid)
-        GDIP.CreateGUID("74D29D05-69A4-4266-9549-3CC52836B632", this.RedEyeCorrectionEffectGuid)
-        GDIP.CreateGUID("63CBF3EE-C526-402C-8F71-62C540BF5142", this.SharpenEffectGuid)
-        GDIP.CreateGUID("1077AF00-2848-4441-9489-44AD4C2D7A2C", this.TintEffectGuid)
-        Return
+        return GdipSetEffectParameters(nativeEffect, params, size);
+    }
+
+    GetParameters(UINT *size, void *params)
+    {
+        return GdipGetEffectParameters(nativeEffect, size, params);
+    }
+
+    ; protected data members.
+    
+    CGpEffect   *nativeEffect;
+    INT         auxDataSize;
+    VOID        *auxData;
+    BOOL        useAuxData;
+    
+public:
+
+    Effect()
+    {
+        auxDataSize = 0;
+        auxData = NULL;
+        nativeEffect = NULL;
+        useAuxData = FALSE;
+    }
+    
+    __Delete()
+    {
+        DllExports::GdipFree(auxData)   ; pvData is allocated by ApplyEffect. Return the pointer so that it can be freed by the appropriate memory manager.
+        GdipDeleteEffect(nativeEffect)  ; Release the native Effect.
+    }
+    
+    UseAuxData(const BOOL useAuxDataFlag)
+    {
+        useAuxData = useAuxDataFlag;
+    }
+
+    GetParameterSize(UINT *size)
+    {
+        return GdipGetEffectParameterSize(nativeEffect, size);
     }
 }
-;-----------------------------------------------------------------------------
 
+; Effect structs
 struct SharpenParams
 {
     float radius;
@@ -5311,26 +4790,6 @@ struct ColorLUTParams
     ColorChannelLUT lutA;
 };
 
-enum CurveAdjustments
-{
-    AdjustExposure,
-    AdjustDensity,
-    AdjustContrast,
-    AdjustHighlight,
-    AdjustShadow,
-    AdjustMidtone,
-    AdjustWhiteSaturation,
-    AdjustBlackSaturation
-};
-
-enum CurveChannel
-{
-    CurveChannelAll,
-    CurveChannelRed,
-    CurveChannelGreen,
-    CurveChannelBlue
-};
-
 struct ColorCurveParams
 {
     CurveAdjustments adjustment;
@@ -5338,51 +4797,9 @@ struct ColorCurveParams
     INT adjustValue;
 };
 
-class Effect
-{
-    SetParameters(const void *params, const UINT size)
-    {
-        return GdipSetEffectParameters(nativeEffect, params, size);
-    }
 
-    GetParameters(UINT *size, void *params)
-    {
-        return GdipGetEffectParameters(nativeEffect, size, params);
-    }
 
-    ; protected data members.
-    
-    CGpEffect   *nativeEffect;
-    INT         auxDataSize;
-    VOID        *auxData;
-    BOOL        useAuxData;
-    
-public:
 
-    Effect()
-    {
-        auxDataSize = 0;
-        auxData = NULL;
-        nativeEffect = NULL;
-        useAuxData = FALSE;
-    }
-    
-    __Delete()
-    {
-        DllExports::GdipFree(auxData)   ; pvData is allocated by ApplyEffect. Return the pointer so that it can be freed by the appropriate memory manager.
-        GdipDeleteEffect(nativeEffect)  ; Release the native Effect.
-    }
-    
-    UseAuxData(const BOOL useAuxDataFlag)
-    {
-        useAuxData = useAuxDataFlag;
-    }
-
-    GetParameterSize(UINT *size)
-    {
-        return GdipGetEffectParameterSize(nativeEffect, size);
-    }
-};
 
 ; Blur
 
