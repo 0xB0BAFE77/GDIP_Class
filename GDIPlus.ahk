@@ -198,59 +198,59 @@ Class GDIP
             dt.double     := 8    ,dt["unsigned __int8"]  := 1    ,dt["signed char"]         := 1
             dt.float      := 4
             
-            dt.ATOM          := 2    ,dt.INT_PTR           := p    ,dt.PSHORT                 := p
-            dt.BOOL          := 4    ,dt.LANGID            := 2    ,dt.PSIZE_T                := p
-            dt.BOOLEAN       := 1    ,dt.LCID              := 4    ,dt.PSSIZE_T               := p
-            dt.BYTE          := 1    ,dt.LCTYPE            := 4    ,dt.PSTR                   := p
-            dt.CCHAR         := 1    ,dt.LGRPID            := 4    ,dt.PTBYTE                 := p
-            dt.CHAR          := 1    ,dt.LONG              := 4    ,dt.PTCHAR                 := p
-            dt.COLORREF      := 4    ,dt.LONG32            := 4    ,dt.PTSTR                  := p
-            dt.DWORD         := 4    ,dt.LONG64            := 8    ,dt.PUCHAR                 := p
-            dt.DWORD32       := 4    ,dt.LONG_PTR          := p    ,dt.PUHALF_PTR             := p
-            dt.DWORD64       := 8    ,dt.LONGLONG          := 8    ,dt.PUINT                  := p
-            dt.DWORD_PTR     := p    ,dt.LPARAM            := p    ,dt.PUINT16                := p
-            dt.DWORDLONG     := 8    ,dt.LPBOOL            := p    ,dt.PUINT32                := p
-            dt.HACCEL        := p    ,dt.LPBYTE            := p    ,dt.PUINT64                := p
-            dt.HALF_PTR      := h    ,dt.LPCOLORREF        := p    ,dt.PUINT8                 := p
-            dt.HANDLE        := p    ,dt.LPCSTR            := p    ,dt.PUINT_PTR              := p
-            dt.HBITMAP       := p    ,dt.LPCTSTR           := p    ,dt.PULONG                 := p
-            dt.HBRUSH        := p    ,dt.LPCVOID           := 0    ,dt.PULONG32               := p
-            dt.HCOLORSPACE   := p    ,dt.LPDWORD           := 4    ,dt.PULONG64               := p
-            dt.HCONV         := p    ,dt.LPHANDLE          := p    ,dt.PULONG_PTR             := p
-            dt.HCONVLIST     := p    ,dt.LPINT             := 4    ,dt.PULONGLONG             := p
-            dt.HCURSOR       := p    ,dt.LPLONG            := 4    ,dt.PUSHORT                := p
-            dt.HDC           := p    ,dt.LPVOID            := p    ,dt.PVOID                  := p
-            dt.HDDEDATA      := p    ,dt.LPWORD            := 2    ,dt.PWCHAR                 := p
-            dt.HDESK         := p    ,dt.LRESULT           := p    ,dt.PWORD                  := p
-            dt.HDROP         := p    ,dt.PBOOL             := p    ,dt.PWSTR                  := p
-            dt.HDWP          := p    ,dt.PBOOLEAN          := p    ,dt.QWORD                  := 8
-            dt.HENHMETAFILE  := p    ,dt.PBYTE             := p    ,dt.REAL                   := 4
-            dt.HFILE         := 4    ,dt.PCHAR             := p    ,dt.SC_HANDLE              := p
-            dt.HFONT         := p    ,dt.PDWORD            := p    ,dt.SC_LOCK                := p
-            dt.HGDIOBJ       := p    ,dt.PDWORD32          := p    ,dt.SERVICE_STATUS_HANDLE  := p
-            dt.HGLOBAL       := p    ,dt.PDWORD64          := p    ,dt.SIZE_T                 := p
-            dt.HHOOK         := p    ,dt.PDWORD_PTR        := p    ,dt.SSIZE_T                := p
-            dt.HICON         := p    ,dt.PDWORDLONG        := p    ,dt.TBYTE                  := u
-            dt.HINSTANCE     := p    ,dt.PFLOAT            := p    ,dt.TCHAR                  := u
-            dt.HKEY          := p    ,dt.PHALF_PTR         := p    ,dt.UCHAR                  := 1
-            dt.HKL           := p    ,dt.PHANDLE           := p    ,dt.UHALF_PTR              := h
-            dt.HLOCAL        := p    ,dt.PHKEY             := p    ,dt.UINT                   := 4
-            dt.HMENU         := p    ,dt.PINT              := p    ,dt.UINT16                 := 2
-            dt.HMETAFILE     := p    ,dt.PINT16            := p    ,dt.UINT32                 := 4
-            dt.HMODULE       := p    ,dt.PINT32            := p    ,dt.UINT64                 := 8
-            dt.HMONITOR      := p    ,dt.PINT64            := p    ,dt.UINT8                  := 1
-            dt.HPALETTE      := p    ,dt.PINT8             := p    ,dt.UINT_PTR               := p
-            dt.HPEN          := p    ,dt.PINT_PTR          := p    ,dt.ULONG                  := 4
-            dt.HRESULT       := 4    ,dt.PLCID             := p    ,dt.ULONG32                := 4
-            dt.HRGN          := p    ,dt.PLONG             := p    ,dt.ULONG64                := 8
-            dt.HRSRC         := p    ,dt.PLONG32           := p    ,dt.ULONG_PTR              := p
-            dt.HSZ           := p    ,dt.PLONG64           := p    ,dt.ULONGLONG              := 8
-            dt.HWINSTA       := p    ,dt.PLONG_PTR         := p    ,dt.USHORT                 := 2
-            dt.HWND          := p    ,dt.PLONGLONG         := p    ,dt.USN                    := 8
-            dt.INT16         := 2    ,dt.POINTER_32        := p    ,dt.VOID                   := 0
-            dt.INT32         := 4    ,dt.POINTER_64        := p    ,dt.WCHAR                  := 2
-            dt.INT64         := 8    ,dt.POINTER_SIGNED    := p    ,dt.WORD                   := 2
-            dt.INT8          := 1    ,dt.POINTER_UNSIGNED  := p    ,dt.WPARAM                 := p                               
+            dt.ATOM         := 2   ,dt.INT_PTR          := p   ,dt.PSHORT                := p
+            dt.BOOL         := 4   ,dt.LANGID           := 2   ,dt.PSIZE_T               := p
+            dt.BOOLEAN      := 1   ,dt.LCID             := 4   ,dt.PSSIZE_T              := p
+            dt.BYTE         := 1   ,dt.LCTYPE           := 4   ,dt.PSTR                  := p
+            dt.CCHAR        := 1   ,dt.LGRPID           := 4   ,dt.PTBYTE                := p
+            dt.CHAR         := 1   ,dt.LONG             := 4   ,dt.PTCHAR                := p
+            dt.COLORREF     := 4   ,dt.LONG32           := 4   ,dt.PTSTR                 := p
+            dt.DWORD        := 4   ,dt.LONG64           := 8   ,dt.PUCHAR                := p
+            dt.DWORD32      := 4   ,dt.LONG_PTR         := p   ,dt.PUHALF_PTR            := p
+            dt.DWORD64      := 8   ,dt.LONGLONG         := 8   ,dt.PUINT                 := p
+            dt.DWORD_PTR    := p   ,dt.LPARAM           := p   ,dt.PUINT16               := p
+            dt.DWORDLONG    := 8   ,dt.LPBOOL           := p   ,dt.PUINT32               := p
+            dt.HACCEL       := p   ,dt.LPBYTE           := p   ,dt.PUINT64               := p
+            dt.HALF_PTR     := h   ,dt.LPCOLORREF       := p   ,dt.PUINT8                := p
+            dt.HANDLE       := p   ,dt.LPCSTR           := p   ,dt.PUINT_PTR             := p
+            dt.HBITMAP      := p   ,dt.LPCTSTR          := p   ,dt.PULONG                := p
+            dt.HBRUSH       := p   ,dt.LPCVOID          := 0   ,dt.PULONG32              := p
+            dt.HCOLORSPACE  := p   ,dt.LPDWORD          := 4   ,dt.PULONG64              := p
+            dt.HCONV        := p   ,dt.LPHANDLE         := p   ,dt.PULONG_PTR            := p
+            dt.HCONVLIST    := p   ,dt.LPINT            := 4   ,dt.PULONGLONG            := p
+            dt.HCURSOR      := p   ,dt.LPLONG           := 4   ,dt.PUSHORT               := p
+            dt.HDC          := p   ,dt.LPVOID           := p   ,dt.PVOID                 := p
+            dt.HDDEDATA     := p   ,dt.LPWORD           := 2   ,dt.PWCHAR                := p
+            dt.HDESK        := p   ,dt.LRESULT          := p   ,dt.PWORD                 := p
+            dt.HDROP        := p   ,dt.PBOOL            := p   ,dt.PWSTR                 := p
+            dt.HDWP         := p   ,dt.PBOOLEAN         := p   ,dt.QWORD                 := 8
+            dt.HENHMETAFILE := p   ,dt.PBYTE            := p   ,dt.REAL                  := 4
+            dt.HFILE        := 4   ,dt.PCHAR            := p   ,dt.SC_HANDLE             := p
+            dt.HFONT        := p   ,dt.PDWORD           := p   ,dt.SC_LOCK               := p
+            dt.HGDIOBJ      := p   ,dt.PDWORD32         := p   ,dt.SERVICE_STATUS_HANDLE := p
+            dt.HGLOBAL      := p   ,dt.PDWORD64         := p   ,dt.SIZE_T                := p
+            dt.HHOOK        := p   ,dt.PDWORD_PTR       := p   ,dt.SSIZE_T               := p
+            dt.HICON        := p   ,dt.PDWORDLONG       := p   ,dt.TBYTE                 := u
+            dt.HINSTANCE    := p   ,dt.PFLOAT           := p   ,dt.TCHAR                 := u
+            dt.HKEY         := p   ,dt.PHALF_PTR        := p   ,dt.UCHAR                 := 1
+            dt.HKL          := p   ,dt.PHANDLE          := p   ,dt.UHALF_PTR             := h
+            dt.HLOCAL       := p   ,dt.PHKEY            := p   ,dt.UINT                  := 4
+            dt.HMENU        := p   ,dt.PINT             := p   ,dt.UINT16                := 2
+            dt.HMETAFILE    := p   ,dt.PINT16           := p   ,dt.UINT32                := 4
+            dt.HMODULE      := p   ,dt.PINT32           := p   ,dt.UINT64                := 8
+            dt.HMONITOR     := p   ,dt.PINT64           := p   ,dt.UINT8                 := 1
+            dt.HPALETTE     := p   ,dt.PINT8            := p   ,dt.UINT_PTR              := p
+            dt.HPEN         := p   ,dt.PINT_PTR         := p   ,dt.ULONG                 := 4
+            dt.HRESULT      := 4   ,dt.PLCID            := p   ,dt.ULONG32               := 4
+            dt.HRGN         := p   ,dt.PLONG            := p   ,dt.ULONG64               := 8
+            dt.HRSRC        := p   ,dt.PLONG32          := p   ,dt.ULONG_PTR             := p
+            dt.HSZ          := p   ,dt.PLONG64          := p   ,dt.ULONGLONG             := 8
+            dt.HWINSTA      := p   ,dt.PLONG_PTR        := p   ,dt.USHORT                := 2
+            dt.HWND         := p   ,dt.PLONGLONG        := p   ,dt.USN                   := 8
+            dt.INT16        := 2   ,dt.POINTER_32       := p   ,dt.VOID                  := 0
+            dt.INT32        := 4   ,dt.POINTER_64       := p   ,dt.WCHAR                 := 2
+            dt.INT64        := 8   ,dt.POINTER_SIGNED   := p   ,dt.WORD                  := 2
+            dt.INT8         := 1   ,dt.POINTER_UNSIGNED := p   ,dt.WPARAM                := p                               
         }
         bytes := dt[type]
         If (bytes != "")
@@ -4653,7 +4653,7 @@ public:
 
 
 
-/* current WIP code
+/* Effect and subclasses WIP
 ; Effect Class - Current WIP
 
 #SingleInstance Force
@@ -4676,34 +4676,34 @@ test()
 ;-----------------------------------------------------------------------------
 Class Effect
 {
-    Static BlurEffectGuid                   := ""
-         , BrightnessContrastEffectGuid     := ""
-         , ColorBalanceEffectGuid           := ""
-         , ColorCurveEffectGuid             := ""
-         , ColorLookupTableEffectGuid       := ""
-         , ColorMatrixEffectGuid            := ""
-         , HueSaturationLightnessEffectGuid := ""
-         , LevelsEffectGuid                 := ""
-         , RedEyeCorrectionEffectGuid       := ""
-         , SharpenEffectGuid                := ""
-         , TintEffectGuid                   := ""
-    
+    ;~ GDIP.Blur.BlurEffectGuid                                     := new GDIP.GUID("{633C80A4-1843-482b-9EF2-BE2834C5FDD4}")
+    ;~ GDIP.BrightnessContrast.BrightnessContrastEffectGuid         := new GDIP.GUID("{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}")
+    ;~ GDIP.ColorBalance.ColorBalanceEffectGuid                     := new GDIP.GUID("{537E597D-251E-48DA-9664-29CA496B70F8}")
+    ;~ GDIP.ColorCurve.ColorCurveEffectGuid                         := new GDIP.GUID("{DD6A0022-58E4-4A67-9D9B-D48EB881A53D}")
+    ;~ GDIP.ColorLookupTable.ColorLookupTableEffectGuid             := new GDIP.GUID("{A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212}")
+    ;~ GDIP.ColorMatrix.ColorMatrixEffectGuid                       := new GDIP.GUID("{718F2615-7933-40E3-A511-5F68FE14DD74}")
+    ;~ GDIP.HueSaturationLightness.HueSaturationLightnessEffectGuid := new GDIP.GUID("{8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F}")
+    ;~ GDIP.Levels.LevelsEffectGuid                                 := new GDIP.GUID("{99C354EC-2A31-4F3A-8C34-17A803B33A25}")
+    ;~ GDIP.RedEyeCorrection.RedEyeCorrectionEffectGuid             := new GDIP.GUID("{74D29D05-69A4-4266-9549-3CC52836B632}")
+    ;~ GDIP.Sharpen.SharpenEffectGuid                               := new GDIP.GUID("{63CBF3EE-C526-402C-8F71-62C540BF5142}")
+    ;~ GDIP.Tint.TintEffectGuid                                     := new GDIP.GUID("{1077AF00-2848-4441-9489-44AD4C2D7A2C}")
     _generate_guids()
     {
-        this.BlurEffectGuid                   := new GDIP.GUID("{633C80A4-1843-482b-9EF2-BE2834C5FDD4}")
-        this.BrightnessContrastEffectGuid     := new GDIP.GUID("{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}")
-        this.ColorBalanceEffectGuid           := new GDIP.GUID("{537E597D-251E-48DA-9664-29CA496B70F8}")
-        this.ColorCurveEffectGuid             := new GDIP.GUID("{DD6A0022-58E4-4A67-9D9B-D48EB881A53D}")
-        this.ColorLookupTableEffectGuid       := new GDIP.GUID("{A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212}")
-        this.ColorMatrixEffectGuid            := new GDIP.GUID("{718F2615-7933-40E3-A511-5F68FE14DD74}")
-        this.HueSaturationLightnessEffectGuid := new GDIP.GUID("{8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F}")
-        this.LevelsEffectGuid                 := new GDIP.GUID("{99C354EC-2A31-4F3A-8C34-17A803B33A25}")
-        this.RedEyeCorrectionEffectGuid       := new GDIP.GUID("{74D29D05-69A4-4266-9549-3CC52836B632}")
-        this.SharpenEffectGuid                := new GDIP.GUID("{63CBF3EE-C526-402C-8F71-62C540BF5142}")
-        this.TintEffectGuid                   := new GDIP.GUID("{1077AF00-2848-4441-9489-44AD4C2D7A2C}")
+        GDIP.Blur.BlurEffectGuid       := new GDIP.GUID("{633C80A4-1843-482b-9EF2-BE2834C5FDD4}")
+        GDIP.BrightnessContrast        := new GDIP.GUID("{D3A1DBE1-8EC4-4C17-9F4C-EA97AD1C343D}")
+        GDIP.ColorBalance              := new GDIP.GUID("{537E597D-251E-48DA-9664-29CA496B70F8}")
+        GDIP.ColorCurve                := new GDIP.GUID("{DD6A0022-58E4-4A67-9D9B-D48EB881A53D}")
+        GDIP.ColorLookupTable          := new GDIP.GUID("{A7CE72A9-0F7F-40D7-B3CC-D0C02D5C3212}")
+        GDIP.ColorMatrix               := new GDIP.GUID("{718F2615-7933-40E3-A511-5F68FE14DD74}")
+        GDIP.HueSaturationLightness    := new GDIP.GUID("{8B2DD6C3-EB07-4D87-A5F0-7108E26A9C5F}")
+        GDIP.Levels                    := new GDIP.GUID("{99C354EC-2A31-4F3A-8C34-17A803B33A25}")
+        GDIP.RedEyeCorrection          := new GDIP.GUID("{74D29D05-69A4-4266-9549-3CC52836B632}")
+        GDIP.Sharpen.SharpenEffectGuid := new GDIP.GUID("{63CBF3EE-C526-402C-8F71-62C540BF5142}")
+        GDIP.Tint.TintEffectGuid       := new GDIP.GUID("{1077AF00-2848-4441-9489-44AD4C2D7A2C}")
     }
     
     ; ## CONSTRUCTOR ##
+    ; effect()
     __New()
     {
         ; ?
@@ -4756,88 +4756,41 @@ public:
     }
 }
 
-; Effect structs
-struct SharpenParams
-{
-    float radius;
-    float amount;
-};
 
-struct BlurParams
-{
-    float radius;
-    BOOL expandEdge;
-};
-
-struct BrightnessContrastParams
-{
-    INT brightnessLevel;
-    INT contrastLevel;
-};
-
-struct RedEyeCorrectionParams
-{
-    UINT numberOfAreas;
-    RECT *areas;
-};
-
-struct HueSaturationLightnessParams
-{
-    INT hueLevel;
-    INT saturationLevel;
-    INT lightnessLevel;
-};
-
-struct TintParams
-{
-    INT hue;
-    INT amount;
-};
-
-struct LevelsParams
-{
-    INT highlight;
-    INT midtone;
-    INT shadow;
-};
-
-struct ColorBalanceParams
-{
-    INT cyanRed;
-    INT magentaGreen;
-    INT yellowBlue;
-};
-
-struct ColorLUTParams
-{
-    ; look up tables for each color channel.
-    
-    ColorChannelLUT lutB;
-    ColorChannelLUT lutG;
-    ColorChannelLUT lutR;
-    ColorChannelLUT lutA;
-};
-
-struct ColorCurveParams
-{
-    CurveAdjustments adjustment;
-    CurveChannel channel;
-    INT adjustValue;
-};
-
-
-
-
-
-; Blur
 
 ; Blur class
+; Radius        The radius of the blur. Must be 0-255. Greater radius = more blur.
+; expandEdge    If true, expands bitmap by an emount equal to the blur radius to accommodate soft edges.
 Class Blur Extends Effect
 {
+    _type      := "Blur"
+    radius     := 0
+    expandEdge := 0
+    ;~ struct BlurParams
+    ;~ {
+        ;~ float radius;
+        ;~ BOOL expandEdge;
+    ;~ }
+
+    
     ; ## CONSTRUCTOR ##
-    __New()
+    __New(radius, expandEdge)
     { 
+        this.SetCapacity("_struct", 8)
+        this._ptr := this.GetAddress("_struct")
+        (radius <= 255 && radius >= 0) && (expandEdge = 0 || expandEdge = 1)
+            ? (this._radius := radius, this._expandEdge := expandEdge)
+            : this.error_log(A_ThisFunc, "", "", {radius:radius, expandEdge:expandEdge})
         GdipCreateEffect(BlurEffectGuid, &nativeEffect)
+    }
+    
+    ; type      Pass expected structure type
+    ; Return    Pointer to struct
+    Struct()
+    {
+         NumPut(, this._ptr+0, 0, "Float")
+        ,NumPut(, this._ptr+0, 4, "Bool" )
+        Return structP+0
     }
     
     ; ## METHODS ##
@@ -4851,12 +4804,17 @@ Class Blur Extends Effect
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; Sharpen
 
 Class Sharpen Extends Effect
 {
+    ;~ struct SharpenParams
+    ;~ {
+        ;~ float radius;
+        ;~ float amount;
+    ;~ }
 public:
     
     Sharpen()
@@ -4874,12 +4832,18 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; RedEye Correction
 
 Class RedEyeCorrection Extends Effect
 {
+    ;~ struct RedEyeCorrectionParams
+    ;~ {
+        ;~ UINT numberOfAreas;
+        ;~ RECT *areas;
+    ;~ }
+
 public:
     
     ; constructors cannot return an error code.
@@ -4911,11 +4875,16 @@ public:
     {
         return Effect::GetParameters(size,(VOID*)parameters);
     }
-};
+}
 
 ; Brightness/Contrast
 Class BrightnessContrast Extends Effect
 {
+    ;~ struct BrightnessContrastParams
+    ;~ {
+        ;~ INT brightnessLevel;
+        ;~ INT contrastLevel;
+    ;~ }
 public:
     BrightnessContrast()
     {
@@ -4932,12 +4901,18 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; Hue/Saturation/Lightness
 
 Class HueSaturationLightness Extends Effect
 {
+    ;~ struct HueSaturationLightnessParams
+    ;~ {
+        ;~ INT hueLevel;
+        ;~ INT saturationLevel;
+        ;~ INT lightnessLevel;
+    ;~ }
 public:
     HueSaturationLightness()
     {
@@ -4954,12 +4929,18 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; Highlight/Midtone/Shadow curves
 
 Class Levels Extends Effect
 {
+    ;~ struct LevelsParams
+    ;~ {
+        ;~ INT highlight;
+        ;~ INT midtone;
+        ;~ INT shadow;
+    ;~ }
 public:
     Levels()
     {
@@ -4976,12 +4957,18 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; Tint
 
 Class Tint Extends Effect
 {
+    ;~ struct TintParams
+    ;~ {
+        ;~ INT hue;
+        ;~ INT amount;
+    ;~ }
+
 public:
     Tint()
     {
@@ -4998,12 +4985,18 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; ColorBalance
 
 Class ColorBalance Extends Effect
 {
+    ;~ struct ColorBalanceParams
+    ;~ {
+        ;~ INT cyanRed;
+        ;~ INT magentaGreen;
+        ;~ INT yellowBlue;
+    ;~ }
 public:
     ColorBalance()
     {
@@ -5020,7 +5013,7 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
+}
 
 ; ColorMatrix
 
@@ -5045,13 +5038,22 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)matrix);
     }
-};
+}
 
 
 ; ColorLUT
 
 Class ColorLUT Extends Effect
 {
+    ;~ struct ColorLUTParams
+    ;~ {
+        ;~ ; look up tables for each color channel.
+        
+        ;~ ColorChannelLUT lutB;
+        ;~ ColorChannelLUT lutG;
+        ;~ ColorChannelLUT lutR;
+        ;~ ColorChannelLUT lutA;
+    ;~ }
     public:
     
     ; constructors cannot return an error code.
@@ -5071,12 +5073,18 @@ Class ColorLUT Extends Effect
     {
         return Effect::GetParameters(size, (VOID*)lut);
     }
-};
+}
 
 ; Color Curve
 
 Class ColorCurve Extends Effect
 {
+    ;~ struct ColorCurveParams
+    ;~ {
+        ;~ CurveAdjustments adjustment;
+        ;~ CurveChannel channel;
+        ;~ INT adjustValue;
+    ;~ }
 public:
     ColorCurve()
     {
@@ -5093,14 +5101,4 @@ public:
     {
         return Effect::GetParameters(size, (VOID*)parameters);
     }
-};
-
-#endif ; _GDIPLUSEFFECTS_EXCLUDEEOBJECTS
-
-#endif ;(GDIPVER >= 0x0110)
-
-
-#endif /* WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) */
-#pragma endregion
-
-#endif
+}
