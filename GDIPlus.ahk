@@ -57,7 +57,7 @@
         Redid entire Rect/Point/Size classes
             Removed float variants and added .Struct(type) method
                 type can be whatever type you need. Int, Float, Etc.
-        Finished Color Class (ARBG)
+        Finished Color Class (ARGB)
         Collected MetaHeader 
         Started on gdiplusimaging
     20210816
@@ -71,13 +71,19 @@
         Finished GUID class
     20210818
         Worked heavily on effect class and the 11 related effect classes
+    20210819
+        Did more work on graphics class
 */
+
+#Warn
 GDIP.Startup()
 
 Class GDIP
 {
     Static  gdip_token  := ""
             ,_version   := 1.0
+    
+    _type := "GDIPlus"
     
     ;####################################################################################################################
     ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
@@ -551,7 +557,6 @@ Class GDIP
     ; An Image object encapsulates a bitmap or a metafile and stores attributes that you can retrieve by calling 
     ; various Get methods.
     ; Image objects can be constructe from the following types: BMP, ICON, GIF, JPEG, Exif, PNG, TIFF, WMF, EMF
-    
     Class Image Extends GDIP
     {
         Static  NativeImage := ""
@@ -923,40 +928,91 @@ Class GDIP
         ; FromHDC(HDC,HANDLE)   Creates a Graphics object from a device context handle and a specified device
         ; FromImage(Image)      Creates a Graphics object associated with an Image object
         ; FromHWND(HWND,BOOL)	Creates a Graphics object associated with a window
-        FromImage(image)
-        {
-            VarSetCapacity(gp, A_PtrSize, 0)
-            (image)
-                ? this.lastResult = DllCall("gdiplus\GdipGetImageGraphicsContext"
-                                           , this.Ptr  , (this.image.nativeImage := image)
-                                           , this.PtrA , &gp)
-                : GDIP.error_log(A_ThisFunc, "A pointer to an image object was required"
-                                ,"", {image_pointer:image})
-            this.nativeGraphics := gp
-        }
+        ;~ FromImage(image)
+        ;~ {
+            ;~ VarSetCapacity(gp, A_PtrSize, 0)
+            ;~ (image)
+                ;~ ? this.lastResult = DllCall("gdiplus\GdipGetImageGraphicsContext"
+                                           ;~ , this.Ptr  , (this.image.nativeImage := image)
+                                           ;~ , this.PtrA , &gp)
+                ;~ : GDIP.error_log(A_ThisFunc, "A pointer to an image object was required"
+                                ;~ ,"", {image_pointer:image})
+            ;~ this.nativeGraphics := gp
+        ;~ }
         
-        FromHDC(HDC, device="")
-        {
-            VarSetCapacity(gp, A_PtrSize, 0)
-            (device = "")
-                ? this.lastResult = DllCall("gdiplus\GdipCreateFromHDC"
-                                           , this.Ptr    , HDC
-                                           , this.PtrA   , &gp)
-                : this.lastResult = DllCall("gdiplus\GdipCreateFromHDC2"
-                                           , this.Ptr    , HDC
-                                           , this.Ptr    , device
-                                           , this.PtrA   , &gp)
-            this.nativeGraphics := gp
-        }
+        ;~ FromHDC(HDC, device="")
+        ;~ {
+            ;~ VarSetCapacity(gp, A_PtrSize, 0)
+            ;~ (device = "")
+                ;~ ? this.lastResult = DllCall("gdiplus\GdipCreateFromHDC"
+                                           ;~ , this.Ptr    , HDC
+                                           ;~ , this.PtrA   , &gp)
+                ;~ : this.lastResult = DllCall("gdiplus\GdipCreateFromHDC2"
+                                           ;~ , this.Ptr    , HDC
+                                           ;~ , this.Ptr    , device
+                                           ;~ , this.PtrA   , &gp)
+            ;~ this.nativeGraphics := gp
+        ;~ }
         
-        FromHWND(HWND, ICM=0)
+        ;~ FromHWND(HWND, ICM=0)
+        ;~ {
+            ;~ VarSetCapacity(gp, A_PtrSize, 0)
+            ;~ this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
+                                       ;~ ,this.Ptr     , HWND
+                                       ;~ ,this.PtrA    , &gp)
+            ;~ this.native_graphics := gp
+            ;~ Return gp
+        ;~ }
+        
+        
+        
+        
+        ;~ public:
+        ;~ friend class Region;
+        ;~ friend class GraphicsPath;
+        ;~ friend class Image;
+        ;~ friend class Bitmap;
+        ;~ friend class Metafile;
+        ;~ friend class Font;
+        ;~ friend class FontFamily;
+        ;~ friend class FontCollection;
+        ;~ friend class CachedBitmap;
+        
+        
+        ; ## CONSTRUCTORS ##
+        ; Graphics(type, HDC, Device)   Handle to a device context. Device is optional.
+        ; Graphics(type, HWND, ICM)     Handle to a window. ICM (Image Color Management) can be true or false
+        ; Graphics(type, Image)         Pointer to an image
+        ; type                          Use the string hwnd, hdc, or image
+        ; p1                            The handle or pointer to use with that type
+        ; dev_icm                       If type is HDC, this is a device handle.
+        ;                               If type is HWND, this is used for ICM true/false.
+        __New(type, p1, dev_icm="")
         {
-            VarSetCapacity(gp, A_PtrSize, 0)
-            this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
-                                       ,this.Ptr     , HWND
-                                       ,this.PtrA    , &gp)
-            this.native_graphics := gp
-            Return gp
+            VarSetCapacity(graphics, A_PtrSize, 0)
+            ,InStr(type, "hdc")
+                ? (dev_icm = "")
+                    ? estat := DllCall("gdip\GdipCreateFromHDC"
+                                      ,this.Ptr  , hdc
+                                      ,this.PtrA , graphics)
+                    : estat := DllCall("gdip\GdipCreateFromHDC2"
+                                      ,this.Ptr  , hdc
+                                      ,this.Ptr  , hdevice
+                                      ,this.PtrA , graphics)
+            : InStr(type, "hwnd")
+                ? estat := DllCall("gdip\GdipCreateFromHWND" (dev_icm ? "ICM" : "")
+                                  ,this.Ptr  , hwnd
+                                  ,this.PtrA , graphics)
+            : estat := DllCall("gdip\GdipGetImageGraphicsContext"
+                              ,this.Ptr  , p1.nativeImage
+                              ,this.PtrA , graphics)
+            
+             this.nativeGraphics := graphics
+            ,this.lastResult := estat
+            ,(estat != 0)
+                ? this.error_log(A_ThisFunc, "Error creating graphic object."
+                    , "HWND`nHDC`nImage Pointer", {type:type, p1:p1, dev_icm:dev_icm})
+                : ""
         }
         
         ; Description       Record any non-OK status and return status
@@ -964,13 +1020,13 @@ Class GDIP
         {
             Return (status = "Ok")
                 ? status
-                : (this.lastResult = status)
+                : (this.lastResult := status)
         }
         
         ; ## DESTRUCTOR ##
         __Delete()
         {
-            DllCall("GdipDeleteGraphics", this.Ptr, this.nativeGraphics)
+            DllCall("GdipDeleteGraphics", this.Ptr, this.nativeGraphics+0)
         }
         
         ; ## METHODS ##
@@ -2386,7 +2442,8 @@ Class GDIP
                  , ColorAdjustTypePen     = 3   ; Color adjustment for Pen objects
                  , ColorAdjustTypeText    = 4   ; Color adjustment for Text objects
                  , ColorAdjustTypeCount   = 5   ; Number of types specified
-                 , ColorAdjustTypeAny     = 6 } ; Reserved
+                 , ColorAdjustTypeAny     = 6   ; Reserved
+        }
         
         Class ColorChannelFlags {              ; Specifies individual channels in the CMYK (cyan, magenta, yellow, black) color space.
             Static ColorChannelFlagsC    = 0   ; Cyan
@@ -3802,7 +3859,7 @@ Class GDIP
             (dx._type = "Point" && y = "")
                 ? this._set_xywh(this.X + dx.X, this.Y + dx.Y, this.width, this.height)
                 : this._set_xywh(this.X + dx, this.Y + dy, this.width, this.height)
-       }
+        }
     }
     
     
@@ -3885,7 +3942,7 @@ Class GDIP
         
         new_guid()
         {
-            this._str := ComObjCreate("Scriptlet.TypeLib").GUID
+             this._str := ComObjCreate("Scriptlet.TypeLib").GUID
             ,this._ptr := this.get_pointer(this._str)
             
         }
@@ -3928,7 +3985,7 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------.
     ; Color Class - Stores a 32 bit value tha represents Alpha, Red, Blue, and Green values.                            |
     ;-------------------------------------------------------------------------------------------------------------------|
-    ; A Color object has Alpha (transparency), Red, Green, and Blue values. Type is ARBG                                |
+    ; A Color object has Alpha (transparency), Red, Green, and Blue values. Type is ARGB                                |
     ; Properties:                                                                                                       |
     ; .Alpha            Transparency. 0-255                                                                             |
     ; .Red              Red value. 0-255                                                                                |
@@ -3937,7 +3994,7 @@ Class GDIP
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Color()           Defaults to solid black. A=255, R=0, B=0, G=0                                                   |
-    ; Color(ARBG)       Copy ARBG object values. A=ARBG.A, R=ARBG.R, B=ARBG.B, G=ARBG.G                                 |
+    ; Color(ARGB)       Copy ARGB object values. A=ARGB.A, R=ARGB.R, B=ARGB.B, G=ARGB.G                                 |
     ; Color(r, b, g)    Red, blue, green values. Alpha is assumed opaque. A=255, R=r, B=b, G=g                          |
     ; Color(a, r, b, g) Set values A=a, R=r, B=b, G=g                                                                   |
     ;                                                                                                                   |
@@ -3949,31 +4006,31 @@ Class GDIP
 
     Class Color
     {
-         _type   := "ARBG"
+         _type   := "ARGB"
         ,Alpha   := A := 0
         ,Red     := R := 0
         ,Blue    := B := 0
         ,Green   := G := 0
         
         ; Color()
-        ; Color(ARBG)
+        ; Color(ARGB)
         ; Color(red, blue, green)
         ; Color(alpha, red, blue, green)
         __New(a="", r="", b="", g="")
         {
-            this.SetCapacity("_ARBG", 4)
-            ,this.structP := this.GetAddress("_ARBG")
-            ,(a._type == "ARBG" && r = "" && b = "" && g = "") ; ARBG object
-                ? this._set_arbg(ARBG.A, ARBG.R, ARBG.B, ARBG.G)
+            this.SetCapacity("_ARGB", 4)
+            ,this.structP := this.GetAddress("_ARGB")
+            ,(a._type == "ARGB" && r = "" && b = "" && g = "") ; ARGB object
+                ? this._set_argb(ARGB.A, ARGB.R, ARGB.B, ARGB.G)
             : (a="" && r="" && b="" && g="")  ; Empty
-                ? this._set_arbg(255, 0, 0, 0)
+                ? this._set_argb(255, 0, 0, 0)
             : (g = "") ; R B G
-                ? this._set_arbg(255, a, r, b)
-                : this._set_arbg(a, r, b, g) ; A R B G
+                ? this._set_argb(255, a, r, b)
+                : this._set_argb(a, r, b, g) ; A R B G
         }
         
         ; Remark: Values below 0 are set to 0 and values above 255 are set to 255
-        _set_arbg(a, r, b, g)
+        _set_argb(a, r, b, g)
         {
              this.Alpha := this.A := a
             ,this.Red   := this.R := r
@@ -4403,17 +4460,15 @@ Class GDIP
             MsgBox, % msg
             Return
         }
-        
-        show_img(image_p)
-        {
-        }
     }
 }
 
+
 ; Used for performance testing. Also, SKAN is a pretty awesome dude.
 ; qpx(1) starts it and qpx() stops timer and returns time
-qpx(N=0) {  ; QueryPerformanceCounter() wrapper originally by SKAN  | Created: 06Dec2009
-    Local   ; My version | Modified: 15Jan2020
+qpx(N=0) ; QueryPerformanceCounter() wrapper originally by SKAN  | Created: 06Dec2009
+{        ; My version | Modified: 15Jan2020
+    Local   
     Static F:="", A:="", Q:="", P:="", X:=""
     If (N && !P)
         Return DllCall("QueryPerformanceFrequency",Int64P,F) + (X:=A:=0)
@@ -4421,6 +4476,7 @@ qpx(N=0) {  ; QueryPerformanceCounter() wrapper originally by SKAN  | Created: 0
     DllCall("QueryPerformanceCounter",Int64P,Q), A:=A+Q-P, P:=Q, X:=X+1
     Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
 }
+
 
 
 ; Helpful links:
