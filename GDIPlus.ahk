@@ -83,8 +83,6 @@ Class GDIP
     Static  gdip_token  := ""
             ,_version   := 1.0
     
-    _type := "GDIPlus"
-    
     ;####################################################################################################################
     ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
     ;                      Any function with a 'status' named return variable will reference this.                      |
@@ -150,13 +148,13 @@ Class GDIP
     GdiplusStartup()
     {
         If (this.gdip_token = "")
-            DllCall("GetModuleHandle", "str", "gdiplus")    ; Check if GDIPlus is loaded
+            DllCall("GetModuleHandle", "str", "gdiplus")    ; Check if GDIPlus been loaded into Window's library
                 ? "" : DllCall("LoadLibrary", "str", "gdiplus")
             ,VarSetCapacity(token, A_PtrSize)
             ,VarSetCapacity(gdip_si, (A_PtrSize = 8) ? 24 : 16, 0)
             ,NumPut(1, gdip_si)
             ,estat := DllCall("gdiplus\GdiplusStartup"
-                             ,this.PtrA , token      ; Pointer to GDIP token
+                             ,this.PtrA , token      ; Variable to receive pointer to token
                              ,this.Ptr  , &gdip_si   ; Startup Input
                              ,this.Ptr  , 0)         ; Startup Output 0 = null
             ,this.gdip_token := token
@@ -179,90 +177,6 @@ Class GDIP
     {
         bf := ObjBindMethod(this, method_name, params*)
         Return bf
-    }
-    
-    ; Error log expects the call where the error happened
-    ; The type of value or what was expected
-    ; Stores byte size of different data_type
-    data_type_size(type)
-    {
-        Static dt  := ""
-        If !IsObject(dt)
-        {
-            p  := A_PtrSize
-            h  := (A_PtrSize = 8) ? 4 : 2
-            u  := A_IsUnicode     ? 2 : 1
-            dt := {}
-            
-            dt.__int8     := 1    ,dt.int                 := 4    ,dt["unsigned __int16"]    := 2
-            dt.__int16    := 2    ,dt.long                := 4    ,dt["unsigned __int32"]    := 4
-            dt.__int32    := 4    ,dt.short               := 2    ,dt["unsigned __int64"]    := 8
-            dt.__int64    := 8    ,dt.wchar_t             := 2    ,dt["unsigned char"]       := 1
-            dt.__wchar_t  := 2    ,dt["long double"]      := 8    ,dt["unsigned short"]      := 2
-            dt.bool       := 1    ,dt["long long"]        := 8    ,dt["unsigned long"]       := 4
-            dt.char       := 1    ,dt["unsigned int"]     := 4    ,dt["unsigned long long"]  := 8
-            dt.double     := 8    ,dt["unsigned __int8"]  := 1    ,dt["signed char"]         := 1
-            dt.float      := 4
-            
-            dt.ATOM         := 2   ,dt.INT_PTR          := p   ,dt.PSHORT                := p
-            dt.BOOL         := 4   ,dt.LANGID           := 2   ,dt.PSIZE_T               := p
-            dt.BOOLEAN      := 1   ,dt.LCID             := 4   ,dt.PSSIZE_T              := p
-            dt.BYTE         := 1   ,dt.LCTYPE           := 4   ,dt.PSTR                  := p
-            dt.CCHAR        := 1   ,dt.LGRPID           := 4   ,dt.PTBYTE                := p
-            dt.CHAR         := 1   ,dt.LONG             := 4   ,dt.PTCHAR                := p
-            dt.COLORREF     := 4   ,dt.LONG32           := 4   ,dt.PTSTR                 := p
-            dt.DWORD        := 4   ,dt.LONG64           := 8   ,dt.PUCHAR                := p
-            dt.DWORD32      := 4   ,dt.LONG_PTR         := p   ,dt.PUHALF_PTR            := p
-            dt.DWORD64      := 8   ,dt.LONGLONG         := 8   ,dt.PUINT                 := p
-            dt.DWORD_PTR    := p   ,dt.LPARAM           := p   ,dt.PUINT16               := p
-            dt.DWORDLONG    := 8   ,dt.LPBOOL           := p   ,dt.PUINT32               := p
-            dt.HACCEL       := p   ,dt.LPBYTE           := p   ,dt.PUINT64               := p
-            dt.HALF_PTR     := h   ,dt.LPCOLORREF       := p   ,dt.PUINT8                := p
-            dt.HANDLE       := p   ,dt.LPCSTR           := p   ,dt.PUINT_PTR             := p
-            dt.HBITMAP      := p   ,dt.LPCTSTR          := p   ,dt.PULONG                := p
-            dt.HBRUSH       := p   ,dt.LPCVOID          := 0   ,dt.PULONG32              := p
-            dt.HCOLORSPACE  := p   ,dt.LPDWORD          := 4   ,dt.PULONG64              := p
-            dt.HCONV        := p   ,dt.LPHANDLE         := p   ,dt.PULONG_PTR            := p
-            dt.HCONVLIST    := p   ,dt.LPINT            := 4   ,dt.PULONGLONG            := p
-            dt.HCURSOR      := p   ,dt.LPLONG           := 4   ,dt.PUSHORT               := p
-            dt.HDC          := p   ,dt.LPVOID           := p   ,dt.PVOID                 := p
-            dt.HDDEDATA     := p   ,dt.LPWORD           := 2   ,dt.PWCHAR                := p
-            dt.HDESK        := p   ,dt.LRESULT          := p   ,dt.PWORD                 := p
-            dt.HDROP        := p   ,dt.PBOOL            := p   ,dt.PWSTR                 := p
-            dt.HDWP         := p   ,dt.PBOOLEAN         := p   ,dt.QWORD                 := 8
-            dt.HENHMETAFILE := p   ,dt.PBYTE            := p   ,dt.REAL                  := 4
-            dt.HFILE        := 4   ,dt.PCHAR            := p   ,dt.SC_HANDLE             := p
-            dt.HFONT        := p   ,dt.PDWORD           := p   ,dt.SC_LOCK               := p
-            dt.HGDIOBJ      := p   ,dt.PDWORD32         := p   ,dt.SERVICE_STATUS_HANDLE := p
-            dt.HGLOBAL      := p   ,dt.PDWORD64         := p   ,dt.SIZE_T                := p
-            dt.HHOOK        := p   ,dt.PDWORD_PTR       := p   ,dt.SSIZE_T               := p
-            dt.HICON        := p   ,dt.PDWORDLONG       := p   ,dt.TBYTE                 := u
-            dt.HINSTANCE    := p   ,dt.PFLOAT           := p   ,dt.TCHAR                 := u
-            dt.HKEY         := p   ,dt.PHALF_PTR        := p   ,dt.UCHAR                 := 1
-            dt.HKL          := p   ,dt.PHANDLE          := p   ,dt.UHALF_PTR             := h
-            dt.HLOCAL       := p   ,dt.PHKEY            := p   ,dt.UINT                  := 4
-            dt.HMENU        := p   ,dt.PINT             := p   ,dt.UINT16                := 2
-            dt.HMETAFILE    := p   ,dt.PINT16           := p   ,dt.UINT32                := 4
-            dt.HMODULE      := p   ,dt.PINT32           := p   ,dt.UINT64                := 8
-            dt.HMONITOR     := p   ,dt.PINT64           := p   ,dt.UINT8                 := 1
-            dt.HPALETTE     := p   ,dt.PINT8            := p   ,dt.UINT_PTR              := p
-            dt.HPEN         := p   ,dt.PINT_PTR         := p   ,dt.ULONG                 := 4
-            dt.HRESULT      := 4   ,dt.PLCID            := p   ,dt.ULONG32               := 4
-            dt.HRGN         := p   ,dt.PLONG            := p   ,dt.ULONG64               := 8
-            dt.HRSRC        := p   ,dt.PLONG32          := p   ,dt.ULONG_PTR             := p
-            dt.HSZ          := p   ,dt.PLONG64          := p   ,dt.ULONGLONG             := 8
-            dt.HWINSTA      := p   ,dt.PLONG_PTR        := p   ,dt.USHORT                := 2
-            dt.HWND         := p   ,dt.PLONGLONG        := p   ,dt.USN                   := 8
-            dt.INT16        := 2   ,dt.POINTER_32       := p   ,dt.VOID                  := 0
-            dt.INT32        := 4   ,dt.POINTER_64       := p   ,dt.WCHAR                 := 2
-            dt.INT64        := 8   ,dt.POINTER_SIGNED   := p   ,dt.WORD                  := 2
-            dt.INT8         := 1   ,dt.POINTER_UNSIGNED := p   ,dt.WPARAM                := p                               
-        }
-        bytes := dt[type]
-        If (bytes != "")
-            Return bytes
-        GDIP.error_log(A_ThisFunc, "No valid datatype found.", type, "See 'data_type_size' function for list of data types.")
-        Return "err"
     }
     
     ;####################################################################################################################
@@ -918,54 +832,11 @@ Class GDIP
     ;####################################################################################################################
     ;  Graphics Class                                                                                                   |
     ;####################################################################################################################
-    Class graphics extends GDIP
+    Class Graphics Extends GDIP
     {
+        _type          := "graphics"
         nativeGraphics := ""
         lastResult     := ""
-        
-        ; ## CONSTRUCTORS ##
-        ; FromHDC(HDC)          Creates a Graphics object from a device context handle
-        ; FromHDC(HDC,HANDLE)   Creates a Graphics object from a device context handle and a specified device
-        ; FromImage(Image)      Creates a Graphics object associated with an Image object
-        ; FromHWND(HWND,BOOL)	Creates a Graphics object associated with a window
-        ;~ FromImage(image)
-        ;~ {
-            ;~ VarSetCapacity(gp, A_PtrSize, 0)
-            ;~ (image)
-                ;~ ? this.lastResult = DllCall("gdiplus\GdipGetImageGraphicsContext"
-                                           ;~ , this.Ptr  , (this.image.nativeImage := image)
-                                           ;~ , this.PtrA , &gp)
-                ;~ : GDIP.error_log(A_ThisFunc, "A pointer to an image object was required"
-                                ;~ ,"", {image_pointer:image})
-            ;~ this.nativeGraphics := gp
-        ;~ }
-        
-        ;~ FromHDC(HDC, device="")
-        ;~ {
-            ;~ VarSetCapacity(gp, A_PtrSize, 0)
-            ;~ (device = "")
-                ;~ ? this.lastResult = DllCall("gdiplus\GdipCreateFromHDC"
-                                           ;~ , this.Ptr    , HDC
-                                           ;~ , this.PtrA   , &gp)
-                ;~ : this.lastResult = DllCall("gdiplus\GdipCreateFromHDC2"
-                                           ;~ , this.Ptr    , HDC
-                                           ;~ , this.Ptr    , device
-                                           ;~ , this.PtrA   , &gp)
-            ;~ this.nativeGraphics := gp
-        ;~ }
-        
-        ;~ FromHWND(HWND, ICM=0)
-        ;~ {
-            ;~ VarSetCapacity(gp, A_PtrSize, 0)
-            ;~ this.lastResult := DllCall("gdiplus\GdipCreateFromHWND" . (ICM ? "ICM" : "")
-                                       ;~ ,this.Ptr     , HWND
-                                       ;~ ,this.PtrA    , &gp)
-            ;~ this.native_graphics := gp
-            ;~ Return gp
-        ;~ }
-        
-        
-        
         
         ;~ public:
         ;~ friend class Region;
@@ -978,47 +849,28 @@ Class GDIP
         ;~ friend class FontCollection;
         ;~ friend class CachedBitmap;
         
-        
-        ; ## CONSTRUCTORS ##
-        ; Graphics(type, HDC, Device)   Handle to a device context. Device is optional.
-        ; Graphics(type, HWND, ICM)     Handle to a window. ICM (Image Color Management) can be true or false
-        ; Graphics(type, Image)         Pointer to an image
-        ; type                          Use the string hwnd, hdc, or image
-        ; p1                            The handle or pointer to use with that type
-        ; dev_icm                       If type is HDC, this is a device handle.
-        ;                               If type is HWND, this is used for ICM true/false.
-        __New(type, p1, dev_icm="")
+        __New(gIn, dev_icm="")
         {
-            VarSetCapacity(graphics, A_PtrSize, 0)
-            ,InStr(type, "hdc")
-                ? (dev_icm = "")
-                    ? estat := DllCall("gdip\GdipCreateFromHDC"
-                                      ,this.Ptr  , hdc
-                                      ,this.PtrA , graphics)
-                    : estat := DllCall("gdip\GdipCreateFromHDC2"
-                                      ,this.Ptr  , hdc
-                                      ,this.Ptr  , hdevice
-                                      ,this.PtrA , graphics)
-            : InStr(type, "hwnd")
-                ? estat := DllCall("gdip\GdipCreateFromHWND" (dev_icm ? "ICM" : "")
-                                  ,this.Ptr  , hwnd
-                                  ,this.PtrA , graphics)
-            : estat := DllCall("gdip\GdipGetImageGraphicsContext"
-                              ,this.Ptr  , p1.nativeImage
-                              ,this.PtrA , graphics)
+            VarSetCapacity(gp, A_PtrSize, 0)
+            ,(dev_icm)   ; dev_icm has value
+                ? ((estat := DllCall("gdip\GdipCreateFromHWNDICM", this.Ptr, gIn, this.PtrA, graphics)) = 0 ) ? ""             ; From HWND with ICM
+                : ((estat := DllCall("gdip\GdipCreateFromHDC2", this.Ptr, gIn, this.Ptr, dev_icm, this.PtrA,graphics)) = 0 )   ; From HDC w/ device
+                ; dev_icm is false
+            : ((estat := DllCall("gdip\GdipCreateFromHDC", this.Ptr, gIn, this.PtrA, gp)) = 0) ? ""                        ; From HDC
+                : ((estat := DllCall("gdip\GdipCreateFromHWND", this.Ptr, gIn, this.PtrA, gp)) = 0) ? ""                   ; From HWND without ICM
+                : ((estat := DllCall("gdip\GdipGetImageGraphicsContext", this.Ptr, gIn.nativeImage, this.PtrA, gp)) = 0)   ; From Image object
             
-             this.nativeGraphics := graphics
+            ,(estat)   ; An estat that's not false (0) is an error and should be logged
+                ? this.log_error(A_ThisFunc, "Error creating Graphics object"
+                                ,"HDC`nHWND`nImage Object", {param1:gIn, param2:dev_icm, estat:estat})
+                : this.nativeGraphics := graphics   ; Otherwise, save graphics and last result
             ,this.lastResult := estat
-            ,(estat != 0)
-                ? this.error_log(A_ThisFunc, "Error creating graphic object."
-                    , "HWND`nHDC`nImage Pointer", {type:type, p1:p1, dev_icm:dev_icm})
-                : ""
         }
         
         ; Description       Record any non-OK status and return status
         SetStatus(status)
         {
-            Return (status = "Ok")
+            Return (status = 0)
                 ? status
                 : (this.lastResult := status)
         }
@@ -4330,7 +4182,7 @@ Class GDIP
     
 
     
-    Class gui extends GDIP
+    Class GUI Extends GDIP
     {
         gHwnd   := {}
         title   := ""
@@ -4347,34 +4199,37 @@ Class GDIP
         ;___________________________________________________________________________________________________________________|
         __New(title="Main", width="", height="", OnTop=1, TitleBar=0, TaskBar=1)
         {
-            this.title  := title
-            this.width  := (width = "") ? A_ScreenWidth : width
-            this.height := (height = "") ? A_ScreenHeight : height
+             this.title    := title
+            ,this.width    := (width = "") ? A_ScreenWidth : width
+            ,this.height   := (height = "") ? A_ScreenHeight : height
+            ,this.OnTop    := OnTop
+            ,this.TitleBar := TitleBar
+            ,this.TaskBar  := TaskBar
             
-            Gui, % title ":New", % "+E0x80000 "                ; Create a new layered window
-                . (TitleBar ? "+" : "-") "Caption "             ; Remove title bar and thick window border/edge
-                . (OnTop    ? "+" : "-") "AlwaysOnTop "         ; Force GUI to always be on top
-                . (TaskBar  ? "+" : "-") "ToolWindow "          ; Removes the taskbar button
-                . "+HWNDguiHwnd "                               ; Saves the handle of the GUI to guiHwnd
-            Gui, Show, NA                                       ; Make window visible but transparent
+            Gui, % title ":New", % "+E0x80000 "             ; Create a new layered window
+                . (TitleBar ? "+" : "-") "Caption "         ; Remove title bar and thick window border/edge
+                . (OnTop    ? "+" : "-") "AlwaysOnTop "     ; Force GUI to always be on top
+                . (TaskBar  ? "+" : "-") "ToolWindow "      ; Removes the taskbar button
+                . "+HWNDguiHwnd "                           ; Saves the handle of the GUI to guiHwnd
+            
             this.gHwnd.gui := guiHwnd
         }
         
         _update(title="Main")
         {
-            DllCall("UpdateLayeredWindow"
-                    , HWND          , this.gHwnd.gui[title]     ; Handle to window
-                    , HDC           , hdcDst                    ; Handle to DC destination
-                    , this.Ptr      , *pptDst                   ; Set new screen position using Point struct
-                    , this.Ptr      , *psize                    ; Set new screen size using Size struct
-                    , HDC           , hdcSrc                    ; Handle to DC source
-                    , this.Ptr      , *pptSrc                   ; Set layer locaiton using Point struct
-                    , COLORREF      , crKey                     ; ColorRef struct
-                    , this.Ptr      , *pblend                   ; Pointer to a BlendFunction struct
-                    , DWORD         , dwFlags )                 ; Add: 0x1 - ULW_COLORKEY
-                                                                ;      0x2 - ULW_ALPHA
-                                                                ;      0x4 - ULW_OPAQUE
-                                                                ;      0x8 - ULW_EX_NORESIZE
+            ;~ DllCall("UpdateLayeredWindow"
+                    ;~ , HWND          , this.gHwnd.gui[title]     ; Handle to window
+                    ;~ , HDC           , hdcDst                    ; Handle to DC destination
+                    ;~ , this.Ptr      , *pptDst                   ; Set new screen position using Point struct
+                    ;~ , this.Ptr      , *psize                    ; Set new screen size using Size struct
+                    ;~ , HDC           , hdcSrc                    ; Handle to DC source
+                    ;~ , this.Ptr      , *pptSrc                   ; Set layer locaiton using Point struct
+                    ;~ , COLORREF      , crKey                     ; ColorRef struct
+                    ;~ , this.Ptr      , *pblend                   ; Pointer to a BlendFunction struct
+                    ;~ , DWORD         , dwFlags )                 ; Add: 0x1 - ULW_COLORKEY
+                                                                ;~ ;      0x2 - ULW_ALPHA
+                                                                ;~ ;      0x4 - ULW_OPAQUE
+                                                                ;~ ;      0x8 - ULW_EX_NORESIZE
             Return
         }
         
@@ -4397,14 +4252,15 @@ Class GDIP
         }
     }
     
-    ; ############
-    ; ## Errors ##
-    ; ############
+    ; #####################
+    ; ## Errors Handling ##
+    ; #####################
+    
     ; The value or what was actually received
     ; call      = Function or method call that failed
     ; msg       = General error message
-    ; expect    = What kind of data was expected
-    ; data_obj  = Object containing all pertinent info.
+    ; expected  = What kind of data was expected
+    ; data_obj  = Object containing all pertinent info. Need to import my object extractor into this. 
     ;             Key name describes vars.
     error_log(call, msg, expected, data_obj)
     {
@@ -4477,6 +4333,87 @@ qpx(N=0) ; QueryPerformanceCounter() wrapper originally by SKAN  | Created: 06De
     Return (N && X=N) ? (X:=X-1)<<64 : (N=0 && (R:=A/X/F)) ? (R + (A:=P:=X:=0)) : 1
 }
 
+; Stores byte size of different data_type
+data_type_size(type)
+{
+    Static dt  := ""
+    If !IsObject(dt)
+    {
+        p  := A_PtrSize
+        h  := (A_PtrSize = 8) ? 4 : 2
+        u  := A_IsUnicode     ? 2 : 1
+        dt := {}
+        
+        dt.__int8     := 1    ,dt.int                 := 4    ,dt["unsigned __int16"]    := 2
+        dt.__int16    := 2    ,dt.long                := 4    ,dt["unsigned __int32"]    := 4
+        dt.__int32    := 4    ,dt.short               := 2    ,dt["unsigned __int64"]    := 8
+        dt.__int64    := 8    ,dt.wchar_t             := 2    ,dt["unsigned char"]       := 1
+        dt.__wchar_t  := 2    ,dt["long double"]      := 8    ,dt["unsigned short"]      := 2
+        dt.bool       := 1    ,dt["long long"]        := 8    ,dt["unsigned long"]       := 4
+        dt.char       := 1    ,dt["unsigned int"]     := 4    ,dt["unsigned long long"]  := 8
+        dt.double     := 8    ,dt["unsigned __int8"]  := 1    ,dt["signed char"]         := 1
+        dt.float      := 4
+        
+        dt.ATOM         := 2   ,dt.INT_PTR          := p   ,dt.PSHORT                := p
+        dt.BOOL         := 4   ,dt.LANGID           := 2   ,dt.PSIZE_T               := p
+        dt.BOOLEAN      := 1   ,dt.LCID             := 4   ,dt.PSSIZE_T              := p
+        dt.BYTE         := 1   ,dt.LCTYPE           := 4   ,dt.PSTR                  := p
+        dt.CCHAR        := 1   ,dt.LGRPID           := 4   ,dt.PTBYTE                := p
+        dt.CHAR         := 1   ,dt.LONG             := 4   ,dt.PTCHAR                := p
+        dt.COLORREF     := 4   ,dt.LONG32           := 4   ,dt.PTSTR                 := p
+        dt.DWORD        := 4   ,dt.LONG64           := 8   ,dt.PUCHAR                := p
+        dt.DWORD32      := 4   ,dt.LONG_PTR         := p   ,dt.PUHALF_PTR            := p
+        dt.DWORD64      := 8   ,dt.LONGLONG         := 8   ,dt.PUINT                 := p
+        dt.DWORD_PTR    := p   ,dt.LPARAM           := p   ,dt.PUINT16               := p
+        dt.DWORDLONG    := 8   ,dt.LPBOOL           := p   ,dt.PUINT32               := p
+        dt.HACCEL       := p   ,dt.LPBYTE           := p   ,dt.PUINT64               := p
+        dt.HALF_PTR     := h   ,dt.LPCOLORREF       := p   ,dt.PUINT8                := p
+        dt.HANDLE       := p   ,dt.LPCSTR           := p   ,dt.PUINT_PTR             := p
+        dt.HBITMAP      := p   ,dt.LPCTSTR          := p   ,dt.PULONG                := p
+        dt.HBRUSH       := p   ,dt.LPCVOID          := 0   ,dt.PULONG32              := p
+        dt.HCOLORSPACE  := p   ,dt.LPDWORD          := 4   ,dt.PULONG64              := p
+        dt.HCONV        := p   ,dt.LPHANDLE         := p   ,dt.PULONG_PTR            := p
+        dt.HCONVLIST    := p   ,dt.LPINT            := 4   ,dt.PULONGLONG            := p
+        dt.HCURSOR      := p   ,dt.LPLONG           := 4   ,dt.PUSHORT               := p
+        dt.HDC          := p   ,dt.LPVOID           := p   ,dt.PVOID                 := p
+        dt.HDDEDATA     := p   ,dt.LPWORD           := 2   ,dt.PWCHAR                := p
+        dt.HDESK        := p   ,dt.LRESULT          := p   ,dt.PWORD                 := p
+        dt.HDROP        := p   ,dt.PBOOL            := p   ,dt.PWSTR                 := p
+        dt.HDWP         := p   ,dt.PBOOLEAN         := p   ,dt.QWORD                 := 8
+        dt.HENHMETAFILE := p   ,dt.PBYTE            := p   ,dt.REAL                  := 4
+        dt.HFILE        := 4   ,dt.PCHAR            := p   ,dt.SC_HANDLE             := p
+        dt.HFONT        := p   ,dt.PDWORD           := p   ,dt.SC_LOCK               := p
+        dt.HGDIOBJ      := p   ,dt.PDWORD32         := p   ,dt.SERVICE_STATUS_HANDLE := p
+        dt.HGLOBAL      := p   ,dt.PDWORD64         := p   ,dt.SIZE_T                := p
+        dt.HHOOK        := p   ,dt.PDWORD_PTR       := p   ,dt.SSIZE_T               := p
+        dt.HICON        := p   ,dt.PDWORDLONG       := p   ,dt.TBYTE                 := u
+        dt.HINSTANCE    := p   ,dt.PFLOAT           := p   ,dt.TCHAR                 := u
+        dt.HKEY         := p   ,dt.PHALF_PTR        := p   ,dt.UCHAR                 := 1
+        dt.HKL          := p   ,dt.PHANDLE          := p   ,dt.UHALF_PTR             := h
+        dt.HLOCAL       := p   ,dt.PHKEY            := p   ,dt.UINT                  := 4
+        dt.HMENU        := p   ,dt.PINT             := p   ,dt.UINT16                := 2
+        dt.HMETAFILE    := p   ,dt.PINT16           := p   ,dt.UINT32                := 4
+        dt.HMODULE      := p   ,dt.PINT32           := p   ,dt.UINT64                := 8
+        dt.HMONITOR     := p   ,dt.PINT64           := p   ,dt.UINT8                 := 1
+        dt.HPALETTE     := p   ,dt.PINT8            := p   ,dt.UINT_PTR              := p
+        dt.HPEN         := p   ,dt.PINT_PTR         := p   ,dt.ULONG                 := 4
+        dt.HRESULT      := 4   ,dt.PLCID            := p   ,dt.ULONG32               := 4
+        dt.HRGN         := p   ,dt.PLONG            := p   ,dt.ULONG64               := 8
+        dt.HRSRC        := p   ,dt.PLONG32          := p   ,dt.ULONG_PTR             := p
+        dt.HSZ          := p   ,dt.PLONG64          := p   ,dt.ULONGLONG             := 8
+        dt.HWINSTA      := p   ,dt.PLONG_PTR        := p   ,dt.USHORT                := 2
+        dt.HWND         := p   ,dt.PLONGLONG        := p   ,dt.USN                   := 8
+        dt.INT16        := 2   ,dt.POINTER_32       := p   ,dt.VOID                  := 0
+        dt.INT32        := 4   ,dt.POINTER_64       := p   ,dt.WCHAR                 := 2
+        dt.INT64        := 8   ,dt.POINTER_SIGNED   := p   ,dt.WORD                  := 2
+        dt.INT8         := 1   ,dt.POINTER_UNSIGNED := p   ,dt.WPARAM                := p                               
+    }
+    bytes := dt[type]
+    If (bytes != "")
+        Return bytes
+    GDIP.error_log(A_ThisFunc, "No valid datatype found.", type, "See 'data_type_size' function for list of data types.")
+    Return "err"
+}
 
 
 ; Helpful links:
