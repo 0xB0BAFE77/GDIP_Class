@@ -5141,3 +5141,2977 @@ public:
         return Effect::GetParameters(size, (VOID*)parameters);
     }
 }
+
+
+
+/*
+;   GdiplusPen.h
+
+;--------------------------------------------------------------------------
+; Pen class
+;--------------------------------------------------------------------------
+
+class Pen : public GdiplusBase
+{
+    _type      := "Pen"
+    nativePen  := ""
+    lastResult := ""
+    
+    ; Pen(IN const Brush* brush, IN REAL width = 1.0f)      ; From brush
+    ; Pen(IN const Color& color, IN REAL width = 1.0f)      ; From color/argb
+    __New(colIn, width)
+    {
+        unit := GDIP.enum("Unit", "UnitWorld")
+        this.SetCapacity("nativePen", A_PtrSize)
+        (colIn.type == "Brush")
+            ? estat := DllCall("gdiplus\GdipCreatePen1"
+                                    ,   ,color.GetValue()
+                                    ,   ,width
+                                    ,   ,unit
+                                    ,   ,&nativePen)
+        : (colIn.type == "Color")
+        
+        this.lastResult := estat
+    }
+    
+    Pen(IN const Color& color, 
+        IN REAL width = 1.0f)
+    {
+        Unit unit = UnitWorld;
+        nativePen = NULL;
+        lastResult = DllCall("gdiplus\GdipCreatePen1(color.GetValue(),
+                                    width, unit, &nativePen);
+    }
+
+    Pen(IN const Brush* brush, 
+        IN REAL width = 1.0f)
+    {
+        Unit unit = UnitWorld;
+        nativePen = NULL;
+        lastResult = DllCall("gdiplus\GdipCreatePen2(brush->nativeBrush,
+                                    width, unit, &nativePen);
+    }
+
+    ;~Pen()
+    __Delete()
+    {
+        DllCall("gdiplus\GdipDeletePen(nativePen);
+    }
+
+    Pen* Clone() const
+    {
+        GpPen *clonePen = NULL;
+
+        lastResult = DllCall("gdiplus\GdipClonePen(nativePen, &clonePen);
+   
+        return new Pen(clonePen, lastResult);
+    }
+
+    Status SetWidth(IN REAL width)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenWidth(nativePen, width));
+    }
+
+    REAL GetWidth() const
+    {
+        REAL width;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenWidth(nativePen, &width));
+        
+        return width;
+    }
+    
+    ; Set/get line caps: start, end, and dash
+
+    ; Line cap and join APIs by using LineCap and LineJoin enums.
+
+    Status SetLineCap(IN LineCap startCap, 
+                      IN LineCap endCap, 
+                      IN DashCap dashCap)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenLineCap197819(nativePen, 
+                                   startCap, endCap, dashCap));
+    }
+
+    Status SetStartCap(IN LineCap startCap)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenStartCap(nativePen, startCap));
+    }
+
+    Status SetEndCap(IN LineCap endCap)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenEndCap(nativePen, endCap));
+    }
+
+    Status SetDashCap(IN DashCap dashCap)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenDashCap197819(nativePen,
+                                   dashCap));
+    }
+
+    LineCap GetStartCap() const
+    {
+        LineCap startCap;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenStartCap(nativePen, &startCap));
+        
+        return startCap;
+    }
+
+    LineCap GetEndCap() const
+    {
+        LineCap endCap;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenEndCap(nativePen, &endCap));
+
+        return endCap;
+    }
+
+    DashCap GetDashCap() const
+    {
+        DashCap dashCap;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenDashCap197819(nativePen,
+                            &dashCap));
+
+        return dashCap;
+    }
+
+    Status SetLineJoin(IN LineJoin lineJoin)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenLineJoin(nativePen, lineJoin));
+    }
+
+    LineJoin GetLineJoin() const
+    {
+        LineJoin lineJoin;
+        
+        SetStatus(DllCall("gdiplus\GdipGetPenLineJoin(nativePen, &lineJoin));
+        
+        return lineJoin;
+    }
+
+    Status SetCustomStartCap(IN const CustomLineCap* customCap)
+    {
+        GpCustomLineCap* nativeCap = NULL;
+        if(customCap)
+            nativeCap = customCap->nativeCap;
+
+        return SetStatus(DllCall("gdiplus\GdipSetPenCustomStartCap(nativePen, 
+                                                              nativeCap));
+    }
+
+    Status GetCustomStartCap(OUT CustomLineCap* customCap) const
+    {
+        if(!customCap)
+            return SetStatus(InvalidParameter);
+
+        return SetStatus(DllCall("gdiplus\GdipGetPenCustomStartCap(nativePen, 
+                                                    &(customCap->nativeCap)));
+    }
+
+    Status SetCustomEndCap(IN const CustomLineCap* customCap)
+    {
+        GpCustomLineCap* nativeCap = NULL;
+        if(customCap)
+            nativeCap = customCap->nativeCap;
+
+        return SetStatus(DllCall("gdiplus\GdipSetPenCustomEndCap(nativePen, 
+                                                            nativeCap));
+    }
+
+    Status GetCustomEndCap(OUT CustomLineCap* customCap) const
+    {
+        if(!customCap)
+            return SetStatus(InvalidParameter);
+
+        return SetStatus(DllCall("gdiplus\GdipGetPenCustomEndCap(nativePen, 
+                                                    &(customCap->nativeCap)));
+    }
+
+    Status SetMiterLimit(IN REAL miterLimit)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenMiterLimit(nativePen, 
+                                                    miterLimit));
+    }
+
+    REAL GetMiterLimit() const
+    {
+        REAL miterLimit;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenMiterLimit(nativePen, &miterLimit));
+
+        return miterLimit;
+    }
+
+    Status SetAlignment(IN PenAlignment penAlignment)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenMode(nativePen, penAlignment));
+    }
+
+    PenAlignment GetAlignment() const
+    {
+        PenAlignment penAlignment;
+        
+        SetStatus(DllCall("gdiplus\GdipGetPenMode(nativePen, &penAlignment));
+        
+        return penAlignment;
+    }
+    
+    Status SetTransform(IN const Matrix* matrix)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenTransform(nativePen, 
+                                                       matrix->nativeMatrix));
+    }
+
+    Status GetTransform(OUT Matrix* matrix) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipGetPenTransform(nativePen, 
+                                                         matrix->nativeMatrix));
+    }
+
+    Status ResetTransform()
+    {
+        return SetStatus(DllCall("gdiplus\GdipResetPenTransform(nativePen));
+    }
+
+    Status MultiplyTransform(IN const Matrix* matrix,
+                             IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipMultiplyPenTransform(nativePen,
+                                                         matrix->nativeMatrix,
+                                                         order));
+    }
+
+    Status TranslateTransform(IN REAL dx, 
+                              IN REAL dy,
+                              IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipTranslatePenTransform(nativePen,
+                                                               dx, 
+                                                               dy, 
+                                                               order));
+    }
+
+    Status ScaleTransform(IN REAL sx, 
+                          IN REAL sy,
+                          IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipScalePenTransform(nativePen,
+                                                           sx, 
+                                                           sy, 
+                                                           order));
+    }
+
+    Status RotateTransform(IN REAL angle, 
+                           IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipRotatePenTransform(nativePen,
+                                                            angle, 
+                                                            order));
+    }
+
+    PenType GetPenType() const
+    {
+       PenType type;
+       SetStatus(DllCall("gdiplus\GdipGetPenFillType(nativePen, &type));
+
+       return type;
+    }
+
+    Status SetColor(IN const Color& color)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenColor(nativePen,
+                                                     color.GetValue()));
+    }
+
+    Status SetBrush(IN const Brush* brush)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenBrushFill(nativePen, 
+                                       brush->nativeBrush));
+    }
+
+    Status GetColor(OUT Color* color) const
+    {
+        if (color == NULL) 
+        {
+            return SetStatus(InvalidParameter);
+        }
+        
+        PenType type = GetPenType();
+
+        if (type != PenTypeSolidColor) 
+        {
+            return WrongState;
+        }
+        
+        ARGB argb;
+        
+        SetStatus(DllCall("gdiplus\GdipGetPenColor(nativePen,
+                                              &argb));
+        if (lastResult == Ok)
+        {
+            color->SetValue(argb);
+        }
+        
+        return lastResult;
+    }
+
+    Brush* GetBrush() const
+    {
+       PenType type = GetPenType();
+
+       Brush* brush = NULL;
+
+       switch(type)
+       {
+       case PenTypeSolidColor:
+           brush = new SolidBrush();
+           break;
+
+       case PenTypeHatchFill:
+           brush = new HatchBrush();
+           break;
+
+       case PenTypeTextureFill:
+           brush = new TextureBrush();
+           break;
+
+       case PenTypePathGradient:
+           brush = new Brush();
+           break;
+
+       case PenTypeLinearGradient:
+           brush = new LinearGradientBrush();
+           break;
+
+       default:
+           break;
+       }
+
+       if(brush)
+       {
+           GpBrush* nativeBrush;
+
+           SetStatus(DllCall("gdiplus\GdipGetPenBrushFill(nativePen, 
+                                                     &nativeBrush));
+           brush->SetNativeBrush(nativeBrush);
+       }
+
+       return brush;
+    }
+
+    DashStyle GetDashStyle() const
+    {
+        DashStyle dashStyle;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenDashStyle(nativePen, &dashStyle));
+
+        return dashStyle;
+    }
+
+    Status SetDashStyle(IN DashStyle dashStyle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenDashStyle(nativePen, 
+                                                         dashStyle));
+    }
+
+    REAL GetDashOffset() const
+    {
+        REAL dashOffset;
+
+        SetStatus(DllCall("gdiplus\GdipGetPenDashOffset(nativePen, &dashOffset));
+
+        return dashOffset;
+    }
+
+    Status SetDashOffset(IN REAL dashOffset)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenDashOffset(nativePen, 
+                                                          dashOffset));
+    }
+    
+    Status SetDashPattern(IN const REAL* dashArray, IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenDashArray(nativePen,
+                                                         dashArray, 
+                                                         count));
+    }
+    
+    INT GetDashPatternCount() const
+    {
+        INT count = 0;
+        
+        SetStatus(DllCall("gdiplus\GdipGetPenDashCount(nativePen, &count));
+        
+        return count;
+    }
+
+    Status GetDashPattern(OUT REAL* dashArray, 
+                          IN INT count) const
+    {
+        if (dashArray == NULL || count <= 0)
+            return SetStatus(InvalidParameter); 
+        
+        return SetStatus(DllCall("gdiplus\GdipGetPenDashArray(nativePen, 
+                                                         dashArray, 
+                                                         count));
+    }
+
+    Status SetCompoundArray(IN const REAL* compoundArray,
+                            IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPenCompoundArray(nativePen, 
+                                                             compoundArray,
+                                                             count));
+    }
+
+    INT GetCompoundArrayCount() const
+    {
+        INT count = 0;
+        
+        SetStatus(DllCall("gdiplus\GdipGetPenCompoundCount(nativePen, &count));
+        
+        return count;
+    }
+
+    Status GetCompoundArray(OUT REAL* compoundArray, 
+                            IN INT count) const
+    {
+        if (compoundArray == NULL || count <= 0)
+            return SetStatus(InvalidParameter); 
+        
+        return SetStatus(DllCall("gdiplus\GdipGetPenCompoundArray(nativePen, 
+                                                             compoundArray, 
+                                                             count));
+    }
+
+    Status GetLastStatus() const
+    {
+        Status lastStatus = lastResult;
+        lastResult = Ok;
+
+        return lastStatus;
+    }
+
+private:
+    Pen(const Pen &);
+    Pen& operator=(const Pen &);
+
+protected:
+    Pen(GpPen* nativePen, Status status)
+    {
+        lastResult = status;
+        SetNativePen(nativePen);
+    }
+
+    VOID SetNativePen(GpPen* nativePen)
+    {
+        this->nativePen = nativePen;
+    }
+    
+    Status SetStatus(Status status) const
+    {
+        if (status != Ok)
+            return (lastResult = status);
+        else 
+            return status;
+    }
+
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+;   GdiplusGraphics.h
+
+class Graphics : public GdiplusBase
+{
+
+
+    ;~Graphics()
+    __Delete()
+    {
+        DllCall("GdipDeleteGraphics", this.Ptr, this.nativeGraphics)
+    }
+
+    Flush(intention = FlushIntentionFlush)
+    {
+        DllCall("gdiplus\GdipFlush", this.Ptr, this.nativeGraphics, intention);
+    }
+
+    ;------------------------------------------------------------------------
+    ; GDI Interop methods
+    ;------------------------------------------------------------------------
+
+    ; Locks the graphics until ReleaseDC is called
+
+    GetHDC()
+    {
+        VarSetCapacity(hdc, A_PtrSize, 0)
+        ,estat := DllCall("gdiplus\GdipGetDC"
+                         ,this.Ptr   ,nativeGraphics
+                         ,this.PtrA  ,hdc)
+        ,(estat) ? (this.lastResult := estat) : estat
+        Return (estat) ? 0 : hdc
+    }
+
+    ReleaseHDC(hdc)
+    {
+        estat := DllCall("gdiplus\GdipReleaseDC"
+                        ,this.Ptr   ,nativeGraphics
+                        ,this.Ptr   ,hdc)
+        ,(estat) ? (this.lastResult := estat) : estat
+    }
+
+    ;------------------------------------------------------------------------
+    ; Rendering modes
+    ;------------------------------------------------------------------------
+
+    SetRenderingOrigin(x, y)
+    {
+        estat := DllCall("gdiplus\GdipSetRenderingOrigin"
+                        ,this.Ptr ,this.nativeGraphics
+                        ,"Int"    ,x
+                        ,"Int"    ,y)
+        Return (estat) ? (this.lastResult := estat) : estat
+    }
+
+    GetRenderingOrigin(ByRef x, ByRef y)
+    {
+         VarSetCapacity(x, 4)
+        ,VarSetCapacity(y, 4)
+        ,estat := DllCall("gdiplus\GdipGetRenderingOrigin"
+                        ,this.Ptr ,this.nativeGraphics
+                        ,"Int"    ,&x
+                        ,"Int"    ,&y)
+        Return (estat) ? (this.lastResult := estat) : estat
+    }
+    
+    ; Expects a number from the CompositingMode enum
+    SetCompositingMode(compositingMode)
+    {
+        estat := DllCall("gdiplus\GdipSetCompositingMode"
+                        ,this.Ptr   ,this.nativeGraphics
+                        ,"UInt"      ,&compositingMode)
+        Return (estat) ? (this.lastResult := estat) : estat
+    }
+
+    GetCompositingMode()
+    {
+        VarSetCapacity(mode, "Int")
+        DllCall("gdiplus\GdipGetCompositingMode"
+                ,this.Ptr   ,this.nativeGraphics
+                ,"UInt"     ,&mode)
+        return mode
+    }
+
+    Status SetCompositingQuality(IN CompositingQuality compositingQuality)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetCompositingQuality(
+            nativeGraphics,
+            compositingQuality));
+    }
+
+    CompositingQuality GetCompositingQuality() const
+    {
+        CompositingQuality quality;
+
+        SetStatus(DllCall("gdiplus\GdipGetCompositingQuality(
+            nativeGraphics,
+            &quality));
+
+        return quality;
+    }
+
+    Status SetTextRenderingHint(IN TextRenderingHint newMode)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetTextRenderingHint(nativeGraphics,
+                                                          newMode));
+    }
+
+    TextRenderingHint GetTextRenderingHint() const
+    {
+        TextRenderingHint hint;
+
+        SetStatus(DllCall("gdiplus\GdipGetTextRenderingHint(nativeGraphics,
+                                                   &hint));
+
+        return hint;
+    }
+
+    Status SetTextContrast(IN UINT contrast)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetTextContrast(nativeGraphics,
+                                                          contrast));
+    }
+
+    UINT GetTextContrast() const
+    {
+        UINT contrast;
+
+        SetStatus(DllCall("gdiplus\GdipGetTextContrast(nativeGraphics,
+                                                    &contrast));
+
+        return contrast;
+    }
+
+    InterpolationMode GetInterpolationMode() const
+    {
+        InterpolationMode mode = InterpolationModeInvalid;
+
+        SetStatus(DllCall("gdiplus\GdipGetInterpolationMode(nativeGraphics,
+                                                           &mode));
+
+        return mode;
+    }
+
+    Status SetInterpolationMode(IN InterpolationMode interpolationMode)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetInterpolationMode(nativeGraphics,
+                                                           interpolationMode));
+    }
+
+#if (GDIPVER >= 0x0110)
+    Status SetAbort(GdiplusAbort *pIAbort)
+    {
+        return SetStatus(DllCall("gdiplus\GdipGraphicsSetAbort(
+            nativeGraphics,
+            pIAbort
+        ));
+    }
+#endif ;(GDIPVER >= 0x0110)
+
+    SmoothingMode GetSmoothingMode() const
+    {
+        SmoothingMode smoothingMode = SmoothingModeInvalid;
+
+        SetStatus(DllCall("gdiplus\GdipGetSmoothingMode(nativeGraphics,
+                                                   &smoothingMode));
+
+        return smoothingMode;
+    }
+
+    Status SetSmoothingMode(IN SmoothingMode smoothingMode)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetSmoothingMode(nativeGraphics,
+                                                          smoothingMode));
+    }
+
+    PixelOffsetMode GetPixelOffsetMode() const
+    {
+        PixelOffsetMode pixelOffsetMode = PixelOffsetModeInvalid;
+
+        SetStatus(DllCall("gdiplus\GdipGetPixelOffsetMode(nativeGraphics,
+                                                     &pixelOffsetMode));
+
+        return pixelOffsetMode;
+    }
+
+    Status SetPixelOffsetMode(IN PixelOffsetMode pixelOffsetMode)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPixelOffsetMode(nativeGraphics,
+                                                            pixelOffsetMode));
+    }
+
+    ;------------------------------------------------------------------------
+    ; Manipulate current world transform
+    ;------------------------------------------------------------------------
+
+    Status SetTransform(IN const Matrix* matrix)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetWorldTransform(nativeGraphics,
+                                                        matrix->nativeMatrix));
+    }
+    Status ResetTransform()
+    {
+        return SetStatus(DllCall("gdiplus\GdipResetWorldTransform(nativeGraphics));
+    }
+
+    Status MultiplyTransform(IN const Matrix* matrix,
+                             IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipMultiplyWorldTransform(nativeGraphics,
+                                                                matrix->nativeMatrix,
+                                                                order));
+    }
+
+    Status TranslateTransform(IN REAL dx,
+                              IN REAL dy,
+                              IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipTranslateWorldTransform(nativeGraphics,
+                                                               dx, dy, order));
+    }
+
+    Status ScaleTransform(IN REAL sx,
+                          IN REAL sy,
+                          IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipScaleWorldTransform(nativeGraphics,
+                                                             sx, sy, order));
+    }
+
+    Status RotateTransform(IN REAL angle,
+                           IN MatrixOrder order = MatrixOrderPrepend)
+    {
+        return SetStatus(DllCall("gdiplus\GdipRotateWorldTransform(nativeGraphics,
+                                                              angle, order));
+    }
+
+    Status GetTransform(OUT Matrix* matrix) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipGetWorldTransform(nativeGraphics,
+                                                           matrix->nativeMatrix));
+    }
+
+    Status SetPageUnit(IN Unit unit)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPageUnit(nativeGraphics,
+                                                     unit));
+    }
+
+    Status SetPageScale(IN REAL scale)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetPageScale(nativeGraphics,
+                                                      scale));
+    }
+
+    Unit GetPageUnit() const
+    {
+        Unit unit;
+
+        SetStatus(DllCall("gdiplus\GdipGetPageUnit(nativeGraphics, &unit));
+
+        return unit;
+    }
+
+    REAL GetPageScale() const
+    {
+        REAL scale;
+
+        SetStatus(DllCall("gdiplus\GdipGetPageScale(nativeGraphics, &scale));
+
+        return scale;
+    }
+
+    REAL GetDpiX() const
+    {
+        REAL dpi;
+
+        SetStatus(DllCall("gdiplus\GdipGetDpiX(nativeGraphics, &dpi));
+
+        return dpi;
+    }
+
+    REAL GetDpiY() const
+    {
+        REAL dpi;
+
+        SetStatus(DllCall("gdiplus\GdipGetDpiY(nativeGraphics, &dpi));
+
+        return dpi;
+    }
+
+    Status TransformPoints(IN CoordinateSpace destSpace,
+                           IN CoordinateSpace srcSpace,
+                           IN OUT PointF* pts,
+                           IN INT count) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipTransformPoints(nativeGraphics,
+                                                         destSpace,
+                                                         srcSpace,
+                                                         pts,
+                                                         count));
+    }
+
+    Status TransformPoints(IN CoordinateSpace destSpace,
+                           IN CoordinateSpace srcSpace,
+                           IN OUT Point* pts,
+                           IN INT count) const
+    {
+
+        return SetStatus(DllCall("gdiplus\GdipTransformPointsI(nativeGraphics,
+                                                          destSpace,
+                                                          srcSpace,
+                                                          pts,
+                                                          count));
+    }
+
+    ;------------------------------------------------------------------------
+    ; GetNearestColor (for <= 8bpp surfaces).  Note: Alpha is ignored.
+    ;------------------------------------------------------------------------
+    
+    Status GetNearestColor(IN OUT Color* color) const
+    {
+        if (color == NULL)
+        {
+            return SetStatus(InvalidParameter);
+        }
+
+        ARGB argb = color->GetValue();
+
+        Status status = SetStatus(DllCall("gdiplus\GdipGetNearestColor(nativeGraphics, &argb));
+
+        color->SetValue(argb);
+
+        return status;
+    }
+
+    Status DrawLine(IN const Pen* pen,
+                    IN REAL x1,
+                    IN REAL y1,
+                    IN REAL x2,
+                    IN REAL y2)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawLine(nativeGraphics,
+                                                  pen->nativePen, x1, y1, x2,
+                                                  y2));
+    }
+
+    Status DrawLine(IN const Pen* pen,
+                    IN const PointF& pt1,
+                    IN const PointF& pt2)
+    {
+        return DrawLine(pen, pt1.X, pt1.Y, pt2.X, pt2.Y);
+    }
+
+    Status DrawLines(IN const Pen* pen,
+                     IN const PointF* points,
+                     IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawLines(nativeGraphics,
+                                                   pen->nativePen,
+                                                   points, count));
+    }
+
+    Status DrawLine(IN const Pen* pen,
+                    IN INT x1,
+                    IN INT y1,
+                    IN INT x2,
+                    IN INT y2)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawLineI(nativeGraphics,
+                                                   pen->nativePen,
+                                                   x1,
+                                                   y1,
+                                                   x2,
+                                                   y2));
+    }
+
+    Status DrawLine(IN const Pen* pen,
+                    IN const Point& pt1,
+                    IN const Point& pt2)
+    {
+        return DrawLine(pen,
+                        pt1.X,
+                        pt1.Y,
+                        pt2.X,
+                        pt2.Y);
+    }
+
+    Status DrawLines(IN const Pen* pen,
+                     IN const Point* points,
+                     IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawLinesI(nativeGraphics,
+                                                    pen->nativePen,
+                                                    points,
+                                                    count));
+    }
+
+    Status DrawArc(IN const Pen* pen,
+                   IN REAL x,
+                   IN REAL y,
+                   IN REAL width,
+                   IN REAL height,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawArc(nativeGraphics,
+                                                 pen->nativePen,
+                                                 x,
+                                                 y,
+                                                 width,
+                                                 height,
+                                                 startAngle,
+                                                 sweepAngle));
+    }
+
+    Status DrawArc(IN const Pen* pen,
+                   IN const RectF& rect,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return DrawArc(pen, rect.X, rect.Y, rect.Width, rect.Height,
+                       startAngle, sweepAngle);
+    }
+
+    Status DrawArc(IN const Pen* pen,
+                   IN INT x,
+                   IN INT y,
+                   IN INT width,
+                   IN INT height,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawArcI(nativeGraphics,
+                                                  pen->nativePen,
+                                                  x,
+                                                  y,
+                                                  width,
+                                                  height,
+                                                  startAngle,
+                                                  sweepAngle));
+    }
+
+
+    Status DrawArc(IN const Pen* pen,
+                   IN const Rect& rect,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return DrawArc(pen,
+                       rect.X,
+                       rect.Y,
+                       rect.Width,
+                       rect.Height,
+                       startAngle,
+                       sweepAngle);
+    }
+
+    Status DrawBezier(IN const Pen* pen,
+                      IN REAL x1,
+                      IN REAL y1,
+                      IN REAL x2,
+                      IN REAL y2,
+                      IN REAL x3,
+                      IN REAL y3,
+                      IN REAL x4,
+                      IN REAL y4)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawBezier(nativeGraphics,
+                                                    pen->nativePen, x1, y1,
+                                                    x2, y2, x3, y3, x4, y4));
+    }
+
+    Status DrawBezier(IN const Pen* pen,
+                      IN const PointF& pt1,
+                      IN const PointF& pt2,
+                      IN const PointF& pt3,
+                      IN const PointF& pt4)
+    {
+        return DrawBezier(pen,
+                          pt1.X,
+                          pt1.Y,
+                          pt2.X,
+                          pt2.Y,
+                          pt3.X,
+                          pt3.Y,
+                          pt4.X,
+                          pt4.Y);
+    }
+
+    Status DrawBeziers(IN const Pen* pen,
+                       IN const PointF* points,
+                       IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawBeziers(nativeGraphics,
+                                                     pen->nativePen,
+                                                     points,
+                                                     count));
+    }
+
+    Status DrawBezier(IN const Pen* pen,
+                      IN INT x1,
+                      IN INT y1,
+                      IN INT x2,
+                      IN INT y2,
+                      IN INT x3,
+                      IN INT y3,
+                      IN INT x4,
+                      IN INT y4)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawBezierI(nativeGraphics,
+                                                     pen->nativePen,
+                                                     x1,
+                                                     y1,
+                                                     x2,
+                                                     y2,
+                                                     x3,
+                                                     y3,
+                                                     x4,
+                                                     y4));
+    }
+
+    Status DrawBezier(IN const Pen* pen,
+                      IN const Point& pt1,
+                      IN const Point& pt2,
+                      IN const Point& pt3,
+                      IN const Point& pt4)
+    {
+        return DrawBezier(pen,
+                          pt1.X,
+                          pt1.Y,
+                          pt2.X,
+                          pt2.Y,
+                          pt3.X,
+                          pt3.Y,
+                          pt4.X,
+                          pt4.Y);
+    }
+
+    Status DrawBeziers(IN const Pen* pen,
+                       IN const Point* points,
+                       IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawBeziersI(nativeGraphics,
+                                                      pen->nativePen,
+                                                      points,
+                                                      count));
+    }
+
+    Status DrawRectangle(IN const Pen* pen,
+                         IN const RectF& rect)
+    {
+        return DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    Status DrawRectangle(IN const Pen* pen,
+                         IN REAL x,
+                         IN REAL y,
+                         IN REAL width,
+                         IN REAL height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawRectangle(nativeGraphics,
+                                                       pen->nativePen, x, y,
+                                                       width, height));
+    }
+
+    Status DrawRectangles(IN const Pen* pen,
+                          IN const RectF* rects,
+                          IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawRectangles(nativeGraphics,
+                                                        pen->nativePen,
+                                                        rects, count));
+    }
+
+    Status DrawRectangle(IN const Pen* pen,
+                         IN const Rect& rect)
+    {
+        return DrawRectangle(pen,
+                             rect.X,
+                             rect.Y,
+                             rect.Width,
+                             rect.Height);
+    }
+
+    Status DrawRectangle(IN const Pen* pen,
+                         IN INT x,
+                         IN INT y,
+                         IN INT width,
+                         IN INT height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawRectangleI(nativeGraphics,
+                                                        pen->nativePen,
+                                                        x,
+                                                        y,
+                                                        width,
+                                                        height));
+    }
+
+    Status DrawRectangles(IN const Pen* pen,
+                          IN const Rect* rects,
+                          IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawRectanglesI(nativeGraphics,
+                                                         pen->nativePen,
+                                                         rects,
+                                                         count));
+    }
+
+    Status DrawEllipse(IN const Pen* pen,
+                       IN const RectF& rect)
+    {
+        return DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    Status DrawEllipse(IN const Pen* pen,
+                       IN REAL x,
+                       IN REAL y,
+                       IN REAL width,
+                       IN REAL height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawEllipse(nativeGraphics,
+                                                     pen->nativePen,
+                                                     x,
+                                                     y,
+                                                     width,
+                                                     height));
+    }
+
+    Status DrawEllipse(IN const Pen* pen,
+                       IN const Rect& rect)
+    {
+        return DrawEllipse(pen,
+                           rect.X,
+                           rect.Y,
+                           rect.Width,
+                           rect.Height);
+    }
+
+    Status DrawEllipse(IN const Pen* pen,
+                       IN INT x,
+                       IN INT y,
+                       IN INT width,
+                       IN INT height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawEllipseI(nativeGraphics,
+                                                      pen->nativePen,
+                                                      x,
+                                                      y,
+                                                      width,
+                                                      height));
+    }
+
+    Status DrawPie(IN const Pen* pen,
+                   IN const RectF& rect,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return DrawPie(pen,
+                       rect.X,
+                       rect.Y,
+                       rect.Width,
+                       rect.Height,
+                       startAngle,
+                       sweepAngle);
+    }
+
+    Status DrawPie(IN const Pen* pen,
+                   IN REAL x,
+                   IN REAL y,
+                   IN REAL width,
+                   IN REAL height,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawPie(nativeGraphics,
+                                                 pen->nativePen,
+                                                 x,
+                                                 y,
+                                                 width,
+                                                 height,
+                                                 startAngle,
+                                                 sweepAngle));
+    }
+
+    Status DrawPie(IN const Pen* pen,
+                   IN const Rect& rect,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return DrawPie(pen,
+                       rect.X,
+                       rect.Y,
+                       rect.Width,
+                       rect.Height,
+                       startAngle,
+                       sweepAngle);
+    }
+
+    Status DrawPie(IN const Pen* pen,
+                   IN INT x,
+                   IN INT y,
+                   IN INT width,
+                   IN INT height,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawPieI(nativeGraphics,
+                                                  pen->nativePen,
+                                                  x,
+                                                  y,
+                                                  width,
+                                                  height,
+                                                  startAngle,
+                                                  sweepAngle));
+    }
+
+    Status DrawPolygon(IN const Pen* pen,
+                       IN const PointF* points,
+                       IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawPolygon(nativeGraphics,
+                                                     pen->nativePen,
+                                                     points,
+                                                     count));
+    }
+
+    Status DrawPolygon(IN const Pen* pen,
+                       IN const Point* points,
+                       IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawPolygonI(nativeGraphics,
+                                                      pen->nativePen,
+                                                      points,
+                                                      count));
+    }
+
+    Status DrawPath(IN const Pen* pen,
+                    IN const GraphicsPath* path)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawPath(nativeGraphics,
+                                                  pen ? pen->nativePen : NULL,
+                                                  path ? path->nativePath : NULL));
+    }
+
+    Status DrawCurve(IN const Pen* pen,
+                     IN const PointF* points,
+                     IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCurve(nativeGraphics,
+                                                   pen->nativePen, points,
+                                                   count));
+    }
+
+    Status DrawCurve(IN const Pen* pen,
+                     IN const PointF* points,
+                     IN INT count,
+                     IN REAL tension)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCurve2(nativeGraphics,
+                                                    pen->nativePen, points,
+                                                    count, tension));
+    }
+
+    Status DrawCurve(IN const Pen* pen,
+                     IN const PointF* points,
+                     IN INT count,
+                     IN INT offset,
+                     IN INT numberOfSegments,
+                     IN REAL tension = 0.5f)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCurve3(nativeGraphics,
+                                                    pen->nativePen, points,
+                                                    count, offset,
+                                                    numberOfSegments, tension));
+    }
+
+    Status DrawCurve(IN const Pen* pen,
+                     IN const Point* points,
+                     IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCurveI(nativeGraphics,
+                                                    pen->nativePen,
+                                                    points,
+                                                    count));
+    }
+
+    Status DrawCurve(IN const Pen* pen,
+                     IN const Point* points,
+                     IN INT count,
+                     IN REAL tension)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCurve2I(nativeGraphics,
+                                                     pen->nativePen,
+                                                     points,
+                                                     count,
+                                                     tension));
+    }
+
+    Status DrawCurve(IN const Pen* pen,
+                     IN const Point* points,
+                     IN INT count,
+                     IN INT offset,
+                     IN INT numberOfSegments,
+                     IN REAL tension = 0.5f)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCurve3I(nativeGraphics,
+                                                     pen->nativePen,
+                                                     points,
+                                                     count,
+                                                     offset,
+                                                     numberOfSegments,
+                                                     tension));
+    }
+
+    Status DrawClosedCurve(IN const Pen* pen,
+                           IN const PointF* points,
+                           IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawClosedCurve(nativeGraphics,
+                                                         pen->nativePen,
+                                                         points, count));
+    }
+
+    Status DrawClosedCurve(IN const Pen *pen,
+                           IN const PointF* points,
+                           IN INT count,
+                           IN REAL tension)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawClosedCurve2(nativeGraphics,
+                                                          pen->nativePen,
+                                                          points, count,
+                                                          tension));
+    }
+
+    Status DrawClosedCurve(IN const Pen* pen,
+                           IN const Point* points,
+                           IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawClosedCurveI(nativeGraphics,
+                                                          pen->nativePen,
+                                                          points,
+                                                          count));
+    }
+
+    Status DrawClosedCurve(IN const Pen *pen,
+                           IN const Point* points,
+                           IN INT count,
+                           IN REAL tension)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawClosedCurve2I(nativeGraphics,
+                                                           pen->nativePen,
+                                                           points,
+                                                           count,
+                                                           tension));
+    }
+
+    Status Clear(IN const Color &color)
+    {
+        return SetStatus(DllCall("gdiplus\GdipGraphicsClear(
+            nativeGraphics,
+            color.GetValue()));
+    }
+
+    Status FillRectangle(IN const Brush* brush,
+                         IN const RectF& rect)
+    {
+        return FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    Status FillRectangle(IN const Brush* brush,
+                         IN REAL x,
+                         IN REAL y,
+                         IN REAL width,
+                         IN REAL height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillRectangle(nativeGraphics,
+                                                       brush->nativeBrush, x, y,
+                                                       width, height));
+    }
+
+    Status FillRectangles(IN const Brush* brush,
+                          IN const RectF* rects,
+                          IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillRectangles(nativeGraphics,
+                                                        brush->nativeBrush,
+                                                        rects, count));
+    }
+
+    Status FillRectangle(IN const Brush* brush,
+                         IN const Rect& rect)
+    {
+        return FillRectangle(brush,
+                             rect.X,
+                             rect.Y,
+                             rect.Width,
+                             rect.Height);
+    }
+
+    Status FillRectangle(IN const Brush* brush,
+                         IN INT x,
+                         IN INT y,
+                         IN INT width,
+                         IN INT height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillRectangleI(nativeGraphics,
+                                                        brush->nativeBrush,
+                                                        x,
+                                                        y,
+                                                        width,
+                                                        height));
+    }
+
+    Status FillRectangles(IN const Brush* brush,
+                          IN const Rect* rects,
+                          IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillRectanglesI(nativeGraphics,
+                                                         brush->nativeBrush,
+                                                         rects,
+                                                         count));
+    }
+
+    Status FillPolygon(IN const Brush* brush,
+                       IN const PointF* points,
+                       IN INT count)
+    {
+        return FillPolygon(brush, points, count, FillModeAlternate);
+    }
+
+    Status FillPolygon(IN const Brush* brush,
+                       IN const PointF* points,
+                       IN INT count,
+                       IN FillMode fillMode)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillPolygon(nativeGraphics,
+                                                     brush->nativeBrush,
+                                                     points, count, fillMode));
+    }
+
+    Status FillPolygon(IN const Brush* brush,
+                       IN const Point* points,
+                       IN INT count)
+    {
+        return FillPolygon(brush, points, count, FillModeAlternate);
+    }
+
+    Status FillPolygon(IN const Brush* brush,
+                       IN const Point* points,
+                       IN INT count,
+                       IN FillMode fillMode)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillPolygonI(nativeGraphics,
+                                                      brush->nativeBrush,
+                                                      points, count,
+                                                      fillMode));
+    }
+
+    Status FillEllipse(IN const Brush* brush,
+                       IN const RectF& rect)
+    {
+        return FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    Status FillEllipse(IN const Brush* brush,
+                       IN REAL x,
+                       IN REAL y,
+                       IN REAL width,
+                       IN REAL height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillEllipse(nativeGraphics,
+                                                     brush->nativeBrush, x, y,
+                                                     width, height));
+    }
+
+    Status FillEllipse(IN const Brush* brush,
+                       IN const Rect& rect)
+    {
+        return FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    Status FillEllipse(IN const Brush* brush,
+                       IN INT x,
+                       IN INT y,
+                       IN INT width,
+                       IN INT height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillEllipseI(nativeGraphics,
+                                                      brush->nativeBrush,
+                                                      x,
+                                                      y,
+                                                      width,
+                                                      height));
+    }
+
+    Status FillPie(IN const Brush* brush,
+                   IN const RectF& rect,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return FillPie(brush, rect.X, rect.Y, rect.Width, rect.Height,
+                       startAngle, sweepAngle);
+    }
+
+    Status FillPie(IN const Brush* brush,
+                   IN REAL x,
+                   IN REAL y,
+                   IN REAL width,
+                   IN REAL height,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillPie(nativeGraphics,
+                                                 brush->nativeBrush, x, y,
+                                                 width, height, startAngle,
+                                                 sweepAngle));
+    }
+
+    Status FillPie(IN const Brush* brush,
+                   IN const Rect& rect,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return FillPie(brush, rect.X, rect.Y, rect.Width, rect.Height,
+                       startAngle, sweepAngle);
+    }
+
+    Status FillPie(IN const Brush* brush,
+                   IN INT x,
+                   IN INT y,
+                   IN INT width,
+                   IN INT height,
+                   IN REAL startAngle,
+                   IN REAL sweepAngle)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillPieI(nativeGraphics,
+                                                  brush->nativeBrush,
+                                                  x,
+                                                  y,
+                                                  width,
+                                                  height,
+                                                  startAngle,
+                                                  sweepAngle));
+    }
+
+    Status FillPath(IN const Brush* brush,
+                    IN const GraphicsPath* path)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillPath(nativeGraphics,
+                                                  brush->nativeBrush,
+                                                  path->nativePath));
+    }
+
+    Status FillClosedCurve(IN const Brush* brush,
+                           IN const PointF* points,
+                           IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillClosedCurve(nativeGraphics,
+                                                         brush->nativeBrush,
+                                                         points, count));
+
+    }
+
+    Status FillClosedCurve(IN const Brush* brush,
+                           IN const PointF* points,
+                           IN INT count,
+                           IN FillMode fillMode,
+                           IN REAL tension = 0.5f)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillClosedCurve2(nativeGraphics,
+                                                          brush->nativeBrush,
+                                                          points, count,
+                                                          tension, fillMode));
+    }
+
+    Status FillClosedCurve(IN const Brush* brush,
+                           IN const Point* points,
+                           IN INT count)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillClosedCurveI(nativeGraphics,
+                                                          brush->nativeBrush,
+                                                          points,
+                                                          count));
+    }
+
+    Status FillClosedCurve(IN const Brush* brush,
+                           IN const Point* points,
+                           IN INT count,
+                           IN FillMode fillMode,
+                           IN REAL tension = 0.5f)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillClosedCurve2I(nativeGraphics,
+                                                           brush->nativeBrush,
+                                                           points, count,
+                                                           tension, fillMode));
+    }
+
+    Status FillRegion(IN const Brush* brush,
+                      IN const Region* region)
+    {
+        return SetStatus(DllCall("gdiplus\GdipFillRegion(nativeGraphics,
+                                                    brush->nativeBrush,
+                                                    region->nativeRegion));
+    }
+
+    Status
+    DrawString(
+        IN const WCHAR        *string,
+        IN INT                 length,
+        IN const Font         *font,
+        IN const RectF        &layoutRect,
+        IN const StringFormat *stringFormat,
+        IN const Brush        *brush
+    )
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &layoutRect,
+            stringFormat ? stringFormat->nativeFormat : NULL,
+            brush ? brush->nativeBrush : NULL
+        ));
+    }
+
+    Status
+    DrawString(
+        const WCHAR        *string,
+        INT                 length,
+        const Font         *font,
+        const PointF       &origin,
+        const Brush        *brush
+    )
+    {
+        RectF rect(origin.X, origin.Y, 0.0f, 0.0f);
+
+        return SetStatus(DllCall("gdiplus\GdipDrawString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &rect,
+            NULL,
+            brush ? brush->nativeBrush : NULL
+        ));
+    }
+
+    Status
+    DrawString(
+        const WCHAR        *string,
+        INT                 length,
+        const Font         *font,
+        const PointF       &origin,
+        const StringFormat *stringFormat,
+        const Brush        *brush
+    )
+    {
+        RectF rect(origin.X, origin.Y, 0.0f, 0.0f);
+
+        return SetStatus(DllCall("gdiplus\GdipDrawString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &rect,
+            stringFormat ? stringFormat->nativeFormat : NULL,
+            brush ? brush->nativeBrush : NULL
+        ));
+    }
+
+    Status
+    MeasureString(
+        IN const WCHAR        *string,
+        IN INT                 length,
+        IN const Font         *font,
+        IN const RectF        &layoutRect,
+        IN const StringFormat *stringFormat,
+        OUT RectF             *boundingBox,
+        OUT INT               *codepointsFitted = 0,
+        OUT INT               *linesFilled      = 0
+    ) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipMeasureString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &layoutRect,
+            stringFormat ? stringFormat->nativeFormat : NULL,
+            boundingBox,
+            codepointsFitted,
+            linesFilled
+        ));
+    }
+
+    Status
+    MeasureString(
+        IN const WCHAR        *string,
+        IN INT                 length,
+        IN const Font         *font,
+        IN const SizeF        &layoutRectSize,
+        IN const StringFormat *stringFormat,
+        OUT SizeF             *size,
+        OUT INT               *codepointsFitted = 0,
+        OUT INT               *linesFilled      = 0
+    ) const
+    {
+        RectF   layoutRect(0, 0, layoutRectSize.Width, layoutRectSize.Height);
+        RectF   boundingBox;
+        Status  status;
+
+        if (size == NULL)
+        {
+            return SetStatus(InvalidParameter);
+        }
+
+        status = SetStatus(DllCall("gdiplus\GdipMeasureString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &layoutRect,
+            stringFormat ? stringFormat->nativeFormat : NULL,
+            size ? &boundingBox : NULL,
+            codepointsFitted,
+            linesFilled
+        ));
+
+        if (size && status == Ok)
+        {
+            size->Width  = boundingBox.Width;
+            size->Height = boundingBox.Height;
+        }
+
+        return status;
+    }
+
+    Status
+    MeasureString(
+        IN const WCHAR        *string,
+        IN INT                 length,
+        IN const Font         *font,
+        IN const PointF       &origin,
+        IN const StringFormat *stringFormat,
+        OUT RectF             *boundingBox
+    ) const
+    {
+        RectF rect(origin.X, origin.Y, 0.0f, 0.0f);
+
+        return SetStatus(DllCall("gdiplus\GdipMeasureString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &rect,
+            stringFormat ? stringFormat->nativeFormat : NULL,
+            boundingBox,
+            NULL,
+            NULL
+        ));
+    }
+
+    Status
+    MeasureString(
+        IN const WCHAR  *string,
+        IN INT           length,
+        IN const Font   *font,
+        IN const RectF  &layoutRect,
+        OUT RectF       *boundingBox
+    ) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipMeasureString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &layoutRect,
+            NULL,
+            boundingBox,
+            NULL,
+            NULL
+        ));
+    }
+
+    Status
+    MeasureString(
+        IN const WCHAR  *string,
+        IN INT           length,
+        IN const Font   *font,
+        IN const PointF &origin,
+        OUT RectF       *boundingBox
+    ) const
+    {
+        RectF rect(origin.X, origin.Y, 0.0f, 0.0f);
+
+        return SetStatus(DllCall("gdiplus\GdipMeasureString(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            &rect,
+            NULL,
+            boundingBox,
+            NULL,
+            NULL
+        ));
+    }
+
+
+    Status
+    MeasureCharacterRanges(
+        IN const WCHAR        *string,
+        IN INT                 length,
+        IN const Font         *font,
+        IN const RectF        &layoutRect,
+        IN const StringFormat *stringFormat,
+        IN INT                 regionCount,
+        OUT Region            *regions
+    ) const
+    {
+        if (!regions || regionCount <= 0)
+        {
+            return InvalidParameter;
+        }
+
+        GpRegion **nativeRegions = new GpRegion* [regionCount];
+
+        if (!nativeRegions)
+        {
+            return OutOfMemory;
+        }
+
+        for (INT i = 0; i < regionCount; i++)
+        {
+            nativeRegions[i] = regions[i].nativeRegion;
+        }
+
+        Status status = SetStatus(DllCall("gdiplus\GdipMeasureCharacterRanges(
+            nativeGraphics,
+            string,
+            length,
+            font ? font->nativeFont : NULL,
+            layoutRect,
+            stringFormat ? stringFormat->nativeFormat : NULL,
+            regionCount,
+            nativeRegions
+        ));
+
+        delete [] nativeRegions;
+
+        return status;
+    }
+
+    Status DrawDriverString(
+        IN const UINT16  *text,
+        IN INT            length,
+        IN const Font    *font,
+        IN const Brush   *brush,
+        IN const PointF  *positions,
+        IN INT            flags,
+        IN const Matrix        *matrix
+    )
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawDriverString(
+            nativeGraphics,
+            text,
+            length,
+            font ? font->nativeFont : NULL,
+            brush ? brush->nativeBrush : NULL,
+            positions,
+            flags,
+            matrix ? matrix->nativeMatrix : NULL
+        ));
+    }
+
+    Status MeasureDriverString(
+        IN const UINT16  *text,
+        IN INT            length,
+        IN const Font    *font,
+        IN const PointF  *positions,
+        IN INT            flags,
+        IN const Matrix        *matrix,
+        OUT RectF        *boundingBox
+    ) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipMeasureDriverString(
+            nativeGraphics,
+            text,
+            length,
+            font ? font->nativeFont : NULL,
+            positions,
+            flags,
+            matrix ? matrix->nativeMatrix : NULL,
+            boundingBox
+        ));
+    }
+
+    ; Draw a cached bitmap on this graphics destination offset by
+    ; x, y. Note this will fail with WrongState if the CachedBitmap
+    ; native format differs from this Graphics.
+
+    Status DrawCachedBitmap(IN CachedBitmap *cb,
+                            IN INT x,
+                            IN INT y)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawCachedBitmap(
+            nativeGraphics,
+            cb->nativeCachedBitmap,
+            x, y
+        ));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const PointF& point)
+    {
+        return DrawImage(image, point.X, point.Y);
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN REAL x,
+                     IN REAL y)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImage(nativeGraphics,
+                                                   image ? image->nativeImage
+                                                         : NULL,
+                                                   x,
+                                                   y));
+    }
+
+    Status DrawImage(IN Image* image, 
+                     IN const RectF& rect)
+    {
+        return DrawImage(image, rect.X, rect.Y, rect.Width, rect.Height);
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN REAL x,
+                     IN REAL y,
+                     IN REAL width,
+                     IN REAL height)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageRect(nativeGraphics,
+                                                       image ? image->nativeImage
+                                                             : NULL,
+                                                       x,
+                                                       y,
+                                                       width,
+                                                       height));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const Point& point)
+    {
+        return DrawImage(image, point.X, point.Y);
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN INT x,
+                     IN INT y)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageI(nativeGraphics,
+                                                    image ? image->nativeImage
+                                                          : NULL,
+                                                    x,
+                                                    y));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const Rect& rect)
+    {
+        return DrawImage(image,
+                         rect.X,
+                         rect.Y,
+                         rect.Width,
+                         rect.Height);
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN INT x,
+                     IN INT y,
+                     IN INT width,
+                     IN INT height) {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageRectI(nativeGraphics,
+                                                        image ? image->nativeImage
+                                                              : NULL,
+                                                        x,
+                                                        y,
+                                                        width,
+                                                        height));
+    }
+
+    
+    Status DrawImage(IN Image* image,
+                     IN const PointF* destPoints,
+                     IN INT count)
+    {
+        if (count != 3 && count != 4)
+            return SetStatus(InvalidParameter);
+
+        return SetStatus(DllCall("gdiplus\GdipDrawImagePoints(nativeGraphics,
+                                                         image ? image->nativeImage
+                                                               : NULL,
+                                                         destPoints, count));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const Point* destPoints,
+                     IN INT count)
+    {
+        if (count != 3 && count != 4)
+            return SetStatus(InvalidParameter);
+
+        return SetStatus(DllCall("gdiplus\GdipDrawImagePointsI(nativeGraphics,
+                                                          image ? image->nativeImage
+                                                                : NULL,
+                                                          destPoints,
+                                                          count));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN REAL x,
+                     IN REAL y,
+                     IN REAL srcx,
+                     IN REAL srcy,
+                     IN REAL srcwidth,
+                     IN REAL srcheight,
+                     IN Unit srcUnit)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImagePointRect(nativeGraphics,
+                                                            image ? image->nativeImage
+                                                                  : NULL,
+                                                            x, y,
+                                                            srcx, srcy,
+                                                            srcwidth, srcheight, srcUnit));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const RectF& destRect,
+                     IN REAL srcx,
+                     IN REAL srcy,
+                     IN REAL srcwidth,
+                     IN REAL srcheight,
+                     IN Unit srcUnit,
+                     IN const ImageAttributes* imageAttributes = NULL,
+                     IN DrawImageAbort callback = NULL,
+                     IN VOID* callbackData = NULL)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageRectRect(nativeGraphics,
+                                                           image ? image->nativeImage
+                                                                 : NULL,
+                                                           destRect.X,
+                                                           destRect.Y,
+                                                           destRect.Width,
+                                                           destRect.Height,
+                                                           srcx, srcy,
+                                                           srcwidth, srcheight,
+                                                           srcUnit,
+                                                           imageAttributes
+                                                            ? imageAttributes->nativeImageAttr
+                                                            : NULL,
+                                                           callback,
+                                                           callbackData));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const PointF* destPoints,
+                     IN INT count,
+                     IN REAL srcx,
+                     IN REAL srcy,
+                     IN REAL srcwidth,
+                     IN REAL srcheight,
+                     IN Unit srcUnit,
+                     IN const ImageAttributes* imageAttributes = NULL,
+                     IN DrawImageAbort callback = NULL,
+                     IN VOID* callbackData = NULL)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImagePointsRect(nativeGraphics,
+                                                             image ? image->nativeImage
+                                                                   : NULL,
+                                                             destPoints, count,
+                                                             srcx, srcy,
+                                                             srcwidth,
+                                                             srcheight,
+                                                             srcUnit,
+                                                             imageAttributes
+                                                              ? imageAttributes->nativeImageAttr
+                                                              : NULL,
+                                                             callback,
+                                                             callbackData));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN INT x,
+                     IN INT y,
+                     IN INT srcx,
+                     IN INT srcy,
+                     IN INT srcwidth,
+                     IN INT srcheight,
+                     IN Unit srcUnit)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImagePointRectI(nativeGraphics,
+                                                             image ? image->nativeImage
+                                                                   : NULL,
+                                                             x,
+                                                             y,
+                                                             srcx,
+                                                             srcy,
+                                                             srcwidth,
+                                                             srcheight,
+                                                             srcUnit));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const Rect& destRect,
+                     IN INT srcx,
+                     IN INT srcy,
+                     IN INT srcwidth,
+                     IN INT srcheight,
+                     IN Unit srcUnit,
+                     IN const ImageAttributes* imageAttributes = NULL,
+                     IN DrawImageAbort callback = NULL,
+                     IN VOID* callbackData = NULL)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageRectRectI(nativeGraphics,
+                                                            image ? image->nativeImage
+                                                                  : NULL,
+                                                            destRect.X,
+                                                            destRect.Y,
+                                                            destRect.Width,
+                                                            destRect.Height,
+                                                            srcx,
+                                                            srcy,
+                                                            srcwidth,
+                                                            srcheight,
+                                                            srcUnit,
+                                                            imageAttributes
+                                                            ? imageAttributes->nativeImageAttr
+                                                            : NULL,
+                                                            callback,
+                                                            callbackData));
+    }
+
+    Status DrawImage(IN Image* image,
+                     IN const Point* destPoints,
+                     IN INT count,
+                     IN INT srcx,
+                     IN INT srcy,
+                     IN INT srcwidth,
+                     IN INT srcheight,
+                     IN Unit srcUnit,
+                     IN const ImageAttributes* imageAttributes = NULL,
+                     IN DrawImageAbort callback = NULL,
+                     IN VOID* callbackData = NULL)
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImagePointsRectI(nativeGraphics,
+                                                              image ? image->nativeImage
+                                                                    : NULL,
+                                                              destPoints,
+                                                              count,
+                                                              srcx,
+                                                              srcy,
+                                                              srcwidth,
+                                                              srcheight,
+                                                              srcUnit,
+                                                              imageAttributes
+                                                               ? imageAttributes->nativeImageAttr
+                                                               : NULL,
+                                                              callback,
+                                                              callbackData));
+    }
+    
+#if (GDIPVER >= 0x0110)
+    Status DrawImage(
+        IN Image *image,
+        IN const RectF &destRect,
+        IN const RectF &sourceRect,
+        IN Unit srcUnit,
+        IN const ImageAttributes *imageAttributes = NULL
+    )
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageRectRect(
+            nativeGraphics,
+            image->nativeImage,
+            destRect.X,
+            destRect.Y,
+            destRect.Width,
+            destRect.Height,
+            sourceRect.X,
+            sourceRect.Y,
+            sourceRect.Width,
+            sourceRect.Height,
+            srcUnit,
+            imageAttributes ? imageAttributes->nativeImageAttr : NULL,
+            NULL,
+            NULL
+        ));
+    }
+
+    Status DrawImage(
+        IN Image *image,
+        IN RectF *sourceRect,
+        IN Matrix *xForm,
+        IN Effect *effect,
+        IN ImageAttributes *imageAttributes,
+        IN Unit srcUnit
+    )
+    {
+        return SetStatus(DllCall("gdiplus\GdipDrawImageFX(
+            nativeGraphics,
+            image->nativeImage,
+            sourceRect,
+            xForm ? xForm->nativeMatrix : NULL,
+            effect ? effect->nativeEffect : NULL,
+            imageAttributes ? imageAttributes->nativeImageAttr : NULL,
+            srcUnit
+        ));
+    }
+#endif ;(GDIPVER >= 0x0110)
+
+    ; The following methods are for playing an EMF+ to a graphics
+    ; via the enumeration interface.  Each record of the EMF+ is
+    ; sent to the callback (along with the callbackData).  Then
+    ; the callback can invoke the Metafile::PlayRecord method
+    ; to play the particular record.
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const PointF &          destPoint,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileDestPoint(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoint,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const Point &           destPoint,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileDestPointI(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoint,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const RectF &           destRect,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileDestRect(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destRect,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const Rect &            destRect,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileDestRectI(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destRect,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const PointF *          destPoints,
+        IN INT                     count,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileDestPoints(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoints,
+                    count,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const Point *           destPoints,
+        IN INT                     count,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileDestPointsI(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoints,
+                    count,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const PointF &          destPoint,
+        IN const RectF &           srcRect,
+        IN Unit                    srcUnit,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileSrcRectDestPoint(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoint,
+                    srcRect,
+                    srcUnit,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const Point &           destPoint,
+        IN const Rect &            srcRect,
+        IN Unit                    srcUnit,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileSrcRectDestPointI(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoint,
+                    srcRect,
+                    srcUnit,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const RectF &           destRect,
+        IN const RectF &           srcRect,
+        IN Unit                    srcUnit,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileSrcRectDestRect(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destRect,
+                    srcRect,
+                    srcUnit,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const Rect &            destRect,
+        IN const Rect &            srcRect,
+        IN Unit                    srcUnit,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileSrcRectDestRectI(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destRect,
+                    srcRect,
+                    srcUnit,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const PointF *          destPoints,
+        IN INT                     count,
+        IN const RectF &           srcRect,
+        IN Unit                    srcUnit,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileSrcRectDestPoints(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoints,
+                    count,
+                    srcRect,
+                    srcUnit,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+
+    Status
+    EnumerateMetafile(
+        IN const Metafile *        metafile,
+        IN const Point *           destPoints,
+        IN INT                     count,
+        IN const Rect &            srcRect,
+        IN Unit                    srcUnit,
+        IN EnumerateMetafileProc   callback,
+        IN VOID *                  callbackData    = NULL,
+        IN const ImageAttributes *       imageAttributes = NULL
+        )
+    {
+        return SetStatus(DllCall("gdiplus\GdipEnumerateMetafileSrcRectDestPointsI(
+                    nativeGraphics,
+                    (const GpMetafile *)(metafile ? metafile->nativeImage:NULL),
+                    destPoints,
+                    count,
+                    srcRect,
+                    srcUnit,
+                    callback,
+                    callbackData,
+                    imageAttributes ? imageAttributes->nativeImageAttr : NULL));
+    }
+    
+    Status SetClip(IN const Graphics* g,
+                   IN CombineMode combineMode = CombineModeReplace)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipGraphics(nativeGraphics,
+                                                         g->nativeGraphics,
+                                                         combineMode));
+    }
+
+    Status SetClip(IN const RectF& rect,
+                   IN CombineMode combineMode = CombineModeReplace)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRect(nativeGraphics,
+                                                     rect.X, rect.Y,
+                                                     rect.Width, rect.Height,
+                                                     combineMode));
+    }
+
+    Status SetClip(IN const Rect& rect,
+                   IN CombineMode combineMode = CombineModeReplace)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRectI(nativeGraphics,
+                                                      rect.X, rect.Y,
+                                                      rect.Width, rect.Height,
+                                                      combineMode));
+    }
+
+    Status SetClip(IN const GraphicsPath* path,
+                   IN CombineMode combineMode = CombineModeReplace)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipPath(nativeGraphics,
+                                                     path->nativePath,
+                                                     combineMode));
+    }
+
+    Status SetClip(IN const Region* region,
+                   IN CombineMode combineMode = CombineModeReplace)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRegion(nativeGraphics,
+                                                       region->nativeRegion,
+                                                       combineMode));
+    }
+
+    ; This is different than the other SetClip methods because it assumes
+    ; that the HRGN is already in device units, so it doesn't transform
+    ; the coordinates in the HRGN.
+    
+    Status SetClip(IN HRGN hRgn,
+                   IN CombineMode combineMode = CombineModeReplace)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipHrgn(nativeGraphics, hRgn,
+                                                     combineMode));
+    }
+
+    Status IntersectClip(IN const RectF& rect)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRect(nativeGraphics,
+                                                     rect.X, rect.Y,
+                                                     rect.Width, rect.Height,
+                                                     CombineModeIntersect));
+    }
+
+    Status IntersectClip(IN const Rect& rect)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRectI(nativeGraphics,
+                                                      rect.X, rect.Y,
+                                                      rect.Width, rect.Height,
+                                                      CombineModeIntersect));
+    }
+
+    Status IntersectClip(IN const Region* region)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRegion(nativeGraphics,
+                                                       region->nativeRegion,
+                                                       CombineModeIntersect));
+    }
+
+    Status ExcludeClip(IN const RectF& rect)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRect(nativeGraphics,
+                                                     rect.X, rect.Y,
+                                                     rect.Width, rect.Height,
+                                                     CombineModeExclude));
+    }
+
+    Status ExcludeClip(IN const Rect& rect)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRectI(nativeGraphics,
+                                                      rect.X, rect.Y,
+                                                      rect.Width, rect.Height,
+                                                      CombineModeExclude));
+    }
+
+    Status ExcludeClip(IN const Region* region)
+    {
+        return SetStatus(DllCall("gdiplus\GdipSetClipRegion(nativeGraphics,
+                                                       region->nativeRegion,
+                                                       CombineModeExclude));
+    }
+
+    Status ResetClip()
+    {
+        return SetStatus(DllCall("gdiplus\GdipResetClip(nativeGraphics));
+    }
+
+    Status TranslateClip(IN REAL dx,
+                         IN REAL dy)
+    {
+        return SetStatus(DllCall("gdiplus\GdipTranslateClip(nativeGraphics, dx, dy));
+    }
+
+    Status TranslateClip(IN INT dx,
+                         IN INT dy)
+    {
+        return SetStatus(DllCall("gdiplus\GdipTranslateClipI(nativeGraphics,
+                                                        dx, dy));
+    }
+
+    Status GetClip(OUT Region* region) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipGetClip(nativeGraphics,
+                                                 region->nativeRegion));
+    }
+
+    Status GetClipBounds(OUT RectF* rect) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipGetClipBounds(nativeGraphics, rect));
+    }
+
+    Status GetClipBounds(OUT Rect* rect) const
+    {
+        return SetStatus(DllCall("gdiplus\GdipGetClipBoundsI(nativeGraphics, rect));
+    }
+
+    BOOL IsClipEmpty() const
+    {
+        BOOL booln = FALSE;
+
+        SetStatus(DllCall("gdiplus\GdipIsClipEmpty(nativeGraphics, &booln));
+
+        return booln;
+    }
+
+    Status GetVisibleClipBounds(OUT RectF *rect) const
+    {
+
+        return SetStatus(DllCall("gdiplus\GdipGetVisibleClipBounds(nativeGraphics,
+                                                              rect));
+    }
+
+    Status GetVisibleClipBounds(OUT Rect *rect) const
+    {
+       return SetStatus(DllCall("gdiplus\GdipGetVisibleClipBoundsI(nativeGraphics,
+                                                              rect));
+    }
+
+    BOOL IsVisibleClipEmpty() const
+    {
+        BOOL booln = FALSE;
+
+        SetStatus(DllCall("gdiplus\GdipIsVisibleClipEmpty(nativeGraphics, &booln));
+
+        return booln;
+    }
+
+    BOOL IsVisible(IN INT x,
+                   IN INT y) const
+    {
+        return IsVisible(Point(x,y));
+    }
+
+    BOOL IsVisible(IN const Point& point) const
+    {
+        BOOL booln = FALSE;
+
+        SetStatus(DllCall("gdiplus\GdipIsVisiblePointI(nativeGraphics,
+                                                  point.X,
+                                                  point.Y,
+                                                  &booln));
+
+        return booln;
+    }
+
+    BOOL IsVisible(IN INT x,
+                   IN INT y,
+                   IN INT width,
+                   IN INT height) const
+    {
+        return IsVisible(Rect(x, y, width, height));
+    }
+
+    BOOL IsVisible(IN const Rect& rect) const
+    {
+
+        BOOL booln = TRUE;
+
+        SetStatus(DllCall("gdiplus\GdipIsVisibleRectI(nativeGraphics,
+                                                 rect.X,
+                                                 rect.Y,
+                                                 rect.Width,
+                                                 rect.Height,
+                                                 &booln));
+        return booln;
+    }
+
+    BOOL IsVisible(IN REAL x,
+                   IN REAL y) const
+    {
+        return IsVisible(PointF(x, y));
+    }
+
+    BOOL IsVisible(IN const PointF& point) const
+    {
+        BOOL booln = FALSE;
+
+        SetStatus(DllCall("gdiplus\GdipIsVisiblePoint(nativeGraphics,
+                                                 point.X,
+                                                 point.Y,
+                                                 &booln));
+
+        return booln;
+    }
+
+    BOOL IsVisible(IN REAL x,
+                   IN REAL y,
+                   IN REAL width,
+                   IN REAL height) const
+    {
+        return IsVisible(RectF(x, y, width, height));
+    }
+
+    BOOL IsVisible(IN const RectF& rect) const
+    {
+        BOOL booln = TRUE;
+
+        SetStatus(DllCall("gdiplus\GdipIsVisibleRect(nativeGraphics,
+                                                rect.X,
+                                                rect.Y,
+                                                rect.Width,
+                                                rect.Height,
+                                                &booln));
+        return booln;
+    }
+
+    GraphicsState Save() const
+    {
+        GraphicsState gstate;
+
+        SetStatus(DllCall("gdiplus\GdipSaveGraphics(nativeGraphics, &gstate));
+
+        return gstate;
+    }
+
+    Status Restore(IN GraphicsState gstate)
+    {
+        return SetStatus(DllCall("gdiplus\GdipRestoreGraphics(nativeGraphics,
+                                                         gstate));
+    }
+
+    GraphicsContainer BeginContainer(IN const RectF &dstrect,
+                                     IN const RectF &srcrect,
+                                     IN Unit         unit)
+    {
+        GraphicsContainer state;
+
+        SetStatus(DllCall("gdiplus\GdipBeginContainer(nativeGraphics, &dstrect,
+                                                 &srcrect, unit, &state));
+
+        return state;
+    }
+
+    GraphicsContainer BeginContainer(IN const Rect    &dstrect,
+                                     IN const Rect    &srcrect,
+                                     IN Unit           unit)
+    {
+        GraphicsContainer state;
+
+        SetStatus(DllCall("gdiplus\GdipBeginContainerI(nativeGraphics, &dstrect,
+                                                  &srcrect, unit, &state));
+
+        return state;
+    }
+
+    GraphicsContainer BeginContainer()
+    {
+        GraphicsContainer state;
+
+        SetStatus(DllCall("gdiplus\GdipBeginContainer2(nativeGraphics, &state));
+
+        return state;
+    }
+
+    Status EndContainer(IN GraphicsContainer state)
+    {
+        return SetStatus(DllCall("gdiplus\GdipEndContainer(nativeGraphics, state));
+    }
+
+    ; Only valid when recording metafiles.
+
+    Status AddMetafileComment(IN const BYTE * data,
+                              IN UINT sizeData)
+    {
+        return SetStatus(DllCall("gdiplus\GdipComment(nativeGraphics, sizeData, data));
+    }
+
+    static HPALETTE GetHalftonePalette()
+    {
+        return DllCall("gdiplus\GdipCreateHalftonePalette();
+    }
+
+    Status GetLastStatus() const
+    {
+        Status lastStatus = lastResult;
+        lastResult = Ok;
+
+        return lastStatus;
+    }
+
+private:
+    Graphics(const Graphics &);
+    Graphics& operator=(const Graphics &);
+
+protected:
+    Graphics(GpGraphics* graphics)
+    {
+        lastResult = Ok;
+        SetNativeGraphics(graphics);
+    }
+
+    VOID SetNativeGraphics(GpGraphics *graphics)
+    {
+        this->nativeGraphics = graphics;
+    }
+
+    Status SetStatus(Status status) const
+    {
+        if (status != Ok)
+            return (lastResult = status);
+        else
+            return status;
+    }
+
+    GpGraphics* GetNativeGraphics() const
+    {
+        return this->nativeGraphics;
+    }
+
+    GpPen* GetNativePen(const Pen* pen)
+    {
+        return pen->nativePen;
+    }
+
+protected:
+    GpGraphics* nativeGraphics;
+    mutable Status lastResult;
+
+};
+
+;----------------------------------------------------------------------------
+; Implementation of GraphicsPath methods that use Graphics
+;----------------------------------------------------------------------------
+
+; The GetBounds rectangle may not be the tightest bounds.
+
+inline Status
+GraphicsPath::GetBounds(
+    OUT RectF* bounds,
+    IN const Matrix* matrix,
+    IN const Pen* pen) const
+{
+    GpMatrix* nativeMatrix = NULL;
+    GpPen* nativePen = NULL;
+
+    if (matrix)
+        nativeMatrix = matrix->nativeMatrix;
+
+    if (pen)
+        nativePen = pen->nativePen;
+
+    return SetStatus(DllCall("gdiplus\GdipGetPathWorldBounds(nativePath, bounds,
+                                                   nativeMatrix, nativePen));
+}
+
+inline Status
+GraphicsPath::GetBounds(
+    OUT Rect* bounds,
+    IN const Matrix* matrix,
+    IN const Pen* pen
+) const
+{
+    GpMatrix* nativeMatrix = NULL;
+    GpPen* nativePen = NULL;
+
+    if (matrix)
+        nativeMatrix = matrix->nativeMatrix;
+
+    if (pen)
+        nativePen = pen->nativePen;
+
+    return SetStatus(DllCall("gdiplus\GdipGetPathWorldBoundsI(nativePath, bounds,
+                                                    nativeMatrix, nativePen));
+}
+
+inline BOOL
+GraphicsPath::IsVisible(
+    IN REAL x,
+    IN REAL y,
+    IN const Graphics* g) const
+{
+   BOOL booln = FALSE;
+
+   GpGraphics* nativeGraphics = NULL;
+
+   if (g)
+       nativeGraphics = g->nativeGraphics;
+
+   SetStatus(DllCall("gdiplus\GdipIsVisiblePathPoint(nativePath,
+                                                x, y, nativeGraphics,
+                                                &booln));
+   return booln;
+}
+
+inline BOOL
+GraphicsPath::IsVisible(
+    IN INT x,
+    IN INT y,
+    IN const Graphics* g) const
+{
+   BOOL booln = FALSE;
+
+   GpGraphics* nativeGraphics = NULL;
+
+   if (g)
+       nativeGraphics = g->nativeGraphics;
+
+   SetStatus(DllCall("gdiplus\GdipIsVisiblePathPointI(nativePath,
+                                                 x, y, nativeGraphics,
+                                                 &booln));
+   return booln;
+}
+
+inline BOOL
+GraphicsPath::IsOutlineVisible(
+    IN REAL x,
+    IN REAL y,
+    IN const Pen* pen,
+    IN const Graphics* g) const
+{
+    BOOL booln = FALSE;
+
+    GpGraphics* nativeGraphics = NULL;
+    GpPen* nativePen = NULL;
+
+    if(g)
+        nativeGraphics = g->nativeGraphics;
+    if(pen)
+        nativePen = pen->nativePen;
+
+    SetStatus(DllCall("gdiplus\GdipIsOutlineVisiblePathPoint(nativePath,
+                                                        x, y, nativePen, nativeGraphics,
+                                                        &booln));
+    return booln;
+}
+
+inline BOOL
+GraphicsPath::IsOutlineVisible(
+    IN INT x,
+    IN INT y,
+    IN const Pen* pen,
+    IN const Graphics* g) const
+{
+    BOOL booln = FALSE;
+
+    GpGraphics* nativeGraphics = NULL;
+    GpPen* nativePen = NULL;
+
+    if(g)
+        nativeGraphics = g->nativeGraphics;
+    if(pen)
+        nativePen = pen->nativePen;
+
+    SetStatus(DllCall("gdiplus\GdipIsOutlineVisiblePathPointI(nativePath,
+                                                         x, y, nativePen, nativeGraphics,
+                                                         &booln));
+    return booln;
+}
+
+#if _MSC_VER >= 1200
+#pragma warning(pop)
+#endif
+
+#endif /* WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) */
+#pragma endregion
+
+#endif
+
