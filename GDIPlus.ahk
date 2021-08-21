@@ -73,6 +73,8 @@
         Worked heavily on effect class and the 11 related effect classes
     20210819
         Did more work on graphics class
+    20210820
+        Graphics Class is now Grafixed and working!!
 */
 
 #Warn
@@ -148,8 +150,8 @@ Class GDIP
     GdiplusStartup()
     {
         If (this.gdip_token = "")
-            DllCall("GetModuleHandle", "str", "gdiplus")    ; Check if GDIPlus been loaded into Window's library
-                ? "" : DllCall("LoadLibrary", "str", "gdiplus")
+            ; Check if GDIPlus been loaded into Window's library
+            DllCall("GetModuleHandle", "str", "gdiplus") ? "" : DllCall("LoadLibrary", "str", "gdiplus")
             ,VarSetCapacity(token, A_PtrSize)
             ,VarSetCapacity(gdip_si, (A_PtrSize = 8) ? 24 : 16, 0)
             ,NumPut(1, gdip_si)
@@ -490,7 +492,7 @@ Class GDIP
         {
             (image_p = "") ? image_p := this.NativeImage : ""
             VarSetCapacity(clone_p, A_PtrSize)
-            estat := DllCall("gdip\GdipCloneImage"
+            estat := DllCall("gdiplus\GdipCloneImage"
                             ,this.Ptr   , &image_p
                             ,this.PtrA  , clone_p)
             estat ? GDIP.error_log(A_ThisFunc, "Enum Status", estat) : ""
@@ -501,14 +503,14 @@ Class GDIP
         ; The FindFirstItem method retrieves the description and the data size of the first metadata item in this Image object.
         ;FindFirstItem()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The FindNextItem method is used along with the FindFirstItem method to enumerate the metadata items stored in this Image object.
         ;FindNextItem()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
@@ -532,168 +534,168 @@ Class GDIP
         ; The FromStream method creates a new Image object based on a stream.
         ;FromStream()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetAllPropertyItems method gets all the property items (metadata) stored in this Image object.
         ;GetAllPropertyItems()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetBounds method gets the bounding rectangle for this image.
         ;GetBounds()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetEncoderParameterList method gets a list of the parameters supported by a specified image encoder.
         ;GetEncoderParameterList()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetEncoderParameterListSize method gets the size, in bytes, of the parameter list for a specified image encoder.
         ;GetEncoderParameterListSize()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetFlags method gets a set of flags that indicate certain attributes of this Image object.
         ;GetFlags()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetFrameCount method gets the number of frames in a specified dimension of this Image object.
         ;GetFrameCount()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetFrameDimensionsCount method gets the number of frame dimensions in this Image object.
         ;GetFrameDimensionsCount()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetFrameDimensionsList method gets the identifiers for the frame dimensions of this Image object.
         ;GetFrameDimensionsList()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetHeight method gets the image height, in pixels, of this image.
         ;GetHeight()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetHorizontalResolution method gets the horizontal resolution, in dots per inch, of this image.
         ;GetHorizontalResolution()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetItemData method gets one piece of metadata from this Image object.
         ;GetItemData()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetLastStatus method returns a value that indicates the nature of this Image object's most recent method failure.
         ;GetLastStatus()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPalette method gets the ColorPalette of this Image object.
         ;GetPalette()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPaletteSize method gets the size, in bytes, of the color palette of this Image object.
         ;GetPaletteSize()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPhysicalDimension method gets the width and height of this image.
         ;GetPhysicalDimension()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPixelFormat method gets the pixel format of this Image object.
         ;GetPixelFormat()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPropertyCount method gets the number of properties (pieces of metadata) stored in this Image object.
         ;GetPropertyCount()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPropertyIdList method gets a list of the property identifiers used in the metadata of this Image object.
         ;GetPropertyIdList()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPropertyItem method gets a specified property item (piece of metadata) from this Image object.
         ;GetPropertyItem()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPropertyItemSize method gets the size, in bytes, of a specified property item of this Image object.
         ;GetPropertyItemSize()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetPropertySize method gets the total size, in bytes, of all the property items stored in this Image object. The GetPropertySize method also gets the number of property items stored in this Image object.
         ;GetPropertySize()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetRawFormat method gets a globally unique identifier ( GUID) that identifies the format of this Image object. GUIDs that identify various file formats are defined in Gdiplusimaging.h.
         ;GetRawFormat()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetThumbnailImage method gets a thumbnail image from this Image object.
         ;GetThumbnailImage()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
@@ -712,119 +714,119 @@ Class GDIP
         ; The GetVerticalResolution method gets the vertical resolution, in dots per inch, of this image.
         ;GetVerticalResolution()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The GetWidth method gets the width, in pixels, of this image.
         ;GetWidth()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; This topic lists the constructors of the Image class. For a complete class listing, see Image Class.
         ;Image()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; Creates an Image object based on a file.
         ;Image()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; This topic lists the constructors of the Image class. For a complete class listing, see Image Class.
         ;Image()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; Creates an Image object based on a stream.
         ;Image()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; This topic lists the constructors of the Image class. For a complete class listing, see Image Class.
         ;Image()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The RemovePropertyItem method removes a property item (piece of metadata) from this Image object.
         ;RemovePropertyItem()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The RotateFlip method rotates and flips this image.
         ;RotateFlip()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The Save method saves this image to a file.
         ;Save()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The Save method saves this image to a stream.
         ;Save()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The SaveAdd method adds a frame to a file or stream specified in a previous call to the Save method.
         ;SaveAdd()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The SaveAdd method adds a frame to a file or stream specified in a previous call to the Save method.
         ;SaveAdd()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The SelectActiveFrame method selects the frame in this Image object specified by a dimension and an index.
         ;SelectActiveFrame()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The SetAbort method sets the object whose Abort method is called periodically during time-consuming rendering operation.
         ;SetAbort()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The SetPalette method sets the color palette of this Image object.
         ;SetPalette()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
         
         ; The SetPropertyItem method sets a property item (piece of metadata) for this Image object. If the item already exists, then its contents are updated; otherwise, a new item is added.
         ;SetPropertyItem()
         ;{
-            ;DllCall("gdip\"
+            ;DllCall("gdiplus\"
             ;, type , value)
         ;}
     }
@@ -851,20 +853,21 @@ Class GDIP
         
         __New(gIn, dev_icm="")
         {
-            VarSetCapacity(gp, A_PtrSize, 0)
-            ,(dev_icm)   ; dev_icm has value
-                ? ((estat := DllCall("gdip\GdipCreateFromHWNDICM", this.Ptr, gIn, this.PtrA, graphics)) = 0 ) ? ""             ; From HWND with ICM
-                : ((estat := DllCall("gdip\GdipCreateFromHDC2", this.Ptr, gIn, this.Ptr, dev_icm, this.PtrA,graphics)) = 0 )   ; From HDC w/ device
-                ; dev_icm is false
-            : ((estat := DllCall("gdip\GdipCreateFromHDC", this.Ptr, gIn, this.PtrA, gp)) = 0) ? ""                        ; From HDC
-                : ((estat := DllCall("gdip\GdipCreateFromHWND", this.Ptr, gIn, this.PtrA, gp)) = 0) ? ""                   ; From HWND without ICM
-                : ((estat := DllCall("gdip\GdipGetImageGraphicsContext", this.Ptr, gIn.nativeImage, this.PtrA, gp)) = 0)   ; From Image object
+            this.SetCapacity("gp", A_PtrSize)
+            ,this.Ptr := this.GetAddress("gp")
+            (dev_icm)   ; dev_icm has value
+                ? !(estat := DllCall("gdiplus\GdipCreateFromHWNDICM", this.Ptr, gIn, this.PtrA, gp)) ? ""                ; From HWND with ICM
+                : !(estat := DllCall("gdiplus\GdipCreateFromHDC2", this.Ptr, gIn, this.Ptr, dev_icm, this.PtrA, gp))     ; From HDC and device
+            :     !(estat := DllCall("gdiplus\GdipCreateFromHWND", this.Ptr, gIn, this.PtrA, gp)) ? ""                   ; From HWND without ICM
+                : !(estat := DllCall("gdiplus\GdipCreateFromHDC", this.Ptr, gIn, this.PtrA, gp)) ? ""                    ; From HDC
+                : !(estat := DllCall("gdiplus\GdipGetImageGraphicsContext", this.Ptr, gIn.nativeImage, this.PtrA, gp))   ; From Image Object
             
-            ,(estat)   ; An estat that's not false (0) is an error and should be logged
+            (estat)   ; An estat that's not 0 is an error and should be logged
                 ? this.log_error(A_ThisFunc, "Error creating Graphics object"
                                 ,"HDC`nHWND`nImage Object", {param1:gIn, param2:dev_icm, estat:estat})
-                : this.nativeGraphics := graphics   ; Otherwise, save graphics and last result
-            ,this.lastResult := estat
+                : this.nativeGraphics := gp   ; Otherwise, save graphics and last result
+            this.lastResult := estat
+            MsgBox, % "estat: " estat "`nthis.lastResult: " this.lastResult 
         }
         
         ; Description       Record any non-OK status and return status
@@ -4184,7 +4187,7 @@ Class GDIP
     
     Class GUI Extends GDIP
     {
-        gHwnd   := {}
+        hwnd    := {}
         title   := ""
         width   := ""
         height  := ""
@@ -4212,13 +4215,13 @@ Class GDIP
                 . (TaskBar  ? "+" : "-") "ToolWindow "      ; Removes the taskbar button
                 . "+HWNDguiHwnd "                           ; Saves the handle of the GUI to guiHwnd
             
-            this.gHwnd.gui := guiHwnd
+            this.hwnd.gui := guiHwnd
         }
         
         _update(title="Main")
         {
             ;~ DllCall("UpdateLayeredWindow"
-                    ;~ , HWND          , this.gHwnd.gui[title]     ; Handle to window
+                    ;~ , HWND          , this.hwnd.gui[title]      ; Handle to window
                     ;~ , HDC           , hdcDst                    ; Handle to DC destination
                     ;~ , this.Ptr      , *pptDst                   ; Set new screen position using Point struct
                     ;~ , this.Ptr      , *psize                    ; Set new screen size using Size struct
