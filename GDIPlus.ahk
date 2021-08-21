@@ -80,6 +80,9 @@
 #Warn
 GDIP.Startup()
 
+MsgBox, % GDIP.Color.Black
+ExitApp
+
 Class GDIP
 {
     Static  gdip_token  := ""
@@ -179,6 +182,11 @@ Class GDIP
     {
         bf := ObjBindMethod(this, method_name, params*)
         Return bf
+    }
+    
+    Enum(name, ID)
+    {
+        Return GDIP.Enumerations[name][ID]
     }
     
     ;####################################################################################################################
@@ -840,34 +848,29 @@ Class GDIP
         nativeGraphics := ""
         lastResult     := ""
         
-        ;~ public:
-        ;~ friend class Region;
-        ;~ friend class GraphicsPath;
-        ;~ friend class Image;
-        ;~ friend class Bitmap;
-        ;~ friend class Metafile;
-        ;~ friend class Font;
-        ;~ friend class FontFamily;
-        ;~ friend class FontCollection;
-        ;~ friend class CachedBitmap;
-        
-        __New(gIn, dev_icm="")
+        ; ##################
+        ; ## CONSTRUCTORS ##
+        ; ##################
+        ; Grahpics(hwnd, icm)   Handle to a window. ICM = I
+        ; Graphics(hdc)         
+        ; Graphics(hdc, device) 
+        ; Graphics(imageObject) 
+        __New(gIn="", dev_icm="")
         {
-            this.SetCapacity("gp", A_PtrSize)
-            ,this.Ptr := this.GetAddress("gp")
-            (dev_icm)   ; dev_icm has value
-                ? !(estat := DllCall("gdiplus\GdipCreateFromHWNDICM", this.Ptr, gIn, this.PtrA, gp)) ? ""                ; From HWND with ICM
+            VarSetCapacity(gp, A_PtrSize, 0)
+            (dev_icm)   ; If dev_icm is true
+                ? !(estat := DllCall("gdiplus\GdipCreateFromHWNDICM", this.Ptr, gIn, this.PtrA, gp))    ? ""             ; From HWND with ICM
                 : !(estat := DllCall("gdiplus\GdipCreateFromHDC2", this.Ptr, gIn, this.Ptr, dev_icm, this.PtrA, gp))     ; From HDC and device
-            :     !(estat := DllCall("gdiplus\GdipCreateFromHWND", this.Ptr, gIn, this.PtrA, gp)) ? ""                   ; From HWND without ICM
-                : !(estat := DllCall("gdiplus\GdipCreateFromHDC", this.Ptr, gIn, this.PtrA, gp)) ? ""                    ; From HDC
-                : !(estat := DllCall("gdiplus\GdipGetImageGraphicsContext", this.Ptr, gIn.nativeImage, this.PtrA, gp))   ; From Image Object
+            ; If dev_icm is false
+            :     !(estat := DllCall("gdiplus\GdipCreateFromHWND", this.Ptr, gIn, this.PtrA, gp))       ? ""             ; From HWND without ICM
+                : !(estat := DllCall("gdiplus\GdipCreateFromHDC", this.Ptr, gIn, this.PtrA, gp))        ? ""             ; From HDC
+                : estat := DllCall("gdiplus\GdipGetImageGraphicsContext", this.Ptr, gIn.nativeImage, this.PtrA, gp)      ; From Image Object
             
             (estat)   ; An estat that's not 0 is an error and should be logged
                 ? this.log_error(A_ThisFunc, "Error creating Graphics object"
                                 ,"HDC`nHWND`nImage Object", {param1:gIn, param2:dev_icm, estat:estat})
-                : this.nativeGraphics := gp   ; Otherwise, save graphics and last result
-            this.lastResult := estat
-            MsgBox, % "estat: " estat "`nthis.lastResult: " this.lastResult 
+                : (this.nativeGraphics := gp   ; Otherwise, save graphics and last result
+                  ,this.lastResult := estat)
         }
         
         ; Description       Record any non-OK status and return status
@@ -2288,7 +2291,7 @@ Class GDIP
     ;####################################################################################################################
     ;  Enumerations (Enum)                                                                                              |
     ;####################################################################################################################
-    Class Enum
+    Class Enumerations
     {
         Class ColorAdjustType {                 ; Specifies which GDI+ objects the color adjustment information is for
             Static ColorAdjustTypeDefault = 0   ; Default GDI+ object color adjustment for all 
@@ -3123,7 +3126,7 @@ Class GDIP
                  , UnitInch       = 4   ; Unit is 1 inch.
                  , UnitDocument   = 5   ; Unit is 1/300 inch.
                  , UnitMillimeter = 6   ; Unit is 1 millimeter.
-                 , UnitAbsolute   = 7   ; Unit is memetic and of type easter egg.
+                 , UnitAbsolute   = 7   ; Unit is memetic for max and is of type easter egg.
         }
         
         Class WarpMode {                     ; Specifies warp modes that can be used to transform images.
@@ -3861,36 +3864,119 @@ Class GDIP
 
     Class Color
     {
-         _type   := "ARGB"
-        ,Alpha   := A := 0
-        ,Red     := R := 0
-        ,Blue    := B := 0
-        ,Green   := G := 0
+        _type := "Color"
+        ,A    := 0
+        ,R    := 0
+        ,B    := 0
+        ,G    := 0
+        
+        ; ARGB masks and bitshifts
+        Static AMask  := 0xFF000000
+             , RMask  := 0x00FF0000
+             , GMask  := 0x0000FF00
+             , BMask  := 0x000000FF
+             , AShift := 24
+             , RShift := 16
+             , GShift := 8
+             , BShift := 0
+        
+        ; Common color constants
+        Static AliceBlue            = 0xFFF0F8FF             , LightSeaGreen        = 0xFF20B2AA
+             , AntiqueWhite         = 0xFFFAEBD7             , LightSkyBlue         = 0xFF87CEFA
+             , Aqua                 = 0xFF00FFFF             , LightSlateGray       = 0xFF778899
+             , Aquamarine           = 0xFF7FFFD4             , LightSteelBlue       = 0xFFB0C4DE
+             , Azure                = 0xFFF0FFFF             , LightYellow          = 0xFFFFFFE0
+             , Beige                = 0xFFF5F5DC             , Lime                 = 0xFF00FF00
+             , Bisque               = 0xFFFFE4C4             , LimeGreen            = 0xFF32CD32
+             , Black                = 0xFF000000             , Linen                = 0xFFFAF0E6
+             , BlanchedAlmond       = 0xFFFFEBCD             , Magenta              = 0xFFFF00FF
+             , Blue                 = 0xFF0000FF             , Maroon               = 0xFF800000
+             , BlueViolet           = 0xFF8A2BE2             , MediumAquamarine     = 0xFF66CDAA
+             , Brown                = 0xFFA52A2A             , MediumBlue           = 0xFF0000CD
+             , BurlyWood            = 0xFFDEB887             , MediumOrchid         = 0xFFBA55D3
+             , CadetBlue            = 0xFF5F9EA0             , MediumPurple         = 0xFF9370DB
+             , Chartreuse           = 0xFF7FFF00             , MediumSeaGreen       = 0xFF3CB371
+             , Chocolate            = 0xFFD2691E             , MediumSlateBlue      = 0xFF7B68EE
+             , Coral                = 0xFFFF7F50             , MediumSpringGreen    = 0xFF00FA9A
+             , CornflowerBlue       = 0xFF6495ED             , MediumTurquoise      = 0xFF48D1CC
+             , Cornsilk             = 0xFFFFF8DC             , MediumVioletRed      = 0xFFC71585
+             , Crimson              = 0xFFDC143C             , MidnightBlue         = 0xFF191970
+             , Cyan                 = 0xFF00FFFF             , MintCream            = 0xFFF5FFFA
+             , DarkBlue             = 0xFF00008B             , MistyRose            = 0xFFFFE4E1
+             , DarkCyan             = 0xFF008B8B             , Moccasin             = 0xFFFFE4B5
+             , DarkGoldenrod        = 0xFFB8860B             , NavajoWhite          = 0xFFFFDEAD
+             , DarkGray             = 0xFFA9A9A9             , Navy                 = 0xFF000080
+        Static DarkGreen            = 0xFF006400             , OldLace              = 0xFFFDF5E6
+             , DarkKhaki            = 0xFFBDB76B             , Olive                = 0xFF808000
+             , DarkMagenta          = 0xFF8B008B             , OliveDrab            = 0xFF6B8E23
+             , DarkOliveGreen       = 0xFF556B2F             , Orange               = 0xFFFFA500
+             , DarkOrange           = 0xFFFF8C00             , OrangeRed            = 0xFFFF4500
+             , DarkOrchid           = 0xFF9932CC             , Orchid               = 0xFFDA70D6
+             , DarkRed              = 0xFF8B0000             , PaleGoldenrod        = 0xFFEEE8AA
+             , DarkSalmon           = 0xFFE9967A             , PaleGreen            = 0xFF98FB98
+             , DarkSeaGreen         = 0xFF8FBC8B             , PaleTurquoise        = 0xFFAFEEEE
+             , DarkSlateBlue        = 0xFF483D8B             , PaleVioletRed        = 0xFFDB7093
+             , DarkSlateGray        = 0xFF2F4F4F             , PapayaWhip           = 0xFFFFEFD5
+             , DarkTurquoise        = 0xFF00CED1             , PeachPuff            = 0xFFFFDAB9
+             , DarkViolet           = 0xFF9400D3             , Peru                 = 0xFFCD853F
+             , DeepPink             = 0xFFFF1493             , Pink                 = 0xFFFFC0CB
+             , DeepSkyBlue          = 0xFF00BFFF             , Plum                 = 0xFFDDA0DD
+             , DimGray              = 0xFF696969             , PowderBlue           = 0xFFB0E0E6
+             , DodgerBlue           = 0xFF1E90FF             , Purple               = 0xFF800080
+             , Firebrick            = 0xFFB22222             , Red                  = 0xFFFF0000
+             , FloralWhite          = 0xFFFFFAF0             , RosyBrown            = 0xFFBC8F8F
+             , ForestGreen          = 0xFF228B22             , RoyalBlue            = 0xFF4169E1
+             , Fuchsia              = 0xFFFF00FF             , SaddleBrown          = 0xFF8B4513
+             , Gainsboro            = 0xFFDCDCDC             , Salmon               = 0xFFFA8072
+             , GhostWhite           = 0xFFF8F8FF             , SandyBrown           = 0xFFF4A460
+             , Gold                 = 0xFFFFD700             , SeaGreen             = 0xFF2E8B57
+             , Goldenrod            = 0xFFDAA520             , SeaShell             = 0xFFFFF5EE
+        Static Gray                 = 0xFF808080             , Sienna               = 0xFFA0522D
+             , Green                = 0xFF008000             , Silver               = 0xFFC0C0C0
+             , GreenYellow          = 0xFFADFF2F             , SkyBlue              = 0xFF87CEEB
+             , Honeydew             = 0xFFF0FFF0             , SlateBlue            = 0xFF6A5ACD
+             , HotPink              = 0xFFFF69B4             , SlateGray            = 0xFF708090
+             , IndianRed            = 0xFFCD5C5C             , Snow                 = 0xFFFFFAFA
+             , Indigo               = 0xFF4B0082             , SpringGreen          = 0xFF00FF7F
+             , Ivory                = 0xFFFFFFF0             , SteelBlue            = 0xFF4682B4
+             , Khaki                = 0xFFF0E68C             , Tan                  = 0xFFD2B48C
+             , Lavender             = 0xFFE6E6FA             , Teal                 = 0xFF008080
+             , LavenderBlush        = 0xFFFFF0F5             , Thistle              = 0xFFD8BFD8
+             , LawnGreen            = 0xFF7CFC00             , Tomato               = 0xFFFF6347
+             , LemonChiffon         = 0xFFFFFACD             , Transparent          = 0x00FFFFFF
+             , LightBlue            = 0xFFADD8E6             , Turquoise            = 0xFF40E0D0
+             , LightCoral           = 0xFFF08080             , Violet               = 0xFFEE82EE
+             , LightCyan            = 0xFFE0FFFF             , Wheat                = 0xFFF5DEB3
+             , LightGoldenrodYellow = 0xFFFAFAD2             , White                = 0xFFFFFFFF
+             , LightGray            = 0xFFD3D3D3             , WhiteSmoke           = 0xFFF5F5F5
+             , LightGreen           = 0xFF90EE90             , Yellow               = 0xFFFFFF00
+             , LightPink            = 0xFFFFB6C1             , YellowGreen          = 0xFF9ACD32
+             , LightSalmon          = 0xFFFFA07A
         
         ; Color()
-        ; Color(ARGB)
+        ; Color(Color)
         ; Color(red, blue, green)
         ; Color(alpha, red, blue, green)
-        __New(a="", r="", b="", g="")
+        __New(a="", r="", g="", b="")
         {
             this.SetCapacity("_ARGB", 4)
             ,this.structP := this.GetAddress("_ARGB")
-            ,(a._type == "ARGB" && r = "" && b = "" && g = "") ; ARGB object
-                ? this._set_argb(ARGB.A, ARGB.R, ARGB.B, ARGB.G)
-            : (a="" && r="" && b="" && g="")  ; Empty
-                ? this._set_argb(255, 0, 0, 0)
-            : (g = "") ; R B G
-                ? this._set_argb(255, a, r, b)
-                : this._set_argb(a, r, b, g) ; A R B G
+            ,(a._type == "Color" && r = "" && g = "" && b = "")   ; Color object
+                ? this._set_color(a.a, a.r, a.g, a.b)
+            : (a="" && r="" && g="" && b="")                      ; Empty
+                ? this._set_color(255, 0, 0, 0)
+            : (g = "")                                            ; RBG values
+                ? this._set_color(255, a, r, g)
+                : this._set_color(a, r, g, b)                     ; Default to ARGB
         }
         
         ; Remark: Values below 0 are set to 0 and values above 255 are set to 255
-        _set_argb(a, r, b, g)
+        _set_color(a, r, g, b)
         {
-             this.Alpha := this.A := a
-            ,this.Red   := this.R := r
-            ,this.Blue  := this.G := b
-            ,this.Green := this.B := g
+            this.A := a
+            this.R := r
+            this.G := b
+            this.B := g
         }
         
         show()
@@ -3904,95 +3990,52 @@ Class GDIP
                 . "`nthis.structP: " this.structP
                 . "`nNumGet Alpha: " NumGet(ptr, 3, "UChar")
                 . "`nNumGet Red: "   NumGet(ptr, 2, "UChar")
-                . "`nNumGet Blue: "  NumGet(ptr, 1, "UChar")
-                . "`nNumGet Green: " NumGet(ptr, 0, "UChar")
+                . "`nNumGet Green: " NumGet(ptr, 1, "UChar")
+                . "`nNumGet Blue: "  NumGet(ptr, 0, "UChar")
         }
         
         Struct()
         {
-             NumPut(this.Green, this.structP+0, 0, "UChar")
-            ,NumPut(this.Blue,  this.structP+0, 1, "UChar")
+             NumPut(this.Blue,  this.structP+0, 0, "UChar")
+            ,NumPut(this.Green, this.structP+0, 1, "UChar")
             ,NumPut(this.Red,   this.structP+0, 2, "UChar")
             ,NumPut(this.Alpha, this.structP+0, 3, "UChar")
-            Return structP+0
+            Return this.structP+0
         }
-       
-        ; Common color constants
-        Class name
-        {
-            Static AliceBlue            = 0xFFF0F8FF             , LightSeaGreen        = 0xFF20B2AA
-                 , AntiqueWhite         = 0xFFFAEBD7             , LightSkyBlue         = 0xFF87CEFA
-                 , Aqua                 = 0xFF00FFFF             , LightSlateGray       = 0xFF778899
-                 , Aquamarine           = 0xFF7FFFD4             , LightSteelBlue       = 0xFFB0C4DE
-                 , Azure                = 0xFFF0FFFF             , LightYellow          = 0xFFFFFFE0
-                 , Beige                = 0xFFF5F5DC             , Lime                 = 0xFF00FF00
-                 , Bisque               = 0xFFFFE4C4             , LimeGreen            = 0xFF32CD32
-                 , Black                = 0xFF000000             , Linen                = 0xFFFAF0E6
-                 , BlanchedAlmond       = 0xFFFFEBCD             , Magenta              = 0xFFFF00FF
-                 , Blue                 = 0xFF0000FF             , Maroon               = 0xFF800000
-                 , BlueViolet           = 0xFF8A2BE2             , MediumAquamarine     = 0xFF66CDAA
-                 , Brown                = 0xFFA52A2A             , MediumBlue           = 0xFF0000CD
-                 , BurlyWood            = 0xFFDEB887             , MediumOrchid         = 0xFFBA55D3
-                 , CadetBlue            = 0xFF5F9EA0             , MediumPurple         = 0xFF9370DB
-                 , Chartreuse           = 0xFF7FFF00             , MediumSeaGreen       = 0xFF3CB371
-                 , Chocolate            = 0xFFD2691E             , MediumSlateBlue      = 0xFF7B68EE
-                 , Coral                = 0xFFFF7F50             , MediumSpringGreen    = 0xFF00FA9A
-                 , CornflowerBlue       = 0xFF6495ED             , MediumTurquoise      = 0xFF48D1CC
-                 , Cornsilk             = 0xFFFFF8DC             , MediumVioletRed      = 0xFFC71585
-                 , Crimson              = 0xFFDC143C             , MidnightBlue         = 0xFF191970
-                 , Cyan                 = 0xFF00FFFF             , MintCream            = 0xFFF5FFFA
-                 , DarkBlue             = 0xFF00008B             , MistyRose            = 0xFFFFE4E1
-                 , DarkCyan             = 0xFF008B8B             , Moccasin             = 0xFFFFE4B5
-                 , DarkGoldenrod        = 0xFFB8860B             , NavajoWhite          = 0xFFFFDEAD
-                 , DarkGray             = 0xFFA9A9A9             , Navy                 = 0xFF000080
-            Static DarkGreen            = 0xFF006400             , OldLace              = 0xFFFDF5E6
-                 , DarkKhaki            = 0xFFBDB76B             , Olive                = 0xFF808000
-                 , DarkMagenta          = 0xFF8B008B             , OliveDrab            = 0xFF6B8E23
-                 , DarkOliveGreen       = 0xFF556B2F             , Orange               = 0xFFFFA500
-                 , DarkOrange           = 0xFFFF8C00             , OrangeRed            = 0xFFFF4500
-                 , DarkOrchid           = 0xFF9932CC             , Orchid               = 0xFFDA70D6
-                 , DarkRed              = 0xFF8B0000             , PaleGoldenrod        = 0xFFEEE8AA
-                 , DarkSalmon           = 0xFFE9967A             , PaleGreen            = 0xFF98FB98
-                 , DarkSeaGreen         = 0xFF8FBC8B             , PaleTurquoise        = 0xFFAFEEEE
-                 , DarkSlateBlue        = 0xFF483D8B             , PaleVioletRed        = 0xFFDB7093
-                 , DarkSlateGray        = 0xFF2F4F4F             , PapayaWhip           = 0xFFFFEFD5
-                 , DarkTurquoise        = 0xFF00CED1             , PeachPuff            = 0xFFFFDAB9
-                 , DarkViolet           = 0xFF9400D3             , Peru                 = 0xFFCD853F
-                 , DeepPink             = 0xFFFF1493             , Pink                 = 0xFFFFC0CB
-                 , DeepSkyBlue          = 0xFF00BFFF             , Plum                 = 0xFFDDA0DD
-                 , DimGray              = 0xFF696969             , PowderBlue           = 0xFFB0E0E6
-                 , DodgerBlue           = 0xFF1E90FF             , Purple               = 0xFF800080
-                 , Firebrick            = 0xFFB22222             , Red                  = 0xFFFF0000
-                 , FloralWhite          = 0xFFFFFAF0             , RosyBrown            = 0xFFBC8F8F
-                 , ForestGreen          = 0xFF228B22             , RoyalBlue            = 0xFF4169E1
-                 , Fuchsia              = 0xFFFF00FF             , SaddleBrown          = 0xFF8B4513
-                 , Gainsboro            = 0xFFDCDCDC             , Salmon               = 0xFFFA8072
-                 , GhostWhite           = 0xFFF8F8FF             , SandyBrown           = 0xFFF4A460
-                 , Gold                 = 0xFFFFD700             , SeaGreen             = 0xFF2E8B57
-                 , Goldenrod            = 0xFFDAA520             , SeaShell             = 0xFFFFF5EE
-            Static Gray                 = 0xFF808080             , Sienna               = 0xFFA0522D
-                 , Green                = 0xFF008000             , Silver               = 0xFFC0C0C0
-                 , GreenYellow          = 0xFFADFF2F             , SkyBlue              = 0xFF87CEEB
-                 , Honeydew             = 0xFFF0FFF0             , SlateBlue            = 0xFF6A5ACD
-                 , HotPink              = 0xFFFF69B4             , SlateGray            = 0xFF708090
-                 , IndianRed            = 0xFFCD5C5C             , Snow                 = 0xFFFFFAFA
-                 , Indigo               = 0xFF4B0082             , SpringGreen          = 0xFF00FF7F
-                 , Ivory                = 0xFFFFFFF0             , SteelBlue            = 0xFF4682B4
-                 , Khaki                = 0xFFF0E68C             , Tan                  = 0xFFD2B48C
-                 , Lavender             = 0xFFE6E6FA             , Teal                 = 0xFF008080
-                 , LavenderBlush        = 0xFFFFF0F5             , Thistle              = 0xFFD8BFD8
-                 , LawnGreen            = 0xFF7CFC00             , Tomato               = 0xFFFF6347
-                 , LemonChiffon         = 0xFFFFFACD             , Transparent          = 0x00FFFFFF
-                 , LightBlue            = 0xFFADD8E6             , Turquoise            = 0xFF40E0D0
-                 , LightCoral           = 0xFFF08080             , Violet               = 0xFFEE82EE
-                 , LightCyan            = 0xFFE0FFFF             , Wheat                = 0xFFF5DEB3
-                 , LightGoldenrodYellow = 0xFFFAFAD2             , White                = 0xFFFFFFFF
-                 , LightGray            = 0xFFD3D3D3             , WhiteSmoke           = 0xFFF5F5F5
-                 , LightGreen           = 0xFF90EE90             , Yellow               = 0xFFFFFF00
-                 , LightPink            = 0xFFFFB6C1             , YellowGreen          = 0xFF9ACD32
-                 , LightSalmon          = 0xFFFFA07A
+        
+        GetAlpha() {
+            Return this.A
+        }
+        
+        GetRed() {
+            Return this.R
+        }
+        
+        GetGreen() {
+            Return this.G
+        }
+        
+        GetBlue() {
+            Return this.B
+        }
+        
+        GetValue() {
+            Return ( (this.A << this.AShift)
+                   + (this.R << this.RShift)
+                   + (this.G << this.GShift)
+                   +  this.B )
+        }
+        
+        SetValue(arbg) {
+             this.A := (arbg & this.AMask) >> AShift
+            ,this.R := (arbg & this.RMask) >> RShift
+            ,this.G := (arbg & this.BMask) >> GShift
+            ,this.B := (arbg & this.GMask)
         }
     }
+    
+    
+    
     
     
     
