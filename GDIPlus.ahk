@@ -75,6 +75,9 @@
         Did more work on graphics class
     20210820
         Graphics Class is now Grafixed and working!!
+    20210821
+        Started work on the Pen class.
+        Updated the Color class and added some methods.
 */
 
 #Warn
@@ -90,7 +93,7 @@ Class GDIP
     
     ;####################################################################################################################
     ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
-    ;                      Any function with a 'status' named return variable will reference this.                      |
+    ;                      Any function with a status return type references this. 0 is OK. Anything > 0 is an error.   |
     ;___________________________________________________________________________________________________________________|
     ; Num | Value                     | Indicates that...                                                               |
     ;  0  | Ok                        | Method call was successful.                                                     |
