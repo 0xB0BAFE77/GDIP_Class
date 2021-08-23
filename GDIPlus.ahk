@@ -81,6 +81,9 @@
     20210821
         Reformatted and organized all the color constants
             Colors are broken up by general color and alphabetized
+    20210822
+        Colors class finished and tested
+        Pen class progress
 
 */
 
@@ -3165,26 +3168,270 @@ Class GDIP
                            ,4:{0:0, 1:0, 2:0, 3:0, 4:0}}
             Return
         }
-    }    
-    
-    ;####################################################################################################################
-    ;  Generators                                                                                                       |
-    ;####################################################################################################################
-    
-    ;####################################################################################################################
-    ; Description   Generates an object containing all the named colors from CSS3/X11 and their hex codes.              |
-    ;               These colors can be accessed by calling this.ColorHex.ColorsName                                    |
-    ;___________________________________________________________________________________________________________________|
-    generate_colorName()
-    {
-        color := {}
-        
-        
-        this.colorhex := Color
-        
-        Return
     }
     
+    
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; GdiplusColor.h                                                                                                    |
+    ;___________________________________________________________________________________________________________________|
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Color Class - Stores a 32 bit value tha represents Alpha, Red, Blue, and Green values.                            |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; A Color object has Alpha (transparency), Red, Green, and Blue values. Type is ARGB                                |
+    ; Properties:                                                                                                       |
+    ; .A                Transparency. 0-255                                                                             |
+    ; .R                Red value. 0-255                                                                                |
+    ; .G                Green value. 0-255                                                                              |
+    ; .B                Blue value. 0-255                                                                               |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; Color()           Create solid black color object                                                                 |
+    ; Color(ColorObj)   Create a color object using the values from the provided color object                           |
+    ; Color(ARGB)       Create a color object using an ARGB (a 0xAARRGGBB value)                                        |
+    ; Color(r, g, b)    Create a solid color object using the provided red, green and blue values                       |
+    ; Color(a, r, g, b) Create a color object using the provided alpha, red, green and blue values                      |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; .Struct()         Builds ARBG structure and returns pointer.                                                      |
+    ; .GetAlpha(hex)    Returns Alpha value.                                                                            |
+    ; .GetRed(hex)      Returns Red value.                                                                              |
+    ; .GetGreen(hex)    Returns Green value.                                                                            |
+    ; .GetBlue(hex)     Returns Blue value.                                                                             |
+    ; .GetValue()       Returns an ARBG value.                                                                          |
+    ; .SetValue(argb)   Sets color's ARGB values using an ARGB.                                                         |
+    ; .MakeARGB(a ,r    Creates an ARGB value using an alpha, red, green, and blue value.                               |
+    ;          ,g ,b)                                                                                                   |
+    ;                                                                                                                   |
+    ; Remarks           An ARGB is a hex number containing 4 values. Alpha, Red, Green, and Blue: 0xAARRGGBB            |
+    ;                   Alpha, Red, Green, and Blue values less than 0 are set to 0 & greater than 255 are set to 255.  |
+    ;                   Gray and grey are both supported for colors. Ex: DarkGray and DarkGrey both return 0xFFA9A9A9   |
+    ;___________________________________________________________________________________________________________________|
+    Class Color
+    {
+        _type := "Color"
+        ,A    := ""
+        ,R    := ""
+        ,G    := ""
+        ,B    := ""
+        
+        ; ############################
+        ; ## COMMON COLOR CONSTANTS ##
+        ; ############################
+            ; Special
+        Static Transparent      = 0x00FFFFFF
+        
+            ; Black and gray/grey               ; White
+        Static Black            = 0xFF000000    , AliceBlue            = 0xFFF0F8FF
+            , DarkGray          = 0xFFA9A9A9    , AntiqueWhite         = 0xFFFAEBD7
+            , DarkGrey          = 0xFFA9A9A9    , Azure                = 0xFFF0FFFF
+            , DarkSlateGray     = 0xFF2F4F4F    , Beige                = 0xFFF5F5DC
+            , DarkSlateGrey     = 0xFF2F4F4F    , FloralWhite          = 0xFFFFFAF0
+            , DimGray           = 0xFF696969    , GhostWhite           = 0xFFF8F8FF
+            , DimGrey           = 0xFF696969    , Honeydew             = 0xFFF0FFF0
+            , Gainsboro         = 0xFFDCDCDC    , Ivory                = 0xFFFFFFF0
+            , Gray              = 0xFF808080    , LavenderBlush        = 0xFFFFF0F5
+            , Grey              = 0xFF808080    , Linen                = 0xFFFAF0E6
+            , LightGray         = 0xFFD3D3D3    , MintCream            = 0xFFF5FFFA
+            , LightGrey         = 0xFFD3D3D3    , MistyRose            = 0xFFFFE4E1
+            , LightSlateGray    = 0xFF778899    , OldLace              = 0xFFFDF5E6
+            , LightSlateGrey    = 0xFF778899    , Seashell             = 0xFFFFF5EE
+            , Silver            = 0xFFC0C0C0    , Snow                 = 0xFFFFFAFA
+            , SlateGray         = 0xFF708090    , White                = 0xFFFFFFFF
+            , SlateGrey         = 0xFF708090    , WhiteSmoke           = 0xFFF5F5F5
+            
+            ; Red                               ; Pink
+        Static Crimson          = 0xFFDC143C    , DeepPink             = 0xFFFF1493
+            , DarkRed           = 0xFF8B0000    , HotPink              = 0xFFFF69B4
+            , DarkSalmon        = 0xFFE9967A    , LightPink            = 0xFFFFB6C1
+            , Firebrick         = 0xFFB22222    , MediumVioletRed      = 0xFFC71585
+            , IndianRed         = 0xFFCD5C5C    , PaleVioletRed        = 0xFFDB7093
+            , LightCoral        = 0xFFF08080    , Pink                 = 0xFFFFC0CB
+            , LightSalmon       = 0xFFFFA07A    
+            , Red               = 0xFFFF0000    
+            , Salmon            = 0xFFFA8072    
+            
+            ; Green                             ; Yellow
+        Static Chartreuse       = 0xFF7FFF00    , Bisque               = 0xFFFFE4C4
+            , DarkGreen         = 0xFF006400    , BlanchedAlmond       = 0xFFFFEBCD
+            , DarkOliveGreen    = 0xFF556B2F    , Burlywood            = 0xFFDEB887
+            , ForestGreen       = 0xFF228B22    , Cornsilk             = 0xFFFFF8DC
+            , Green             = 0xFF008000    , DarkKhaki            = 0xFFBDB76B
+            , GreenYellow       = 0xFFADFF2F    , Gold                 = 0xFFFFD700
+            , LawnGreen         = 0xFF7CFC00    , Khaki                = 0xFFF0E68C
+            , LightGreen        = 0xFF90EE90    , LemonChiffon         = 0xFFFFFACD
+            , Lime              = 0xFF00FF00    , LightGoldenrodYellow = 0xFFFAFAD2
+            , LimeGreen         = 0xFF32CD32    , LightYellow          = 0xFFFFFFE0
+            , MediumAquamarine  = 0xFF66CDAA    , Moccasin             = 0xFFFFE4B5
+            , MediumSeaGreen    = 0xFF3CB371    , NavajoWhite          = 0xFFFFDEAD
+            , MediumSpringGreen = 0xFF00FA9A    , PaleGoldenrod        = 0xFFEEE8AA
+            , Olive             = 0xFF808000    , PapayaWhip           = 0xFFFFEFD5
+            , OliveDrab         = 0xFF6B8E23    , PeachPuff            = 0xFFFFDAB9
+            , PaleGreen         = 0xFF98FB98    , Wheat                = 0xFFF5DEB3
+            , SeaGreen          = 0xFF2E8B57    , Yellow               = 0xFFFFFF00
+            , SpringGreen       = 0xFF00FF7F    
+            , YellowGreen       = 0xFF9ACD32    
+            
+            ; Blue                              ; Cyan
+        Static Blue             = 0xFF0000FF    , Aqua                 = 0xFF00FFFF
+            , CornflowerBlue    = 0xFF6495ED    , Aquamarine           = 0xFF7FFFD4
+            , DarkBlue          = 0xFF00008B    , CadetBlue            = 0xFF5F9EA0
+            , DeepSkyBlue       = 0xFF00BFFF    , Cyan                 = 0xFF00FFFF
+            , DodgerBlue        = 0xFF1E90FF    , DarkCyan             = 0xFF008B8B
+            , LightBlue         = 0xFFADD8E6    , DarkTurquoise        = 0xFF00CED1
+            , LightSkyBlue      = 0xFF87CEFA    , LightCyan            = 0xFFE0FFFF
+            , LightSteelBlue    = 0xFFB0C4DE    , LightSeaGreen        = 0xFF20B2AA
+            , MediumBlue        = 0xFF0000CD    , MediumTurquoise      = 0xFF48D1CC
+            , MidnightBlue      = 0xFF191970    , PaleTurquoise        = 0xFFAFEEEE
+            , Navy              = 0xFF000080    , Teal                 = 0xFF008080
+            , PowderBlue        = 0xFFB0E0E6    , Turquoise            = 0xFF40E0D0
+            , RoyalBlue         = 0xFF4169E1    
+            , SkyBlue           = 0xFF87CEEB    
+            , SteelBlue         = 0xFF4682B4    
+            
+            ; Purple/magenta                    ; Orange
+        Static BlueViolet       = 0xFF8A2BE2    , Coral                = 0xFFFF7F50
+            , DarkMagenta       = 0xFF8B008B    , DarkOrange           = 0xFFFF8C00
+            , DarkOrchid        = 0xFF9932CC    , Orange               = 0xFFFFA500
+            , DarkSlateBlue     = 0xFF483D8B    , OrangeRed            = 0xFFFF4500
+            , DarkViolet        = 0xFF9400D3    , Tomato               = 0xFFFF6347
+            , Fuchsia           = 0xFFFF00FF    
+            , Indigo            = 0xFF4B0082    ; Brown
+            , Lavender          = 0xFFE6E6FA    , Brown                = 0xFFA52A2A
+            , Magenta           = 0xFFFF00FF    , Chocolate            = 0xFFD2691E
+            , MediumOrchid      = 0xFFBA55D3    , DarkGoldenrod        = 0xFFB8860B
+            , MediumPurple      = 0xFF9370DB    , Goldenrod            = 0xFFDAA520
+            , MediumSlateBlue   = 0xFF7B68EE    , Maroon               = 0xFF800000
+            , Orchid            = 0xFFDA70D6    , Peru                 = 0xFFCD853F
+            , Plum              = 0xFFDDA0DD    , RosyBrown            = 0xFFBC8F8F
+            , Purple            = 0xFF800080    , SaddleBrown          = 0xFF8B4513
+            , SlateBlue         = 0xFF6A5ACD    , SandyBrown           = 0xFFF4A460
+            , Thistle           = 0xFFD8BFD8    , Sienna               = 0xFFA0522D
+            , Violet            = 0xFFEE82EE    , Tan                  = 0xFFD2B48C
+        
+        ; Color()
+        ; Color(ColorObject)
+        ; Color(ARGB)
+        ; Color(red, blue, green)
+        ; Color(alpha, red, blue, green)
+        __New(a="", r="", g="", b="")
+        {
+            this.SetCapacity("_struct", 4)
+            ,this.structP := this.GetAddress("_struct")
+            ,(a._type == "Color" && r = "" && g = "" && b = "")     ; Color object
+                ? this._set_color(a.A, a.R, a.G, a.B)
+            : ((a >= 0 && a <= 0xFFFFFFFF) && r="" && g="" && b="") ; ARGB (0xAARRGGBB)
+                ? this.SetValue(a)
+            : (a="" && r="" && g="" && b="")                        ; All Empty
+                ? this._set_color(255, 0, 0, 0)
+            : (b = "")                                              ; R G B values
+                ? this._set_color(255, a, r, g)
+                : this._set_color(a, r, g, b)                       ; A R G B values 
+        }
+        
+        ; Remark: Values fallling out of the 0-255 range will be rounded
+        _set_color(a, r, g, b)
+        {
+             this.A := (a < 0) ? 0 : (a > 255) ? 255 : a
+            ,this.R := (r < 0) ? 0 : (r > 255) ? 255 : r
+            ,this.G := (g < 0) ? 0 : (g > 255) ? 255 : g
+            ,this.B := (b < 0) ? 0 : (b > 255) ? 255 : b
+        }
+        
+        show()
+        {
+            ptr   := this.Struct()
+            ,a    := NumGet(ptr+0, 3, "UChar")
+            ,r    := NumGet(ptr+0, 2, "UChar")
+            ,g    := NumGet(ptr+0, 1, "UChar")
+            ,b    := NumGet(ptr+0, 0, "UChar")
+            ,argb := this.GetValue()
+            MsgBox, % this._type " object:"
+                . "`nstructP: "   this.structP
+                . "`nA: "         GDIP.to_hex(this.A) " | " this.A
+                . "`nR: "         GDIP.to_hex(this.R) " | " this.R
+                . "`nB: "         GDIP.to_hex(this.B) " | " this.B
+                . "`nG: "         GDIP.to_hex(this.G) " | " this.G
+                . "`nNumGet A: "  GDIP.to_hex(a) " | " a
+                . "`nNumGet R: "  GDIP.to_hex(r) " | " r
+                . "`nNumGet G: "  GDIP.to_hex(g) " | " g
+                . "`nNumGet B: "  GDIP.to_hex(b) " | " b
+                . "`nARBG: "      GDIP.to_hex(argb) " | " argb
+        }
+        
+        Struct()
+        {
+             NumPut(this.B, this.structP+0, 0, "UChar")
+            ,NumPut(this.G, this.structP+0, 1, "UChar")
+            ,NumPut(this.R, this.structP+0, 2, "UChar")
+            ,NumPut(this.A, this.structP+0, 3, "UChar")
+            Return this.structP+0
+        }
+        
+        GetAlpha(hex=0) {
+            Return (hex ? GDIP.to_hex(this.A) : this.A)
+        }
+        
+        GetRed(hex=0) {
+            Return (hex ? GDIP.to_hex(this.R) : this.R)
+        }
+        
+        GetGreen(hex=0) {
+            Return (hex ? GDIP.to_hex(this.G) : this.G)
+        }
+        
+        GetBlue(hex=0) {
+            Return (hex ? GDIP.to_hex(this.B) : this.B)
+        }
+        
+        GetValue(hex=0) {
+            argb := (this.A << this.A_Shift)
+                 +  (this.R << this.R_Shift)
+                 +  (this.G << this.G_Shift)
+                 +   this.B
+            Return (hex ? GDIP.to_hex(argb) : argb)
+        }
+        
+        SetValue(argb) {
+             this.A := (argb & this.A_Mask) >> this.A_Shift
+            ,this.R := (argb & this.R_Mask) >> this.R_Shift
+            ,this.G := (argb & this.G_Mask) >> this.G_Shift
+            ,this.B := (argb & this.B_Mask)
+        }
+        
+        ; Takes four 8-bit values (0-255) and returns a 32-bit combined
+        MakeARGB(a, r, g, b)
+        {
+            Return ( (a << this.A_Shift)
+                   + (r << this.R_Shift)
+                   + (g << this.G_Shift)
+                   +  b )
+        }        
+        
+        ; ; I don't think these two will be needed, so they're staying commented out for now
+        ; ; Set ARGB value using a COLORREF
+        ; SetFromCOLORREF()
+        ; {
+        ;     Return
+        ; }
+        ; 
+        ; ; Converts ARGB value to a COLORREF
+        ; ToCOLORREF(ARGB)
+        ; {
+        ;     Return
+        ; }
+        
+        ; ARGB masks and bitshifts
+        Static A_Mask  := 0xFF000000
+             , R_Mask  := 0x00FF0000
+             , G_Mask  := 0x0000FF00
+             , B_Mask  := 0x000000FF
+             , A_Shift := 24
+             , R_Shift := 16
+             , G_Shift := 8
+             , B_Shift := 0
+    }
     
     
     ;-------------------------------------------------------------------------------------------------------------------.
@@ -3194,32 +3441,32 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------.
     ; Point Class - Represents a location in a 2D coordinate system                                                     |
     ;-------------------------------------------------------------------------------------------------------------------|
-    ; A Point object contains x and y values.                                                                           |
+    ; A Point object contains x and y coordinate values.                                                                |
     ; Properties:                                                                                                       |
     ; .X                X coord                                                                                         |
     ; .Y                Y coord                                                                                         |
+    ; ._float           Set to 1 if Point is of Float type. Default is 0 which is Int.                                  |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Point()           Set X and Y to 0                                                                                |
     ; Point(x, y)       Set X and Y to number                                                                           |
-    ; Point(Size)       Set X to Size.width and Y to Size.height                                                        |
     ; Point(Point)      Set X to Point.X and Y to Point.Y                                                               |
+    ; Point(Size)       Set X to Size.width and Y to Size.height                                                        |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Create struct with current values and return pointer to it. type can be any 4 byte data type.   |
-    ; .Plus(Point)      Return a new Point object with sum of Point and NativePoint values                              |
-    ; .Minus(Point)     Return a new Point object with difference of NativePoint and Point values                       |
+    ; .Struct()         Create struct and return pointer to it.                                                         |
+    ; .Plus(Point)      Return a new Point object with Point and NativePoint values summed                              |
+    ; .Minus(Point)     Return a new Point object with Point and NativePoint values differenced                         |
     ; .Equals(Point)    Return True if Point and NativePoint have equal values                                          |
     ;                                                                                                                   |
-    ; Remarks           To set a struct data type permanently, set the _dt to the preferred type. Point._dt := "Int"    |
-    ;                   There is no way to use the + and - operators between Points. Use: .plus(p) or .minus(p)         |
+    ; Remarks           You cannot use + and - operators on Points like in C++. Use: p1.plus(p2) or p1.minus(p2)        |
     ;___________________________________________________________________________________________________________________|
     Class Point
     {
-        _type   := "Point"
-        _dt     := "UInt"
-        Width   := ""
-        Height  := ""
+        _type  := "Point"
+        _float := 0
+        Width  := ""
+        Height := ""
         
         ; ## Constructor ##
         ; Point()
@@ -3233,11 +3480,11 @@ Class GDIP
             
             ,(x = "" && y = "")                     ; empty
                 ? this._set_xy(0, 0)
-            : (GDIP.is_num(x) && GDIP.is_num(y))    ; nums
+            : (GDIP.is_num(x) && GDIP.is_num(y))    ; numbers
                 ? this._set_xy(x, y)
-            : (x._type == "Point" && y = "")         ; Point
+            : (x._type == "Point" && y = "")        ; Point
                 ? this._set_xy(x.X, x.Y)
-            : (x._type == "Size" && y = "")          ; Size
+            : (x._type == "Size" && y = "")         ; Size
                 ? this._set_xy(x.Width, x.Height)
             : GDIP.error_log(A_ThisFunc, "Point constructor error."
                 , "Empty: Point()`nFrom two numbers: Point(x, y)"
@@ -3245,10 +3492,10 @@ Class GDIP
                 , {p1:w, p2:h})
         }
         
-        Show(type="")
+        Show()
         {
             ptr := this.Struct()
-            type := (type = "") ? this._dt : type
+            ,type := (this._float) ? "Float" : "Int"
             MsgBox, % this._type " Object:"
                 . "`nthis.X: "       this.X
                 . "`nthis.Y: "       this.Y
@@ -3264,11 +3511,10 @@ Class GDIP
             ,this.Y := y
         }
         
-        ; type      Pass expected structure type
         ; Return    Pointer to struct
-        Struct(type="")
+        Struct()
         {
-            type := (type = "") ? this._dt : type
+             type := (this._float) ? "Float" : "Int"
             ,NumPut(this.X, this.structP+0, 0, type)
             ,NumPut(this.Y, this.structP+0, 4, type)
             Return structP+0
@@ -3297,6 +3543,7 @@ Class GDIP
     ; Properties:                                                                                                       |
     ; .Width            Size Width                                                                                      |
     ; .Height           Size Height                                                                                     |
+    ; ._float           Set to 1 if Size is of Float type. Default is 0 which is Int.                                   |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Size()            Set Width and Height to 0                                                                       |
@@ -3304,21 +3551,20 @@ Class GDIP
     ; Size(Size)        Set Width to Size.Width and Height to Size.Height                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Create struct with current values and return pointer to it. type can be any 4 byte data type.   |
+    ; .Struct(type)     Create struct a struct and return pointer to it.                                                |
     ; .Plus(Size)       Return a new Size object with sum of Size and NativeSize values                                 |
     ; .Minus(Size)      Return a new Size object with difference of NativeSize and Size values                          |
     ; .Equals(Size)     Return True if Size and NativeSize have equal values                                            |
     ; .Empty()          Return true if width or height <= 0                                                             |
     ;                                                                                                                   |
-    ; Remarks           To set a struct data type permanently, set _dt to the preferred type. Size._dt := "Int"         |
-    ;                   There is no way to use the + and - operators between Sizes. Use: .plus(s) or .minus(p)          |
+    ; Remarks           You cannot use + and - operators on Sizes like in C++. Use: s1.plus(s2) or s1.minus(s2)         |
     ;___________________________________________________________________________________________________________________|
     Class Size
     {
-        _type   := "Size"
-        _dt     := "UInt"
-        Width   := ""
-        Height  := ""
+        _type  := "Size"
+        _float := 0
+        Width  := ""
+        Height := ""
         
         ; ## Constructor ##
         ; Size()
@@ -3343,7 +3589,7 @@ Class GDIP
         Show(type="")
         {
             ptr := this.Struct()
-            type := (type = "") ? this._dt : type
+            ,type := (this._float) ? "Float" : "Int"
             MsgBox, % "Size Object:"
                 . "`nthis.Width: "    this.Width
                 . "`nthis.Height: "   this.Height
@@ -3362,7 +3608,7 @@ Class GDIP
         ; type      Pass expected structure type
         Struct(type="")
         {
-            type := (type = "") ? this._dt : type
+             type := (this._float) ? "Float" : "Int"
             ,NumPut(this.Width,  this.structP+0, 0, type)
             ,NumPut(this.Height, this.structP+0, 4, type)
             Return structP+0
@@ -3402,6 +3648,7 @@ Class GDIP
     ; .Top              Y coordinate of Top edge                                                                        |
     ; .Right            X coordinate of Right edge                                                                      |
     ; .Bottom           Y coordinate of Bottom edge                                                                     |
+    ; ._float           Set to 1 if Rect is of Float type. Default is 0 which is Int.                                   |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Rect()            X, Y, Width, and Height = 0                                                                     |
@@ -3440,7 +3687,7 @@ Class GDIP
     Class Rect
     {
          _type  := "Rect"
-        ,_dt    := "UInt"
+        ,_float := 0
         ,X      := Left   := ""
         ,Y      := Top    := ""
         ,Width  := Right  := ""
@@ -3470,8 +3717,10 @@ Class GDIP
         {
              this.Left   := this.X       := x
             ,this.Top    := this.Y       := y
-            ,this.Right  := (this.Width  := w) + x
-            ,this.Bottom := (this.Height := h) + y
+            ,this.Right  := x + w
+            ,this.Bottom := y + h
+            ,this.Width  := w
+            ,this.Height := h
         }
         
         _set_edge(l, t, r, b)
@@ -3486,7 +3735,7 @@ Class GDIP
         ; Return    Pointer to struct
         Struct(type="")
         {
-            type := (type = "") ? this._dt : type
+             type := (this._float) ? "Float" : "Int"
             ,NumPut(this.X,      this.structP+0,  0, type)
             ,NumPut(this.Y,      this.structP+0,  4, type)
             ,NumPut(this.Width,  this.structP+0,  8, type)
@@ -3497,7 +3746,7 @@ Class GDIP
         Show(type="") ; Used for testing purposes
         {
             ptr := this.Struct()
-            type := (type = "") ? this._dt : type
+            ,type := (this._float) ? "Float" : "Int"
             MsgBox, % this._type " object:"
                 . "`nthis.structP: "  this.structP
                 . "`nthis.X: "        this.X
@@ -3553,7 +3802,7 @@ Class GDIP
         ; Contains(x, y)
         ; Contains(Point)
         ; Contains(Rect)
-        ; Return: 1 = Contains, 0 = Does not contain, "" = Error
+        ; Return: 1 = True, 0 = False, "" = Error
         Contains(x, y="")
         {
             Return (x._type == "Point" && y = "") ; Point object
@@ -3633,7 +3882,7 @@ Class GDIP
         {
             (dx._type = "Point" && y = "")
                 ? this._set_xywh(this.X + dx.X, this.Y + dx.Y, this.width, this.height)
-                : this._set_xywh(this.X + dx, this.Y + dy, this.width, this.height)
+                : this._set_xywh(this.X + dx  , this.Y + dy  , this.width, this.height)
         }
     }
     
@@ -3656,7 +3905,7 @@ Class GDIP
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
     ; get_string(ptr)   Returns GUID string if success or a blank string if fail                                        |
-    ; get_pointer(str)     Returns GUID pointer if success or a blank string if fail                                       |
+    ; get_pointer(str)  Returns GUID pointer if success or a blank string if fail                                       |
     ;                                                                                                                   |
     ; Remark            Opening/closing brackets {} and hyphens - are optional.                                         |
     ;                   GUID strings must be 32 hex digits long.                                                        |
@@ -4235,9 +4484,8 @@ data_type_size(type)
 
 
 
-
-; Graphics Class - Current WIP
-
+; Temporary workspace for constructing and testing GDIPlus classes
+; DON'T FORGET TO IMPORT BACK INTO MAIN FILE, YOU SPED!!!
 #SingleInstance Force
 #Warn
 test()
@@ -4245,15 +4493,11 @@ ExitApp
 
 test()
 {
-    MsgBox, % GDIP.to_hex(GDIP.Color.LightSeaGreen)
-    myCol := new GDIP.Color(GDIP.Color.LightSeaGreen)
-    MsgBox, % "myCol.a: " myCol.a "`nmyCol.r: " myCol.r "`nmyCol.g: " myCol.g "`nmyCol.b: " myCol.b 
-    MsgBox, % gdip.to_hex(myCol.MakeARGB(0xDE, 0xAD, 0xBE, 0xEF))
+    
     Return
 }
 
 *Escape::ExitApp
-
 
 Class GDIP
 {
@@ -4266,10 +4510,11 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------|
     ; A Color object has Alpha (transparency), Red, Green, and Blue values. Type is ARGB                                |
     ; Properties:                                                                                                       |
-    ; .Alpha            Transparency. 0-255                                                                             |
-    ; .Red              Red value. 0-255                                                                                |
-    ; .Green            Green value. 0-255                                                                              |
-    ; .Blue             Blue value. 0-255                                                                               |
+    ; .A                Transparency. 0-255                                                                             |
+    ; .R                Red value. 0-255                                                                                |
+    ; .G                Green value. 0-255                                                                              |
+    ; .B                Blue value. 0-255                                                                               |
+    ; .Struct           Stores the pointer for the struct                                                               |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Color()           Create solid black color object                                                                 |
@@ -4279,21 +4524,18 @@ Class GDIP
     ; Color(a, r, g, b) Create a color object using the provided alpha, red, green and blue values                      |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct()         Builds ARBG and returns pointer.                                                       |
-    ; .GetAlpha(hex)    Returns 
-    ; .GetRed(hex)
-    ; .GetGreen(hex)
-    ; .GetBlue(hex)
-    ; .GetValue()
-    ; .SetValue(argb)
-    ; .; Takes four 8-bit values (0-255) and returns a 32-bit combined
-    ; .MakeARGB(a, r, g, b)
-
-    
+    ; .GetAlpha(hex)    Returns Alpha value.                                                                            |
+    ; .GetRed(hex)      Returns Red value.                                                                              |
+    ; .GetGreen(hex)    Returns Green value.                                                                            |
+    ; .GetBlue(hex)     Returns Blue value.                                                                             |
+    ; .GetValue()       Returns an ARBG value.                                                                          |
+    ; .SetValue(argb)   Sets color's ARGB values using an ARGB.                                                         |
+    ; .MakeARGB(a ,r    Creates an ARGB value using an alpha, red, green, and blue value.                               |
+    ;          ,g ,b)                                                                                                   |
     ;                                                                                                                   |
-    ; Remarks           Alpha, Red, Green, and Blue values less than 0 are set to 0 & greater than 255 are set to 255.  |
-    ;                                                                                                                   |
-    ; Enum: Names       List of 139 pre-defined colors. Use: this.name.Colorname                                        |
+    ; Remarks           An ARGB is a hex number containing 4 values. Alpha, Red, Green, and Blue: 0xAARRGGBB            |
+    ;                   Alpha, Red, Green, and Blue values less than 0 are set to 0 & greater than 255 are set to 255.  |
+    ;                   Gray and grey are both supported for colors. Ex: DarkGray and DarkGrey both return 0xFFA9A9A9   |
     ;___________________________________________________________________________________________________________________|
     Class Color
     {
@@ -4302,100 +4544,128 @@ Class GDIP
         ,R    := ""
         ,G    := ""
         ,B    := ""
+        _ptr[]
+        {
+            Get {
+                Return
+            }
+            
+            Set {
+                Return
+            }
+        }
+        
+        struct[]
+        {
+            Get {
+                 NumPut(this.B, this._ptr, 0, "UChar")
+                ,NumPut(this.G, this._ptr, 1, "UChar")
+                ,NumPut(this.R, this._ptr, 2, "UChar")
+                ,NumPut(this.A, this._ptr, 3, "UChar")
+                Return this._ptr
+            }
+            
+            Set {
+                Return
+            }
+        }
+        
+        
+        
         
         ; ############################
         ; ## COMMON COLOR CONSTANTS ##
         ; ############################
-        ; Black and gray/grey               ; White
-    Static Black            = 0xFF000000    , AliceBlue            = 0xFFF0F8FF
-        , DarkGray          = 0xFFA9A9A9    , AntiqueWhite         = 0xFFFAEBD7
-        , DarkGrey          = 0xFFA9A9A9    , Azure                = 0xFFF0FFFF
-        , DarkSlateGray     = 0xFF2F4F4F    , Beige                = 0xFFF5F5DC
-        , DarkSlateGrey     = 0xFF2F4F4F    , FloralWhite          = 0xFFFFFAF0
-        , DimGray           = 0xFF696969    , GhostWhite           = 0xFFF8F8FF
-        , DimGrey           = 0xFF696969    , Honeydew             = 0xFFF0FFF0
-        , Gainsboro         = 0xFFDCDCDC    , Ivory                = 0xFFFFFFF0
-        , Gray              = 0xFF808080    , LavenderBlush        = 0xFFFFF0F5
-        , Grey              = 0xFF808080    , Linen                = 0xFFFAF0E6
-        , LightGray         = 0xFFD3D3D3    , MintCream            = 0xFFF5FFFA
-        , LightGrey         = 0xFFD3D3D3    , MistyRose            = 0xFFFFE4E1
-        , LightSlateGray    = 0xFF778899    , OldLace              = 0xFFFDF5E6
-        , LightSlateGrey    = 0xFF778899    , Seashell             = 0xFFFFF5EE
-        , Silver            = 0xFFC0C0C0    , Snow                 = 0xFFFFFAFA
-        , SlateGray         = 0xFF708090    , White                = 0xFFFFFFFF
-        , SlateGrey         = 0xFF708090    , WhiteSmoke           = 0xFFF5F5F5
+            ; Special
+        Static Transparent      = 0x00FFFFFF
         
-        ; Red                               ; Pink
-    Static Crimson          = 0xFFDC143C    , DeepPink             = 0xFFFF1493
-        , DarkRed           = 0xFF8B0000    , HotPink              = 0xFFFF69B4
-        , DarkSalmon        = 0xFFE9967A    , LightPink            = 0xFFFFB6C1
-        , Firebrick         = 0xFFB22222    , MediumVioletRed      = 0xFFC71585
-        , IndianRed         = 0xFFCD5C5C    , PaleVioletRed        = 0xFFDB7093
-        , LightCoral        = 0xFFF08080    , Pink                 = 0xFFFFC0CB
-        , LightSalmon       = 0xFFFFA07A    
-        , Red               = 0xFFFF0000    
-        , Salmon            = 0xFFFA8072    
-        
-        ; Green                             ; Yellow
-    Static Chartreuse       = 0xFF7FFF00    , Bisque               = 0xFFFFE4C4
-        , DarkGreen         = 0xFF006400    , BlanchedAlmond       = 0xFFFFEBCD
-        , DarkOliveGreen    = 0xFF556B2F    , Burlywood            = 0xFFDEB887
-        , ForestGreen       = 0xFF228B22    , Cornsilk             = 0xFFFFF8DC
-        , Green             = 0xFF008000    , DarkKhaki            = 0xFFBDB76B
-        , GreenYellow       = 0xFFADFF2F    , Gold                 = 0xFFFFD700
-        , LawnGreen         = 0xFF7CFC00    , Khaki                = 0xFFF0E68C
-        , LightGreen        = 0xFF90EE90    , LemonChiffon         = 0xFFFFFACD
-        , Lime              = 0xFF00FF00    , LightGoldenrodYellow = 0xFFFAFAD2
-        , LimeGreen         = 0xFF32CD32    , LightYellow          = 0xFFFFFFE0
-        , MediumAquamarine  = 0xFF66CDAA    , Moccasin             = 0xFFFFE4B5
-        , MediumSeaGreen    = 0xFF3CB371    , NavajoWhite          = 0xFFFFDEAD
-        , MediumSpringGreen = 0xFF00FA9A    , PaleGoldenrod        = 0xFFEEE8AA
-        , Olive             = 0xFF808000    , PapayaWhip           = 0xFFFFEFD5
-        , OliveDrab         = 0xFF6B8E23    , PeachPuff            = 0xFFFFDAB9
-        , PaleGreen         = 0xFF98FB98    , Wheat                = 0xFFF5DEB3
-        , SeaGreen          = 0xFF2E8B57    , Yellow               = 0xFFFFFF00
-        , SpringGreen       = 0xFF00FF7F    
-        , YellowGreen       = 0xFF9ACD32    
-        
-        ; Blue                              ; Cyan
-    Static Blue             = 0xFF0000FF    , Aqua                 = 0xFF00FFFF
-        , CornflowerBlue    = 0xFF6495ED    , Aquamarine           = 0xFF7FFFD4
-        , DarkBlue          = 0xFF00008B    , CadetBlue            = 0xFF5F9EA0
-        , DeepSkyBlue       = 0xFF00BFFF    , Cyan                 = 0xFF00FFFF
-        , DodgerBlue        = 0xFF1E90FF    , DarkCyan             = 0xFF008B8B
-        , LightBlue         = 0xFFADD8E6    , DarkTurquoise        = 0xFF00CED1
-        , LightSkyBlue      = 0xFF87CEFA    , LightCyan            = 0xFFE0FFFF
-        , LightSteelBlue    = 0xFFB0C4DE    , LightSeaGreen        = 0xFF20B2AA
-        , MediumBlue        = 0xFF0000CD    , MediumTurquoise      = 0xFF48D1CC
-        , MidnightBlue      = 0xFF191970    , PaleTurquoise        = 0xFFAFEEEE
-        , Navy              = 0xFF000080    , Teal                 = 0xFF008080
-        , PowderBlue        = 0xFFB0E0E6    , Turquoise            = 0xFF40E0D0
-        , RoyalBlue         = 0xFF4169E1    
-        , SkyBlue           = 0xFF87CEEB    
-        , SteelBlue         = 0xFF4682B4    
-        
-        ; Purple/magenta                    ; Orange
-    Static BlueViolet       = 0xFF8A2BE2    ,Coral                 = 0xFFFF7F50
-        , DarkMagenta       = 0xFF8B008B    ,DarkOrange            = 0xFFFF8C00
-        , DarkOrchid        = 0xFF9932CC    ,Orange                = 0xFFFFA500
-        , DarkSlateBlue     = 0xFF483D8B    ,OrangeRed             = 0xFFFF4500
-        , DarkViolet        = 0xFF9400D3    ,Tomato                = 0xFFFF6347
-        , Fuchsia           = 0xFFFF00FF    
-        , Indigo            = 0xFF4B0082    ; Brown
-        , Lavender          = 0xFFE6E6FA    , Brown                = 0xFFA52A2A
-        , Magenta           = 0xFFFF00FF    , Chocolate            = 0xFFD2691E
-        , MediumOrchid      = 0xFFBA55D3    , DarkGoldenrod        = 0xFFB8860B
-        , MediumPurple      = 0xFF9370DB    , Goldenrod            = 0xFFDAA520
-        , MediumSlateBlue   = 0xFF7B68EE    , Maroon               = 0xFF800000
-        , Orchid            = 0xFFDA70D6    , Peru                 = 0xFFCD853F
-        , Plum              = 0xFFDDA0DD    , RosyBrown            = 0xFFBC8F8F
-        , Purple            = 0xFF800080    , SaddleBrown          = 0xFF8B4513
-        , SlateBlue         = 0xFF6A5ACD    , SandyBrown           = 0xFFF4A460
-        , Thistle           = 0xFFD8BFD8    , Sienna               = 0xFFA0522D
-        , Violet            = 0xFFEE82EE    , Tan                  = 0xFFD2B48C
-        
-        ; Special
-    Static Transparent      = 0x00FFFFFF
+            ; Black and gray/grey               ; White
+        Static Black            = 0xFF000000    , AliceBlue            = 0xFFF0F8FF
+            , DarkGray          = 0xFFA9A9A9    , AntiqueWhite         = 0xFFFAEBD7
+            , DarkGrey          = 0xFFA9A9A9    , Azure                = 0xFFF0FFFF
+            , DarkSlateGray     = 0xFF2F4F4F    , Beige                = 0xFFF5F5DC
+            , DarkSlateGrey     = 0xFF2F4F4F    , FloralWhite          = 0xFFFFFAF0
+            , DimGray           = 0xFF696969    , GhostWhite           = 0xFFF8F8FF
+            , DimGrey           = 0xFF696969    , Honeydew             = 0xFFF0FFF0
+            , Gainsboro         = 0xFFDCDCDC    , Ivory                = 0xFFFFFFF0
+            , Gray              = 0xFF808080    , LavenderBlush        = 0xFFFFF0F5
+            , Grey              = 0xFF808080    , Linen                = 0xFFFAF0E6
+            , LightGray         = 0xFFD3D3D3    , MintCream            = 0xFFF5FFFA
+            , LightGrey         = 0xFFD3D3D3    , MistyRose            = 0xFFFFE4E1
+            , LightSlateGray    = 0xFF778899    , OldLace              = 0xFFFDF5E6
+            , LightSlateGrey    = 0xFF778899    , Seashell             = 0xFFFFF5EE
+            , Silver            = 0xFFC0C0C0    , Snow                 = 0xFFFFFAFA
+            , SlateGray         = 0xFF708090    , White                = 0xFFFFFFFF
+            , SlateGrey         = 0xFF708090    , WhiteSmoke           = 0xFFF5F5F5
+            
+            ; Red                               ; Pink
+        Static Crimson          = 0xFFDC143C    , DeepPink             = 0xFFFF1493
+            , DarkRed           = 0xFF8B0000    , HotPink              = 0xFFFF69B4
+            , DarkSalmon        = 0xFFE9967A    , LightPink            = 0xFFFFB6C1
+            , Firebrick         = 0xFFB22222    , MediumVioletRed      = 0xFFC71585
+            , IndianRed         = 0xFFCD5C5C    , PaleVioletRed        = 0xFFDB7093
+            , LightCoral        = 0xFFF08080    , Pink                 = 0xFFFFC0CB
+            , LightSalmon       = 0xFFFFA07A    
+            , Red               = 0xFFFF0000    
+            , Salmon            = 0xFFFA8072    
+            
+            ; Green                             ; Yellow
+        Static Chartreuse       = 0xFF7FFF00    , Bisque               = 0xFFFFE4C4
+            , DarkGreen         = 0xFF006400    , BlanchedAlmond       = 0xFFFFEBCD
+            , DarkOliveGreen    = 0xFF556B2F    , Burlywood            = 0xFFDEB887
+            , ForestGreen       = 0xFF228B22    , Cornsilk             = 0xFFFFF8DC
+            , Green             = 0xFF008000    , DarkKhaki            = 0xFFBDB76B
+            , GreenYellow       = 0xFFADFF2F    , Gold                 = 0xFFFFD700
+            , LawnGreen         = 0xFF7CFC00    , Khaki                = 0xFFF0E68C
+            , LightGreen        = 0xFF90EE90    , LemonChiffon         = 0xFFFFFACD
+            , Lime              = 0xFF00FF00    , LightGoldenrodYellow = 0xFFFAFAD2
+            , LimeGreen         = 0xFF32CD32    , LightYellow          = 0xFFFFFFE0
+            , MediumAquamarine  = 0xFF66CDAA    , Moccasin             = 0xFFFFE4B5
+            , MediumSeaGreen    = 0xFF3CB371    , NavajoWhite          = 0xFFFFDEAD
+            , MediumSpringGreen = 0xFF00FA9A    , PaleGoldenrod        = 0xFFEEE8AA
+            , Olive             = 0xFF808000    , PapayaWhip           = 0xFFFFEFD5
+            , OliveDrab         = 0xFF6B8E23    , PeachPuff            = 0xFFFFDAB9
+            , PaleGreen         = 0xFF98FB98    , Wheat                = 0xFFF5DEB3
+            , SeaGreen          = 0xFF2E8B57    , Yellow               = 0xFFFFFF00
+            , SpringGreen       = 0xFF00FF7F    
+            , YellowGreen       = 0xFF9ACD32    
+            
+            ; Blue                              ; Cyan
+        Static Blue             = 0xFF0000FF    , Aqua                 = 0xFF00FFFF
+            , CornflowerBlue    = 0xFF6495ED    , Aquamarine           = 0xFF7FFFD4
+            , DarkBlue          = 0xFF00008B    , CadetBlue            = 0xFF5F9EA0
+            , DeepSkyBlue       = 0xFF00BFFF    , Cyan                 = 0xFF00FFFF
+            , DodgerBlue        = 0xFF1E90FF    , DarkCyan             = 0xFF008B8B
+            , LightBlue         = 0xFFADD8E6    , DarkTurquoise        = 0xFF00CED1
+            , LightSkyBlue      = 0xFF87CEFA    , LightCyan            = 0xFFE0FFFF
+            , LightSteelBlue    = 0xFFB0C4DE    , LightSeaGreen        = 0xFF20B2AA
+            , MediumBlue        = 0xFF0000CD    , MediumTurquoise      = 0xFF48D1CC
+            , MidnightBlue      = 0xFF191970    , PaleTurquoise        = 0xFFAFEEEE
+            , Navy              = 0xFF000080    , Teal                 = 0xFF008080
+            , PowderBlue        = 0xFFB0E0E6    , Turquoise            = 0xFF40E0D0
+            , RoyalBlue         = 0xFF4169E1    
+            , SkyBlue           = 0xFF87CEEB    
+            , SteelBlue         = 0xFF4682B4    
+            
+            ; Purple/magenta                    ; Orange
+        Static BlueViolet       = 0xFF8A2BE2    , Coral                = 0xFFFF7F50
+            , DarkMagenta       = 0xFF8B008B    , DarkOrange           = 0xFFFF8C00
+            , DarkOrchid        = 0xFF9932CC    , Orange               = 0xFFFFA500
+            , DarkSlateBlue     = 0xFF483D8B    , OrangeRed            = 0xFFFF4500
+            , DarkViolet        = 0xFF9400D3    , Tomato               = 0xFFFF6347
+            , Fuchsia           = 0xFFFF00FF    
+            , Indigo            = 0xFF4B0082    ; Brown
+            , Lavender          = 0xFFE6E6FA    , Brown                = 0xFFA52A2A
+            , Magenta           = 0xFFFF00FF    , Chocolate            = 0xFFD2691E
+            , MediumOrchid      = 0xFFBA55D3    , DarkGoldenrod        = 0xFFB8860B
+            , MediumPurple      = 0xFF9370DB    , Goldenrod            = 0xFFDAA520
+            , MediumSlateBlue   = 0xFF7B68EE    , Maroon               = 0xFF800000
+            , Orchid            = 0xFFDA70D6    , Peru                 = 0xFFCD853F
+            , Plum              = 0xFFDDA0DD    , RosyBrown            = 0xFFBC8F8F
+            , Purple            = 0xFF800080    , SaddleBrown          = 0xFF8B4513
+            , SlateBlue         = 0xFF6A5ACD    , SandyBrown           = 0xFFF4A460
+            , Thistle           = 0xFFD8BFD8    , Sienna               = 0xFFA0522D
+            , Violet            = 0xFFEE82EE    , Tan                  = 0xFFD2B48C
         
         ; Color()
         ; Color(ColorObject)
@@ -4404,15 +4674,15 @@ Class GDIP
         ; Color(alpha, red, blue, green)
         __New(a="", r="", g="", b="")
         {
-            this.SetCapacity("_ARGB", 4)
-            ,this.structP := this.GetAddress("_ARGB")
+            this.SetCapacity("_struct", 4)
+            ,this._ptr := this.GetAddress("_struct")
             ,(a._type == "Color" && r = "" && g = "" && b = "")     ; Color object
                 ? this._set_color(a.A, a.R, a.G, a.B)
             : ((a >= 0 && a <= 0xFFFFFFFF) && r="" && g="" && b="") ; ARGB (0xAARRGGBB)
                 ? this.SetValue(a)
             : (a="" && r="" && g="" && b="")                        ; All Empty
                 ? this._set_color(255, 0, 0, 0)
-            : (g = "")                                              ; R G B values
+            : (b = "")                                              ; R G B values
                 ? this._set_color(255, a, r, g)
                 : this._set_color(a, r, g, b)                       ; A R G B values 
         }
@@ -4426,48 +4696,49 @@ Class GDIP
             ,this.B := (b < 0) ? 0 : (b > 255) ? 255 : b
         }
         
-        show()
+        Show()
         {
-            ptr := this.Struct()
+            ptr   := this.Struct()
+            ,a    := NumGet(ptr+0, 3, "UChar")
+            ,r    := NumGet(ptr+0, 2, "UChar")
+            ,g    := NumGet(ptr+0, 1, "UChar")
+            ,b    := NumGet(ptr+0, 0, "UChar")
+            ,argb := this.GetValue()
             MsgBox, % this._type " object:"
-                . "`nA: "         this.A
-                . "`nR: "         this.R
-                . "`nB: "         this.B
-                . "`nG: "         this.G
-                . "`nstructP: "   this.structP
-                . "`nNumGet A: "  NumGet(ptr, 3, "UChar")
-                . "`nNumGet R: "  NumGet(ptr, 2, "UChar")
-                . "`nNumGet G: "  NumGet(ptr, 1, "UChar")
-                . "`nNumGet B: "  NumGet(ptr, 0, "UChar")
-        }
-        
-        Struct()
-        {
-             NumPut(this.GetValue(), this.structP+0, 0, "Int")
-            Return this.structP+0
+                . "`n_ptr: "   this._ptr
+                . "`nA: "         GDIP.to_hex(this.A) " | " this.A
+                . "`nR: "         GDIP.to_hex(this.R) " | " this.R
+                . "`nB: "         GDIP.to_hex(this.B) " | " this.B
+                . "`nG: "         GDIP.to_hex(this.G) " | " this.G
+                . "`nNumGet A: "  GDIP.to_hex(a) " | " a
+                . "`nNumGet R: "  GDIP.to_hex(r) " | " r
+                . "`nNumGet G: "  GDIP.to_hex(g) " | " g
+                . "`nNumGet B: "  GDIP.to_hex(b) " | " b
+                . "`nARBG: "      GDIP.to_hex(argb) " | " argb
         }
         
         GetAlpha(hex=0) {
-            Return (hex ? this.to_hex(this.A) : this.A)
+            Return (hex ? GDIP.to_hex(this.A) : this.A)
         }
         
         GetRed(hex=0) {
-            Return (hex ? this.to_hex(this.R) : this.R)
+            Return (hex ? GDIP.to_hex(this.R) : this.R)
         }
         
         GetGreen(hex=0) {
-            Return (hex ? this.to_hex(this.G) : this.G)
+            Return (hex ? GDIP.to_hex(this.G) : this.G)
         }
         
         GetBlue(hex=0) {
-            Return (hex ? this.to_hex(this.B) : this.B)
+            Return (hex ? GDIP.to_hex(this.B) : this.B)
         }
         
-        GetValue() {
-            Return ( (this.A << this.A_Shift)
-                   + (this.R << this.R_Shift)
-                   + (this.G << this.G_Shift)
-                   +  this.B )
+        GetValue(hex=0) {
+            argb := (this.A << this.A_Shift)
+                 +  (this.R << this.R_Shift)
+                 +  (this.G << this.G_Shift)
+                 +   this.B
+            Return (hex ? GDIP.to_hex(argb) : argb)
         }
         
         SetValue(argb) {
@@ -4485,7 +4756,6 @@ Class GDIP
                    + (g << this.G_Shift)
                    +  b )
         }        
-        
         
         ; ; I don't think these two will be needed, so they're staying commented out for now
         ; ; Set ARGB value using a COLORREF
@@ -4521,20 +4791,19 @@ Class GDIP
     }
     
     to_hex(num) {
-        Return Format("{:#x}", num)
+        Return Format("0x{:X}", num)
     }
-
-    ;   GdiplusPen.h
-
+    
+    
+    
     ;-------------------------------------------------------------------------------------------------------------------.
-    ; Pen Class -                                                                                                       |
+    ; GdiplusPen.h                                                                                                      |
+    ;___________________________________________________________________________________________________________________|
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Pen Class - Creates an object to draw lines with.                                                                 |
     ;-------------------------------------------------------------------------------------------------------------------|
-    ; A Color object has Alpha (transparency), Red, Green, and Blue values. Type is ARGB                                |
     ; Properties:                                                                                                       |
-    ; .Alpha            Transparency. 0-255                                                                             |
-    ; .Red              Red value. 0-255                                                                                |
-    ; .Blue             Blue value. 0-255                                                                               |
-    ; .Green            Green value. 0-255                                                                              |
+    ; None              The pen object only has methods.                                                                |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Color()           Defaults to solid black. A=255, R=0, B=0, G=0                                                   |
@@ -4547,477 +4816,469 @@ Class GDIP
     ;                                                                                                                   |
     ; Enum: Names       List of 139 pre-defined colors. Use: this.name.Colorname                                        |
     ;___________________________________________________________________________________________________________________|
-    class Pen : public GdiplusBase
+    Class Pen
     {
         _type      := "Pen"
-        nativePen  := ""
         lastResult := ""
-        
-        ; Pen(IN const Brush* brush, IN REAL width = 1.0f)      ; From brush
-        ; Pen(IN const Color& color, IN REAL width = 1.0f)      ; From color/argb
-        __New(p1, width=1)
+        nativePen[]
         {
-            (colIn.type == "Color")
+            Get {
+                Return this._ptr+0
+            }
+            Set {
+                this._ptr := value
+            }
+        }
+        
+        ;Pen()                  ; Creates a default black pen with width 1
+        ;Pen(ColorObj, width)   ; Creates a pen 
+        ;Pen(BrushObj, width)
+        ;Pen(PenObj)
+        ;Pen()
+        __New(p1="", width=1)
+        {
+            this.SetCapacity(nativePen, A_PtrSize)
+            ,(p1._type == "Color")
                 ? this.lastResult := DllCall("gdiplus\GdipCreatePen1"
-                                            ,"Int"        ,p1.Struct()
+                                            ,"Int"        ,p1.GetValue()
                                             ,"Float"      ,width
                                             ,"Int"        ,0
-                                            ,this.PtrA    ,this.nativePen)
-                : this.lastResult := DllCall("gdiplus\GdipCreatePen2"
+                                            ,this.PtrA    ,this.nativePen+0)
+            : (p1._type == "Brush")
+                ? this.lastResult := DllCall("gdiplus\GdipCreatePen2"
                                             ,this.Ptr     ,p1.nativeBrush
                                             ,"Float"      ,width
                                             ,"Int"        ,0
-                                            ,this.PtrA    ,this.nativePen)
+                                            ,this.PtrA    ,this.nativePen+0)
+            : (p1 == "Clone" && width != 1)
+                ? (this.NativePen := width, this.lastResult := 0
         }
         
-        Pen(IN const Color& color, 
-            IN REAL width = 1.0f)
-        {
-            Unit unit = UnitWorld;
-            nativePen = NULL;
-            lastResult = DllCall("gdiplus\GdipCreatePen1(color.GetValue(),
-                                        width, unit, &nativePen);
-        }
-
-        Pen(IN const Brush* brush, 
-            IN REAL width = 1.0f)
-        {
-            Unit unit = UnitWorld;
-            nativePen = NULL;
-            lastResult = DllCall("gdiplus\GdipCreatePen2(brush->nativeBrush,
-                                        width, unit, &nativePen);
-        }
-
         ;~Pen()
         __Delete()
         {
-            DllCall("gdiplus\GdipDeletePen", this.Ptr, this.nativePen)
-        }
-
-        Pen* Clone() const
-        {
-            GpPen *clonePen = NULL;
-
-            lastResult = DllCall("gdiplus\GdipClonePen(nativePen, &clonePen);
-       
-            return new Pen(clonePen, lastResult);
-        }
-
-        Status SetWidth(IN REAL width)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenWidth(nativePen, width));
-        }
-
-        REAL GetWidth() const
-        {
-            REAL width;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenWidth(nativePen, &width));
-            
-            return width;
+            DllCall("gdiplus\GdipDeletePen", this.Ptr, this.nativePen+0)
         }
         
-        ; Set/get line caps: start, end, and dash
-
-        ; Line cap and join APIs by using LineCap and LineJoin enums.
-
-        Status SetLineCap(IN LineCap startCap, 
-                          IN LineCap endCap, 
-                          IN DashCap dashCap)
+        ;Pen* Clone() const
+        Clone()
         {
-            return SetStatus(DllCall("gdiplus\GdipSetPenLineCap197819(nativePen, 
-                                       startCap, endCap, dashCap));
-        }
-
-        Status SetStartCap(IN LineCap startCap)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenStartCap(nativePen, startCap));
-        }
-
-        Status SetEndCap(IN LineCap endCap)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenEndCap(nativePen, endCap));
-        }
-
-        Status SetDashCap(IN DashCap dashCap)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenDashCap197819(nativePen,
-                                       dashCap));
-        }
-
-        LineCap GetStartCap() const
-        {
-            LineCap startCap;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenStartCap(nativePen, &startCap));
-            
-            return startCap;
-        }
-
-        LineCap GetEndCap() const
-        {
-            LineCap endCap;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenEndCap(nativePen, &endCap));
-
-            return endCap;
-        }
-
-        DashCap GetDashCap() const
-        {
-            DashCap dashCap;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenDashCap197819(nativePen,
-                                &dashCap));
-
-            return dashCap;
-        }
-
-        Status SetLineJoin(IN LineJoin lineJoin)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenLineJoin(nativePen, lineJoin));
-        }
-
-        LineJoin GetLineJoin() const
-        {
-            LineJoin lineJoin;
-            
-            SetStatus(DllCall("gdiplus\GdipGetPenLineJoin(nativePen, &lineJoin));
-            
-            return lineJoin;
-        }
-
-        Status SetCustomStartCap(IN const CustomLineCap* customCap)
-        {
-            GpCustomLineCap* nativeCap = NULL;
-            if(customCap)
-                nativeCap = customCap->nativeCap;
-
-            return SetStatus(DllCall("gdiplus\GdipSetPenCustomStartCap(nativePen, 
-                                                                  nativeCap));
-        }
-
-        Status GetCustomStartCap(OUT CustomLineCap* customCap) const
-        {
-            if(!customCap)
-                return SetStatus(InvalidParameter);
-
-            return SetStatus(DllCall("gdiplus\GdipGetPenCustomStartCap(nativePen, 
-                                                        &(customCap->nativeCap)));
-        }
-
-        Status SetCustomEndCap(IN const CustomLineCap* customCap)
-        {
-            GpCustomLineCap* nativeCap = NULL;
-            if(customCap)
-                nativeCap = customCap->nativeCap;
-
-            return SetStatus(DllCall("gdiplus\GdipSetPenCustomEndCap(nativePen, 
-                                                                nativeCap));
-        }
-
-        Status GetCustomEndCap(OUT CustomLineCap* customCap) const
-        {
-            if(!customCap)
-                return SetStatus(InvalidParameter);
-
-            return SetStatus(DllCall("gdiplus\GdipGetPenCustomEndCap(nativePen, 
-                                                        &(customCap->nativeCap)));
-        }
-
-        Status SetMiterLimit(IN REAL miterLimit)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenMiterLimit(nativePen, 
-                                                        miterLimit));
-        }
-
-        REAL GetMiterLimit() const
-        {
-            REAL miterLimit;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenMiterLimit(nativePen, &miterLimit));
-
-            return miterLimit;
-        }
-
-        Status SetAlignment(IN PenAlignment penAlignment)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenMode(nativePen, penAlignment));
-        }
-
-        PenAlignment GetAlignment() const
-        {
-            PenAlignment penAlignment;
-            
-            SetStatus(DllCall("gdiplus\GdipGetPenMode(nativePen, &penAlignment));
-            
-            return penAlignment;
+            VarSetCapacity(clonePen, A_PtrSize, 0)
+            this.lastResult := DllCall("gdiplus\GdipClonePen"
+                                      ,this.Ptr     ,this.nativePen+0
+                                      ,this.PtrA    ,clonePen)
+            Return new Pen(clonePen, lastResult)
         }
         
-        Status SetTransform(IN const Matrix* matrix)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenTransform(nativePen, 
-                                                           matrix->nativeMatrix));
-        }
-
-        Status GetTransform(OUT Matrix* matrix) const
-        {
-            return SetStatus(DllCall("gdiplus\GdipGetPenTransform(nativePen, 
-                                                             matrix->nativeMatrix));
-        }
-
-        Status ResetTransform()
-        {
-            return SetStatus(DllCall("gdiplus\GdipResetPenTransform(nativePen));
-        }
-
-        Status MultiplyTransform(IN const Matrix* matrix,
-                                 IN MatrixOrder order = MatrixOrderPrepend)
-        {
-            return SetStatus(DllCall("gdiplus\GdipMultiplyPenTransform(nativePen,
-                                                             matrix->nativeMatrix,
-                                                             order));
-        }
-
-        Status TranslateTransform(IN REAL dx, 
-                                  IN REAL dy,
-                                  IN MatrixOrder order = MatrixOrderPrepend)
-        {
-            return SetStatus(DllCall("gdiplus\GdipTranslatePenTransform(nativePen,
-                                                                   dx, 
-                                                                   dy, 
-                                                                   order));
-        }
-
-        Status ScaleTransform(IN REAL sx, 
-                              IN REAL sy,
-                              IN MatrixOrder order = MatrixOrderPrepend)
-        {
-            return SetStatus(DllCall("gdiplus\GdipScalePenTransform(nativePen,
-                                                               sx, 
-                                                               sy, 
-                                                               order));
-        }
-
-        Status RotateTransform(IN REAL angle, 
-                               IN MatrixOrder order = MatrixOrderPrepend)
-        {
-            return SetStatus(DllCall("gdiplus\GdipRotatePenTransform(nativePen,
-                                                                angle, 
-                                                                order));
-        }
-
-        PenType GetPenType() const
-        {
-           PenType type;
-           SetStatus(DllCall("gdiplus\GdipGetPenFillType(nativePen, &type));
-
-           return type;
-        }
-
-        Status SetColor(IN const Color& color)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenColor(nativePen,
-                                                         color.GetValue()));
-        }
-
-        Status SetBrush(IN const Brush* brush)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenBrushFill(nativePen, 
-                                           brush->nativeBrush));
-        }
-
-        Status GetColor(OUT Color* color) const
-        {
-            if (color == NULL) 
-            {
-                return SetStatus(InvalidParameter);
-            }
-            
-            PenType type = GetPenType();
-
-            if (type != PenTypeSolidColor) 
-            {
-                return WrongState;
-            }
-            
-            ARGB argb;
-            
-            SetStatus(DllCall("gdiplus\GdipGetPenColor(nativePen,
-                                                  &argb));
-            if (lastResult == Ok)
-            {
-                color->SetValue(argb);
-            }
-            
-            return lastResult;
-        }
-
-        Brush* GetBrush() const
-        {
-           PenType type = GetPenType();
-
-           Brush* brush = NULL;
-
-           switch(type)
-           {
-           case PenTypeSolidColor:
-               brush = new SolidBrush();
-               break;
-
-           case PenTypeHatchFill:
-               brush = new HatchBrush();
-               break;
-
-           case PenTypeTextureFill:
-               brush = new TextureBrush();
-               break;
-
-           case PenTypePathGradient:
-               brush = new Brush();
-               break;
-
-           case PenTypeLinearGradient:
-               brush = new LinearGradientBrush();
-               break;
-
-           default:
-               break;
-           }
-
-           if(brush)
-           {
-               GpBrush* nativeBrush;
-
-               SetStatus(DllCall("gdiplus\GdipGetPenBrushFill(nativePen, 
-                                                         &nativeBrush));
-               brush->SetNativeBrush(nativeBrush);
-           }
-
-           return brush;
-        }
-
-        DashStyle GetDashStyle() const
-        {
-            DashStyle dashStyle;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenDashStyle(nativePen, &dashStyle));
-
-            return dashStyle;
-        }
-
-        Status SetDashStyle(IN DashStyle dashStyle)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenDashStyle(nativePen, 
-                                                             dashStyle));
-        }
-
-        REAL GetDashOffset() const
-        {
-            REAL dashOffset;
-
-            SetStatus(DllCall("gdiplus\GdipGetPenDashOffset(nativePen, &dashOffset));
-
-            return dashOffset;
-        }
-
-        Status SetDashOffset(IN REAL dashOffset)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenDashOffset(nativePen, 
-                                                              dashOffset));
-        }
+        ;~ Status SetWidth(IN REAL width)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenWidth(nativePen, width));
+        ;~ }
         
-        Status SetDashPattern(IN const REAL* dashArray, IN INT count)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenDashArray(nativePen,
-                                                             dashArray, 
-                                                             count));
-        }
+        ;~ REAL GetWidth() const
+        ;~ {
+            ;~ REAL width;
         
-        INT GetDashPatternCount() const
-        {
-            INT count = 0;
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenWidth(nativePen, &width));
             
-            SetStatus(DllCall("gdiplus\GdipGetPenDashCount(nativePen, &count));
-            
-            return count;
-        }
-
-        Status GetDashPattern(OUT REAL* dashArray, 
-                              IN INT count) const
-        {
-            if (dashArray == NULL || count <= 0)
-                return SetStatus(InvalidParameter); 
-            
-            return SetStatus(DllCall("gdiplus\GdipGetPenDashArray(nativePen, 
-                                                             dashArray, 
-                                                             count));
-        }
-
-        Status SetCompoundArray(IN const REAL* compoundArray,
-                                IN INT count)
-        {
-            return SetStatus(DllCall("gdiplus\GdipSetPenCompoundArray(nativePen, 
-                                                                 compoundArray,
-                                                                 count));
-        }
-
-        INT GetCompoundArrayCount() const
-        {
-            INT count = 0;
-            
-            SetStatus(DllCall("gdiplus\GdipGetPenCompoundCount(nativePen, &count));
-            
-            return count;
-        }
-
-        Status GetCompoundArray(OUT REAL* compoundArray, 
-                                IN INT count) const
-        {
-            if (compoundArray == NULL || count <= 0)
-                return SetStatus(InvalidParameter); 
-            
-            return SetStatus(DllCall("gdiplus\GdipGetPenCompoundArray(nativePen, 
-                                                                 compoundArray, 
-                                                                 count));
-        }
-
-        Status GetLastStatus() const
-        {
-            Status lastStatus = lastResult;
-            lastResult = Ok;
-
-            return lastStatus;
-        }
-
-    private:
-        Pen(const Pen &);
-        Pen& operator=(const Pen &);
-
-    protected:
-        Pen(GpPen* nativePen, Status status)
-        {
-            lastResult = status;
-            SetNativePen(nativePen);
-        }
-
-        VOID SetNativePen(GpPen* nativePen)
-        {
-            this->nativePen = nativePen;
-        }
+            ;~ return width;
+        ;~ }
         
-        Status SetStatus(Status status) const
-        {
-            if (status != Ok)
-                return (lastResult = status);
-            else 
-                return status;
-        }
-
-    };
-
-
+        ;~ ; Set/get line caps: start, end, and dash
+        
+        ;~ ; Line cap and join APIs by using LineCap and LineJoin enums.
+        
+        ;~ Status SetLineCap(IN LineCap startCap, 
+                          ;~ IN LineCap endCap, 
+                          ;~ IN DashCap dashCap)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenLineCap197819(nativePen, 
+                                       ;~ startCap, endCap, dashCap));
+        ;~ }
+        
+        ;~ Status SetStartCap(IN LineCap startCap)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenStartCap(nativePen, startCap));
+        ;~ }
+        
+        ;~ Status SetEndCap(IN LineCap endCap)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenEndCap(nativePen, endCap));
+        ;~ }
+        
+        ;~ Status SetDashCap(IN DashCap dashCap)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenDashCap197819(nativePen,
+                                       ;~ dashCap));
+        ;~ }
+        
+        ;~ LineCap GetStartCap() const
+        ;~ {
+            ;~ LineCap startCap;
+        
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenStartCap(nativePen, &startCap));
+            
+            ;~ return startCap;
+        ;~ }
+        
+        ;~ LineCap GetEndCap() const
+        ;~ {
+            ;~ LineCap endCap;
+        
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenEndCap(nativePen, &endCap));
+        
+            ;~ return endCap;
+        ;~ }
+        
+        ;~ DashCap GetDashCap() const
+        ;~ {
+            ;~ DashCap dashCap;
+        
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenDashCap197819(nativePen,
+                                ;~ &dashCap));
+        
+            ;~ return dashCap;
+        ;~ }
+        
+        ;~ Status SetLineJoin(IN LineJoin lineJoin)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenLineJoin(nativePen, lineJoin));
+        ;~ }
+        
+        ;~ LineJoin GetLineJoin() const
+        ;~ {
+            ;~ LineJoin lineJoin;
+            
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenLineJoin(nativePen, &lineJoin));
+            
+            ;~ return lineJoin;
+        ;~ }
+        
+        ;~ Status SetCustomStartCap(IN const CustomLineCap* customCap)
+        ;~ {
+            ;~ GpCustomLineCap* nativeCap = NULL;
+            ;~ if(customCap)
+                ;~ nativeCap = customCap->nativeCap;
+        
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenCustomStartCap(nativePen, 
+                                                                  ;~ nativeCap));
+        ;~ }
+        
+        ;~ Status GetCustomStartCap(OUT CustomLineCap* customCap) const
+        ;~ {
+            ;~ if(!customCap)
+                ;~ return SetStatus(InvalidParameter);
+        
+            ;~ return SetStatus(DllCall("gdiplus\GdipGetPenCustomStartCap(nativePen, 
+                                                        ;~ &(customCap->nativeCap)));
+        ;~ }
+        
+        ;~ Status SetCustomEndCap(IN const CustomLineCap* customCap)
+        ;~ {
+            ;~ GpCustomLineCap* nativeCap = NULL;
+            ;~ if(customCap)
+                ;~ nativeCap = customCap->nativeCap;
+        
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenCustomEndCap(nativePen, 
+                                                                ;~ nativeCap));
+        ;~ }
+        
+        ;~ Status GetCustomEndCap(OUT CustomLineCap* customCap) const
+        ;~ {
+            ;~ if(!customCap)
+                ;~ return SetStatus(InvalidParameter);
+        
+            ;~ return SetStatus(DllCall("gdiplus\GdipGetPenCustomEndCap(nativePen, 
+                                                        ;~ &(customCap->nativeCap)));
+        ;~ }
+        
+        ;~ Status SetMiterLimit(IN REAL miterLimit)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenMiterLimit(nativePen, 
+                                                        ;~ miterLimit));
+        ;~ }
+        
+        ;~ REAL GetMiterLimit() const
+        ;~ {
+            ;~ REAL miterLimit;
+        
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenMiterLimit(nativePen, &miterLimit));
+        
+            ;~ return miterLimit;
+        ;~ }
+        
+        ;~ Status SetAlignment(IN PenAlignment penAlignment)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenMode(nativePen, penAlignment));
+        ;~ }
+        
+        ;~ PenAlignment GetAlignment() const
+        ;~ {
+            ;~ PenAlignment penAlignment;
+            
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenMode(nativePen, &penAlignment));
+            
+            ;~ return penAlignment;
+        ;~ }
+        
+        ;~ Status SetTransform(IN const Matrix* matrix)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenTransform(nativePen, 
+                                                           ;~ matrix->nativeMatrix));
+        ;~ }
+        
+        ;~ Status GetTransform(OUT Matrix* matrix) const
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipGetPenTransform(nativePen, 
+                                                             ;~ matrix->nativeMatrix));
+        ;~ }
+        
+        ;~ Status ResetTransform()
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipResetPenTransform(nativePen));
+        ;~ }
+        
+        ;~ Status MultiplyTransform(IN const Matrix* matrix,
+                                 ;~ IN MatrixOrder order = MatrixOrderPrepend)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipMultiplyPenTransform(nativePen,
+                                                             ;~ matrix->nativeMatrix,
+                                                             ;~ order));
+        ;~ }
+        
+        ;~ Status TranslateTransform(IN REAL dx, 
+                                  ;~ IN REAL dy,
+                                  ;~ IN MatrixOrder order = MatrixOrderPrepend)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipTranslatePenTransform(nativePen,
+                                                                   ;~ dx, 
+                                                                   ;~ dy, 
+                                                                   ;~ order));
+        ;~ }
+        
+        ;~ Status ScaleTransform(IN REAL sx, 
+                              ;~ IN REAL sy,
+                              ;~ IN MatrixOrder order = MatrixOrderPrepend)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipScalePenTransform(nativePen,
+                                                               ;~ sx, 
+                                                               ;~ sy, 
+                                                               ;~ order));
+        ;~ }
+        
+        ;~ Status RotateTransform(IN REAL angle, 
+                               ;~ IN MatrixOrder order = MatrixOrderPrepend)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipRotatePenTransform(nativePen,
+                                                                ;~ angle, 
+                                                                ;~ order));
+        ;~ }
+        
+        ;~ PenType GetPenType() const
+        ;~ {
+           ;~ PenType type;
+           ;~ SetStatus(DllCall("gdiplus\GdipGetPenFillType(nativePen, &type));
+        
+           ;~ return type;
+        ;~ }
+        
+        ;~ Status SetColor(IN const Color& color)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenColor(nativePen,
+                                                         ;~ color.GetValue()));
+        ;~ }
+        
+        ;~ Status SetBrush(IN const Brush* brush)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenBrushFill(nativePen, 
+                                           ;~ brush->nativeBrush));
+        ;~ }
+        
+        ;~ Status GetColor(OUT Color* color) const
+        ;~ {
+            ;~ if (color == NULL) 
+            ;~ {
+                ;~ return SetStatus(InvalidParameter);
+            ;~ }
+            
+            ;~ PenType type = GetPenType();
+        
+            ;~ if (type != PenTypeSolidColor) 
+            ;~ {
+                ;~ return WrongState;
+            ;~ }
+            
+            ;~ ARGB argb;
+            
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenColor(nativePen,
+                                                  ;~ &argb));
+            ;~ if (lastResult == Ok)
+            ;~ {
+                ;~ color->SetValue(argb);
+            ;~ }
+            
+            ;~ return lastResult;
+        ;~ }
+        
+        ;~ Brush* GetBrush() const
+        ;~ {
+           ;~ PenType type = GetPenType();
+        
+           ;~ Brush* brush = NULL;
+        
+           ;~ switch(type)
+           ;~ {
+           ;~ case PenTypeSolidColor:
+               ;~ brush = new SolidBrush();
+               ;~ break;
+        
+           ;~ case PenTypeHatchFill:
+               ;~ brush = new HatchBrush();
+               ;~ break;
+        
+           ;~ case PenTypeTextureFill:
+               ;~ brush = new TextureBrush();
+               ;~ break;
+        
+           ;~ case PenTypePathGradient:
+               ;~ brush = new Brush();
+               ;~ break;
+        
+           ;~ case PenTypeLinearGradient:
+               ;~ brush = new LinearGradientBrush();
+               ;~ break;
+        
+           ;~ default:
+               ;~ break;
+           ;~ }
+        
+           ;~ if(brush)
+           ;~ {
+               ;~ GpBrush* nativeBrush;
+        
+               ;~ SetStatus(DllCall("gdiplus\GdipGetPenBrushFill(nativePen, 
+                                                         ;~ &nativeBrush));
+               ;~ brush->SetNativeBrush(nativeBrush);
+           ;~ }
+        
+           ;~ return brush;
+        ;~ }
+        
+        ;~ DashStyle GetDashStyle() const
+        ;~ {
+            ;~ DashStyle dashStyle;
+        
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenDashStyle(nativePen, &dashStyle));
+        
+            ;~ return dashStyle;
+        ;~ }
+        
+        ;~ Status SetDashStyle(IN DashStyle dashStyle)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenDashStyle(nativePen, 
+                                                             ;~ dashStyle));
+        ;~ }
+        
+        ;~ REAL GetDashOffset() const
+        ;~ {
+            ;~ REAL dashOffset;
+        
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenDashOffset(nativePen, &dashOffset));
+        
+            ;~ return dashOffset;
+        ;~ }
+        
+        ;~ Status SetDashOffset(IN REAL dashOffset)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenDashOffset(nativePen, 
+                                                              ;~ dashOffset));
+        ;~ }
+        
+        ;~ Status SetDashPattern(IN const REAL* dashArray, IN INT count)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenDashArray(nativePen,
+                                                             ;~ dashArray, 
+                                                             ;~ count));
+        ;~ }
+        
+        ;~ INT GetDashPatternCount() const
+        ;~ {
+            ;~ INT count = 0;
+            
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenDashCount(nativePen, &count));
+            
+            ;~ return count;
+        ;~ }
+        
+        ;~ Status GetDashPattern(OUT REAL* dashArray, 
+                              ;~ IN INT count) const
+        ;~ {
+            ;~ if (dashArray == NULL || count <= 0)
+                ;~ return SetStatus(InvalidParameter); 
+            
+            ;~ return SetStatus(DllCall("gdiplus\GdipGetPenDashArray(nativePen, 
+                                                             ;~ dashArray, 
+                                                             ;~ count));
+        ;~ }
+        
+        ;~ Status SetCompoundArray(IN const REAL* compoundArray,
+                                ;~ IN INT count)
+        ;~ {
+            ;~ return SetStatus(DllCall("gdiplus\GdipSetPenCompoundArray(nativePen, 
+                                                                 ;~ compoundArray,
+                                                                 ;~ count));
+        ;~ }
+        
+        ;~ INT GetCompoundArrayCount() const
+        ;~ {
+            ;~ INT count = 0;
+            
+            ;~ SetStatus(DllCall("gdiplus\GdipGetPenCompoundCount(nativePen, &count));
+            
+            ;~ return count;
+        ;~ }
+        
+        ;~ Status GetCompoundArray(OUT REAL* compoundArray, 
+                                ;~ IN INT count) const
+        ;~ {
+            ;~ if (compoundArray == NULL || count <= 0)
+                ;~ return SetStatus(InvalidParameter); 
+            
+            ;~ return SetStatus(DllCall("gdiplus\GdipGetPenCompoundArray(nativePen, 
+                                                                 ;~ compoundArray, 
+                                                                 ;~ count));
+        ;~ }
+        
+        ;~ Status GetLastStatus() const
+        ;~ {
+            ;~ Status lastStatus = lastResult;
+            ;~ lastResult = Ok;
+        
+            ;~ return lastStatus;
+        ;~ }
+    
+    ;~ protected:
+        ;~ Pen(GpPen* nativePen, Status status)
+        ;~ {
+            ;~ lastResult = status;
+            ;~ SetNativePen(nativePen);
+        ;~ }
+        
+        ;~ VOID SetNativePen(GpPen* nativePen)
+        ;~ {
+            ;~ this->nativePen = nativePen;
+        ;~ }
+        
+        ;~ Status SetStatus(Status status) const
+        ;~ {
+            ;~ if (status != Ok)
+                ;~ return (lastResult = status);
+            ;~ else 
+                ;~ return status;
+        ;~ }
+    }
 }
+
 
 
 
