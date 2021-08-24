@@ -84,6 +84,9 @@
     20210822
         Colors class finished and tested
         Pen class progress
+    20210824
+        Pen class - Got a chunk of methods done
+            Added SetStatus method back in
 
 */
 
