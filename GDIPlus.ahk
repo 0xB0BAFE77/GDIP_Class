@@ -2079,6 +2079,322 @@ Class GDIP
     
     
     
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Metafile headers                                                                                                  |
+    ;___________________________________________________________________________________________________________________|
+    ;; Will work on this later.
+    Class MetafileHeader
+    {
+        ; Placeable WMFs
+        
+        ; Placeable Metafiles were created as a non-standard way of specifying how 
+        ; a metafile is mapped and scaled on an output device.
+        ; Placeable metafiles are quite wide-spread, but not directly supported by
+        ; the Windows API. To playback a placeable metafile using the Windows API,
+        ; you will first need to strip the placeable metafile header from the file.
+        ; This is typically performed by copying the metafile to a temporary file
+        ; starting at file offset 22 (0x16). The contents of the temporary file may
+        ; then be used as input to the Windows GetMetaFile(), PlayMetaFile(),
+        ; CopyMetaFile(), etc. GDI functions.
+        
+        ; Each placeable metafile begins with a 22-byte header,
+        ;  followed by a standard metafile:
+        
+        ;~ typedef struct
+        ;~ {
+            ;~ DWORD   iType;              ; Record type EMR_HEADER
+            ;~ DWORD   nSize;              ; Record size in bytes.  This may be greater
+                                        ;~ ; than the sizeof(ENHMETAHEADER).
+            ;~ RECTL   rclBounds;          ; Inclusive-inclusive bounds in device units
+            ;~ RECTL   rclFrame;           ; Inclusive-inclusive Picture Frame .01mm unit
+            ;~ DWORD   dSignature;         ; Signature.  Must be ENHMETA_SIGNATURE.
+            ;~ DWORD   nVersion;           ; Version number
+            ;~ DWORD   nBytes;             ; Size of the metafile in bytes
+            ;~ DWORD   nRecords;           ; Number of records in the metafile
+            ;~ WORD    nHandles;           ; Number of handles in the handle table
+                                        ;~ ; Handle index zero is reserved.
+            ;~ WORD    sReserved;          ; Reserved.  Must be zero.
+            ;~ DWORD   nDescription;       ; Number of chars in the unicode desc string
+                                        ;~ ; This is 0 if there is no description string
+            ;~ DWORD   offDescription;     ; Offset to the metafile description record.
+                                        ;~ ; This is 0 if there is no description string
+            ;~ DWORD   nPalEntries;        ; Number of entries in the metafile palette.
+            ;~ SIZEL   szlDevice;          ; Size of the reference device in pels
+            ;~ SIZEL   szlMillimeters;     ; Size of the reference device in millimeters
+        ;~ } ENHMETAHEADER3;
+        
+        ;~ typedef struct
+        ;~ {
+            ;~ INT16           Left;
+            ;~ INT16           Top;
+            ;~ INT16           Right;
+            ;~ INT16           Bottom;
+        ;~ } PWMFRect16;
+        
+        ;~ typedef struct
+        ;~ {
+            ;~ UINT32          Key;            ; GDIP_WMF_PLACEABLEKEY
+            ;~ INT16           Hmf;            ; Metafile HANDLE number (always 0)
+            ;~ PWMFRect16      BoundingBox;    ; Coordinates in metafile units
+            ;~ INT16           Inch;           ; Number of metafile units per inch
+            ;~ UINT32          Reserved;       ; Reserved (always 0)
+            ;~ INT16           Checksum;       ; Checksum value for previous 10 WORDs
+        ;~ } WmfPlaceableFileHeader;
+        
+        ;~ ; Key contains a special identification value that indicates the presence
+        ;~ ; of a placeable metafile header and is always 0x9AC6CDD7.
+        
+        ;~ ; Handle is used to stored the handle of the metafile in memory. When written
+        ;~ ; to disk, this field is not used and will always contains the value 0.
+        
+        ;~ ; Left, Top, Right, and Bottom contain the coordinates of the upper-left
+        ;~ ; and lower-right corners of the image on the output device. These are
+        ;~ ; measured in twips.
+        
+        ;~ ; A twip (meaning "twentieth of a point") is the logical unit of measurement
+        ;~ ; used in Windows Metafiles. A twip is equal to 1/1440 of an inch. Thus 720
+        ;~ ; twips equal 1/2 inch, while 32,768 twips is 22.75 inches.
+        
+        ;~ ; Inch contains the number of twips per inch used to represent the image.
+        ;~ ; Normally, there are 1440 twips per inch; however, this number may be
+        ;~ ; changed to scale the image. A value of 720 indicates that the image is
+        ;~ ; double its normal size, or scaled to a factor of 2:1. A value of 360
+        ;~ ; indicates a scale of 4:1, while a value of 2880 indicates that the image
+        ;~ ; is scaled down in size by a factor of two. A value of 1440 indicates
+        ;~ ; a 1:1 scale ratio.
+        
+        ;~ ; Reserved is not used and is always set to 0.
+        
+        ;~ ; Checksum contains a checksum value for the previous 10 WORDs in the header.
+        ;~ ; This value can be used in an attempt to detect if the metafile has become
+        ;~ ; corrupted. The checksum is calculated by XORing each WORD value to an
+        ;~ ; initial value of 0.
+        
+        ;~ ; If the metafile was recorded with a reference Hdc that was a display.
+        
+        ;~ Type                := 0    ; MetafileType      
+        ;~ Size                := 0    ; UINT              ; Size of the metafile (in bytes)
+        ;~ Version             := 0    ; UINT              ; EMF+, EMF, or WMF version
+        ;~ EmfPlusFlags        := 0    ; UINT              
+        ;~ DpiX                := 0    ; REAL              
+        ;~ DpiY                := 0    ; REAL              
+        ;~ X                   := 0    ; INT               ; Bounds in device units
+        ;~ Y                   := 0    ; INT               
+        ;~ Width               := 0    ; INT               
+        ;~ Height              := 0    ; INT               
+        ;~ Union               := {}   ; 
+        ;~ Union.WmfHeader     := 0    ; METAHEADER        
+        ;~ Union.EmfHeader     := 0    ; ENHMETAHEADER3    
+        ;~ EmfPlusHeaderSize   := 0    ; INT               ; size of the EMF+ header in file
+        ;~ LogicalDpiX         := 0    ; INT               ; Logical Dpi of reference Hdc
+        ;~ LogicalDpiY         := 0    ; INT               ; usually valid only for EMF+
+                            ;~ := 0    ; 
+        
+        ;~ GetType()
+        ;~ {
+            ;~ Return this.Type
+        ;~ }
+        
+        ;~ GetMetafileSize()
+        ;~ {
+            ;~ Return this.Size
+        ;~ }
+        
+        ;~ ; If IsEmfPlus, this is the EMF+ version; else it is the WMF or EMF ver
+        ;~ GetVersion()
+        ;~ {
+            ;~ Return this.Version
+        ;~ }
+        
+        ;~ ; Get the EMF+ flags associated with the metafile
+        ;~ GetEmfPlusFlags()
+        ;~ {
+            ;~ Return this.EmfPlusFlags
+        ;~ }
+        
+        ;~ GetDpiX()
+        ;~ {
+            ;~ Return this.DpiX
+        ;~ }
+        
+        ;~ GetDpiY()
+        ;~ {
+            ;~ Return this.DpiY
+        ;~ }
+        
+        ;~ GetBounds()
+        ;~ {
+            ;~ Return new GDIP.Rect(this.x, this.y, this.width, this.height)
+        ;~ }
+        
+        ;~ ; Is it any type of WMF (standard or Placeable Metafile)?
+        ;~ IsWmf()
+        ;~ {
+            ;~ Return (this.type = 1 || this.type = 2)
+        ;~ }
+        
+        ;~ ; Is this an Placeable Metafile?
+        ;~ IsWmfPlaceable()
+        ;~ {
+            ;~ Return (this.Type = 2)
+        ;~ }
+        
+        ;~ ; Is this an EMF (not an EMF+)?
+        ;~ IsEmf()
+        ;~ {
+            ;~ Return (this.type = 3)
+        ;~ }
+        
+        ;~ ; Is this an EMF or EMF+ file?
+        ;~ IsEmfOrEmfPlus()
+        ;~ {
+            ;~ Return (this.Type >= 3)
+        ;~ }
+        
+        ;~ ; Is this an EMF+ file?
+        ;~ IsEmfPlus()
+        ;~ {
+            ;~ Return (this.Type >= 4)
+        ;~ }
+        
+        ;~ ; Is this an EMF+ dual (has dual, down-level records) file?
+        ;~ IsEmfPlusDual()
+        ;~ {
+            ;~ Return (this.Type = 5)
+        ;~ }
+        
+        ;~ ; Is this an EMF+ only (no dual records) file?
+        ;~ IsEmfPlusOnly()
+        ;~ {
+            ;~ Return (Type = 4)
+        ;~ }
+        
+        ;~ ; If it's an EMF+ file, was it recorded against a display Hdc?
+        ;~ IsDisplay()
+        ;~ {
+            ;~ Return (this.IsEmfPlus() && ((this.EmfPlusFlags & 1) != 0))
+        ;~ }
+        
+        ;~ ; Get the WMF header of the metafile (if it is a WMF)
+        ;~ GetWmfHeader() ; ptr
+        ;~ {
+            ;~ Return this.IsWmf()
+                ;~ ? 
+            
+            ;~ if (IsWmf())
+            ;~ {
+                ;~ Return &WmfHeader;
+            ;~ }
+            ;~ Return NULL;
+        ;~ }
+        
+        ;~ ; Get the EMF header of the metafile (if it is an EMF)
+        
+        ;~ const ENHMETAHEADER3 * GetEmfHeader() const
+        ;~ {
+            ;~ if (IsEmfOrEmfPlus())
+            ;~ {
+                ;~ Return &EmfHeader;
+            ;~ }
+            ;~ Return NULL;
+        ;~ }
+    }
+    
+    
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Imaging.h                                                                                                         |
+    ;___________________________________________________________________________________________________________________|
+    class ImageCodecInfo
+    {
+        ;CLSID Clsid
+        ;GUID  FormatID
+        ;const WCHAR* CodecName
+        ;const WCHAR* DllName
+        ;const WCHAR* FormatDescription
+        ;const WCHAR* FilenameExtension
+        ;const WCHAR* MimeType
+        ;DWORD Flags
+        ;DWORD Version
+        ;DWORD SigCount
+        ;DWORD SigSize
+        ;const BYTE* SigPattern
+        ;const BYTE* SigMask
+    }
+    
+    class BitmapData
+    {
+        ;UINT Width
+        ;UINT Height
+        ;INT Stride
+        ;PixelFormat PixelFormat
+        ;VOID* Scan0
+        ;UINT_PTR Reserved
+    }
+    
+    class EncoderParameter
+    {
+        ;GUID    Guid               ; GUID of the parameter
+        ;ULONG   NumberOfValues     ; Number of the parameter values
+        ;ULONG   Type               ; Value type, like ValueTypeLONG  etc.
+        ;VOID*   Value              ; A pointer to the parameter values
+    }
+    
+    class ImageItemData
+    {
+        ;UINT  Size;                 ; size of the structure 
+        ;UINT  Position;             ; flags describing how the data is to be used.
+        ;VOID *Desc;                 ; description on how the data is to be saved.
+        ;                            ; it is different for every codec type.
+        ;UINT  DescSize;             ; size memory pointed by Desc
+        ;VOID *Data;                 ; pointer to the data that is to be saved in the
+        ;                            ; file, could be anything saved directly.
+        ;UINT  DataSize;             ; size memory pointed by Data
+        ;UINT  Cookie;               ; opaque for the apps data member used during
+        ;                            ; enumeration of image data items.
+    }
+    
+    class PropertyItem
+    {
+        ;PROPID  id;                 ; ID of this property
+        ;ULONG   length;             ; Length of the property value, in bytes
+        ;WORD    type;               ; Type of the value, as one of TAG_TYPE_XXX
+        ;                            ; defined above
+        ;VOID*   value;              ; property value
+    }
+    
+    
+    
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; GdiplusColorMatrix.h                                                                                              |
+    ;___________________________________________________________________________________________________________________|
+    Class ColorMatrix
+    {
+        _type   := "ColorMatrix"
+        _dt     := "Float"
+        __New()
+        {
+            this.matrix := {0:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,1:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,2:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,3:{0:0, 1:0, 2:0, 3:0, 4:0}
+                           ,4:{0:0, 1:0, 2:0, 3:0, 4:0}}
+            Return
+        }
+    }
+    
+    
+    
+    ; Effects are next
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
@@ -3909,22 +4225,6 @@ Class GDIP
         ;~ The Graphics::TranslateTransform method updates this Graphics object's world transformation matrix with the product of itself and a translation matrix.
     }
     
-    ;----------------------------------------------------------------------------
-    ; Color matrix
-    Class ColorMatrix
-    {
-        _type   := "ColorMatrix"
-        _dt     := "Float"
-        __New()
-        {
-            this.matrix := {0:{0:0, 1:0, 2:0, 3:0, 4:0}
-                           ,1:{0:0, 1:0, 2:0, 3:0, 4:0}
-                           ,2:{0:0, 1:0, 2:0, 3:0, 4:0}
-                           ,3:{0:0, 1:0, 2:0, 3:0, 4:0}
-                           ,4:{0:0, 1:0, 2:0, 3:0, 4:0}}
-            Return
-        }
-    }
     
     
     
@@ -5063,229 +5363,460 @@ data_type_size(type)
 
 
 
-/*
-; Temporary workspace for constructing and testing GDIPlus classes
-; DON'T FORGET TO IMPORT BACK INTO MAIN FILE, YOU SPED!!!
-#SingleInstance Force
-#Warn
-test()
-ExitApp
+/* WIP
+    ;   Gdiplus effect objects.
 
-test()
-{
-    
-    Return
-}
+    ;-----------------------------------------------------------------------------
+    ; GDI+ effect GUIDs
+    ;-----------------------------------------------------------------------------
 
-*Escape::ExitApp
+    ; BlurEffectGuid = {633C80A4-1843-482b-9EF2-BE2834C5FDD4}
+    ; SharpenEffectGuid = {63CBF3EE-C526-402c-8F71-62C540BF5142}
+    ; ColorMatrixEffectGuid = {718F2615-7933-40e3-A511-5F68FE14DD74}
+    ; ColorLUTEffectGuid = {A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}
+    ; BrightnessContrastEffectGuid = {D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}
+    ; HueSaturationLightnessEffectGuid = {8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}
+    ; LevelsEffectGuid = {99C354EC-2A31-4f3a-8C34-17A803B33A25}
+    ; TintEffectGuid = {1077AF00-2848-4441-9489-44AD4C2D7A2C}
+    ; ColorBalanceEffectGuid = {537E597D-251E-48da-9664-29CA496B70F8}
+    ; RedEyeCorrectionEffectGuid = {74D29D05-69A4-4266-9549-3CC52836B632}
+    ; GUID ColorCurveEffectGuid ={DD6A0022-58E4-4a67-9D9B-D48EB881A53D}
+    ;-----------------------------------------------------------------------------
 
-Class GDIP
-{
-    ;   Metafile headers
-    
-    ; Placeable WMFs
-
-    ; Placeable Metafiles were created as a non-standard way of specifying how 
-    ; a metafile is mapped and scaled on an output device.
-    ; Placeable metafiles are quite wide-spread, but not directly supported by
-    ; the Windows API. To playback a placeable metafile using the Windows API,
-    ; you will first need to strip the placeable metafile header from the file.
-    ; This is typically performed by copying the metafile to a temporary file
-    ; starting at file offset 22 (0x16). The contents of the temporary file may
-    ; then be used as input to the Windows GetMetaFile(), PlayMetaFile(),
-    ; CopyMetaFile(), etc. GDI functions.
-
-    ; Each placeable metafile begins with a 22-byte header,
-    ;  followed by a standard metafile:
-    
-    ;~ typedef struct
-    ;~ {
-        ;~ DWORD   iType;              ; Record type EMR_HEADER
-        ;~ DWORD   nSize;              ; Record size in bytes.  This may be greater
-                                    ;~ ; than the sizeof(ENHMETAHEADER).
-        ;~ RECTL   rclBounds;          ; Inclusive-inclusive bounds in device units
-        ;~ RECTL   rclFrame;           ; Inclusive-inclusive Picture Frame .01mm unit
-        ;~ DWORD   dSignature;         ; Signature.  Must be ENHMETA_SIGNATURE.
-        ;~ DWORD   nVersion;           ; Version number
-        ;~ DWORD   nBytes;             ; Size of the metafile in bytes
-        ;~ DWORD   nRecords;           ; Number of records in the metafile
-        ;~ WORD    nHandles;           ; Number of handles in the handle table
-                                    ;~ ; Handle index zero is reserved.
-        ;~ WORD    sReserved;          ; Reserved.  Must be zero.
-        ;~ DWORD   nDescription;       ; Number of chars in the unicode desc string
-                                    ;~ ; This is 0 if there is no description string
-        ;~ DWORD   offDescription;     ; Offset to the metafile description record.
-                                    ;~ ; This is 0 if there is no description string
-        ;~ DWORD   nPalEntries;        ; Number of entries in the metafile palette.
-        ;~ SIZEL   szlDevice;          ; Size of the reference device in pels
-        ;~ SIZEL   szlMillimeters;     ; Size of the reference device in millimeters
-    ;~ } ENHMETAHEADER3;
-    
-    ;~ typedef struct
-    ;~ {
-        ;~ INT16           Left;
-        ;~ INT16           Top;
-        ;~ INT16           Right;
-        ;~ INT16           Bottom;
-    ;~ } PWMFRect16;
-    
-    ;~ typedef struct
-    ;~ {
-        ;~ UINT32          Key;            ; GDIP_WMF_PLACEABLEKEY
-        ;~ INT16           Hmf;            ; Metafile HANDLE number (always 0)
-        ;~ PWMFRect16      BoundingBox;    ; Coordinates in metafile units
-        ;~ INT16           Inch;           ; Number of metafile units per inch
-        ;~ UINT32          Reserved;       ; Reserved (always 0)
-        ;~ INT16           Checksum;       ; Checksum value for previous 10 WORDs
-    ;~ } WmfPlaceableFileHeader;
-
-    ; Key contains a special identification value that indicates the presence
-    ; of a placeable metafile header and is always 0x9AC6CDD7.
-
-    ; Handle is used to stored the handle of the metafile in memory. When written
-    ; to disk, this field is not used and will always contains the value 0.
-
-    ; Left, Top, Right, and Bottom contain the coordinates of the upper-left
-    ; and lower-right corners of the image on the output device. These are
-    ; measured in twips.
-
-    ; A twip (meaning "twentieth of a point") is the logical unit of measurement
-    ; used in Windows Metafiles. A twip is equal to 1/1440 of an inch. Thus 720
-    ; twips equal 1/2 inch, while 32,768 twips is 22.75 inches.
-
-    ; Inch contains the number of twips per inch used to represent the image.
-    ; Normally, there are 1440 twips per inch; however, this number may be
-    ; changed to scale the image. A value of 720 indicates that the image is
-    ; double its normal size, or scaled to a factor of 2:1. A value of 360
-    ; indicates a scale of 4:1, while a value of 2880 indicates that the image
-    ; is scaled down in size by a factor of two. A value of 1440 indicates
-    ; a 1:1 scale ratio.
-
-    ; Reserved is not used and is always set to 0.
-
-    ; Checksum contains a checksum value for the previous 10 WORDs in the header.
-    ; This value can be used in an attempt to detect if the metafile has become
-    ; corrupted. The checksum is calculated by XORing each WORD value to an
-    ; initial value of 0.
-
-    ; If the metafile was recorded with a reference Hdc that was a display.
-
-    
-
-    class MetafileHeader
+    struct SharpenParams
     {
-    public:
-        MetafileType        Type;
-        UINT                Size;               ; Size of the metafile (in bytes)
-        UINT                Version;            ; EMF+, EMF, or WMF version
-        UINT                EmfPlusFlags;
-        REAL                DpiX;
-        REAL                DpiY;
-        INT                 X;                  ; Bounds in device units
-        INT                 Y;
-        INT                 Width;
-        INT                 Height;
-        union
-        {
-            METAHEADER      WmfHeader;
-            ENHMETAHEADER3  EmfHeader;
-        };
-        INT                 EmfPlusHeaderSize;  ; size of the EMF+ header in file
-        INT                 LogicalDpiX;        ; Logical Dpi of reference Hdc
-        INT                 LogicalDpiY;        ; usually valid only for EMF+
-
-    public:
-        MetafileType GetType() const { return Type; }
-
-        UINT GetMetafileSize() const { return Size; }
-
-        ; If IsEmfPlus, this is the EMF+ version; else it is the WMF or EMF ver
+        float radius;
+        float amount;
+    };
         
-        UINT GetVersion() const { return Version; }
-
-        ; Get the EMF+ flags associated with the metafile
+    struct BlurParams
+    {
+        float radius;
+        BOOL expandEdge;
+    };
         
-        UINT GetEmfPlusFlags() const { return EmfPlusFlags; }
-
-        REAL GetDpiX() const { return DpiX; }
-
-        REAL GetDpiY() const { return DpiY; }
-
-        VOID GetBounds (OUT Rect *rect) const
+    struct BrightnessContrastParams
+    {
+        INT brightnessLevel;
+        INT contrastLevel;
+    };
+        
+    struct RedEyeCorrectionParams
+    {
+        UINT numberOfAreas;
+        RECT *areas;
+    };
+        
+    struct HueSaturationLightnessParams
+    {
+        INT hueLevel;
+        INT saturationLevel;
+        INT lightnessLevel;
+    };
+        
+    struct TintParams
+    {
+        INT hue;
+        INT amount;
+    };
+        
+    struct LevelsParams
+    {
+        INT highlight;
+        INT midtone;
+        INT shadow;
+    };
+        
+    struct ColorBalanceParams
+    {
+        INT cyanRed;
+        INT magentaGreen;
+        INT yellowBlue;
+    };
+        
+    struct ColorLUTParams
+    {
+        ; look up tables for each color channel.
+        
+        ColorChannelLUT lutB;
+        ColorChannelLUT lutG;
+        ColorChannelLUT lutR;
+        ColorChannelLUT lutA;
+    };
+        
+    enum CurveAdjustments
+    {
+        AdjustExposure,
+        AdjustDensity,
+        AdjustContrast,
+        AdjustHighlight,
+        AdjustShadow,
+        AdjustMidtone,
+        AdjustWhiteSaturation,
+        AdjustBlackSaturation
+    };
+        
+    enum CurveChannel
+    {
+        CurveChannelAll,
+        CurveChannelRed,
+        CurveChannelGreen,
+        CurveChannelBlue
+    };
+        
+    struct ColorCurveParams
+    {
+        CurveAdjustments adjustment;
+        CurveChannel channel;
+        INT adjustValue;
+    };
+        
+    Class CGpEffect
+    {
+        Status __stdcall
+        GdipCreateEffect(const GUID guid, CGpEffect **effect);
+    
+        Status __stdcall
+        GdipDeleteEffect(CGpEffect *effect);
+    
+        Status __stdcall
+        GdipGetEffectParameterSize(CGpEffect *effect, UINT *size);
+    
+        Status __stdcall
+        GdipSetEffectParameters(CGpEffect *effect, const VOID *params, const UINT size);
+    
+        Status __stdcall
+        GdipGetEffectParameters(CGpEffect *effect, UINT *size, VOID *params);
+    }
+        
+    #ifndef _GDIPLUSEFFECTS_EXCLUDEOBJECTS
+        
+    class Effect
+    {
+        public:
+        Effect()
         {
-            rect->X = X;
-            rect->Y = Y;
-            rect->Width = Width;
-            rect->Height = Height;
+            auxDataSize = 0;
+            auxData = NULL;
+            nativeEffect = NULL;
+            useAuxData = FALSE;
         }
         
-        ; Is it any type of WMF (standard or Placeable Metafile)?
-        
-        BOOL IsWmf() const
+        virtual ~Effect()
         {
-           return ((Type == MetafileTypeWmf) || (Type == MetafileTypeWmfPlaceable));
+            ; pvData is allocated by ApplyEffect. Return the pointer so that
+            ; it can be freed by the appropriate memory manager.
+            
+            DllExports::GdipFree(auxData);
+            
+            ; Release the native Effect.
+            
+            GdipDeleteEffect(nativeEffect);
         }
-
-        ; Is this an Placeable Metafile?
-
-        BOOL IsWmfPlaceable() const { return (Type == MetafileTypeWmfPlaceable); }
-
-        ; Is this an EMF (not an EMF+)?
         
-        BOOL IsEmf() const { return (Type == MetafileTypeEmf); }
-
-        ; Is this an EMF or EMF+ file?
-        
-        BOOL IsEmfOrEmfPlus() const { return (Type >= MetafileTypeEmf); }
-
-        ; Is this an EMF+ file?
-        
-        BOOL IsEmfPlus() const { return (Type >= MetafileTypeEmfPlusOnly); }
-
-        ; Is this an EMF+ dual (has dual, down-level records) file?
-        
-        BOOL IsEmfPlusDual() const { return (Type == MetafileTypeEmfPlusDual); }
-
-        ; Is this an EMF+ only (no dual records) file?
-        
-        BOOL IsEmfPlusOnly() const { return (Type == MetafileTypeEmfPlusOnly); }
-
-        ; If it's an EMF+ file, was it recorded against a display Hdc?
-        
-        BOOL IsDisplay() const
+        INT GetAuxDataSize() const
         {
-            return (IsEmfPlus() &&
-                    ((EmfPlusFlags & GDIP_EMFPLUSFLAGS_DISPLAY) != 0));
+            return auxDataSize;
         }
-
-        ; Get the WMF header of the metafile (if it is a WMF)
         
-        const METAHEADER * GetWmfHeader() const
+        VOID *GetAuxData() const
         {
-            if (IsWmf())
-            {
-                return &WmfHeader;
-            }
-            return NULL;
+            return auxData;
         }
-
-        ; Get the EMF header of the metafile (if it is an EMF)
         
-        const ENHMETAHEADER3 * GetEmfHeader() const
+        VOID UseAuxData(const BOOL useAuxDataFlag)
         {
-            if (IsEmfOrEmfPlus())
-            {
-                return &EmfHeader;
-            }
-            return NULL;
+            useAuxData = useAuxDataFlag;
+        }
+        
+        Status GetParameterSize(UINT *size)
+        {
+            return GdipGetEffectParameterSize(nativeEffect, size);
+        }
+        
+    protected:
+        
+        Status SetParameters(const void *params, const UINT size)
+        {
+            return GdipSetEffectParameters(nativeEffect, params, size);
+        }
+        
+        Status GetParameters(UINT *size, void *params)
+        {
+            return GdipGetEffectParameters(nativeEffect, size, params);
+        }
+        
+        ; protected data members.
+        
+        CGpEffect *nativeEffect;
+        INT auxDataSize;
+        VOID *auxData;
+        BOOL useAuxData;
+    };
+        
+    ; Blur
+        
+    class Blur : public Effect
+    {
+        public:
+        
+        ; constructors cannot return an error code.
+        
+        Blur()
+        { 
+            GdipCreateEffect(BlurEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const BlurParams *parameters)
+        {
+            UINT size = sizeof(BlurParams);
+            return Effect::SetParameters(parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, BlurParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
         }
     };
+        
+    ; Sharpen
+        
+    class Sharpen : public Effect
+    {
+    public:
+        
+        Sharpen()
+        { 
+            GdipCreateEffect(SharpenEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const SharpenParams *parameters)
+        {
+            UINT size = sizeof(SharpenParams);
+            return Effect::SetParameters(parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, SharpenParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
+        
+    ; RedEye Correction
+        
+    class RedEyeCorrection : public Effect
+    {
+    public:
+        
+        ; constructors cannot return an error code.
+        
+        RedEyeCorrection()
+        { 
+            GdipCreateEffect(RedEyeCorrectionEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const RedEyeCorrectionParams *parameters)
+        {
+            Status status = InvalidParameter;
+        
+            if (parameters)
+            {
+                RedEyeCorrectionParams *inputParam =
+                    (RedEyeCorrectionParams*)parameters;
+        
+                UINT size = sizeof(RedEyeCorrectionParams) +
+                    inputParam->numberOfAreas * sizeof(RECT);
+        
+                status = Effect::SetParameters(parameters, size);
+            }
+        
+            return status;
+        }    
+        
+        Status GetParameters(UINT *size, RedEyeCorrectionParams *parameters)
+        {
+            return Effect::GetParameters(size,(VOID*)parameters);
+        }
+    };
+        
+    ; Brightness/Contrast
+    class BrightnessContrast : public Effect
+    {
+    public:
+        BrightnessContrast()
+        {
+            GdipCreateEffect(BrightnessContrastEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const BrightnessContrastParams *parameters)
+        {
+            UINT size = sizeof(BrightnessContrastParams);
+            return Effect::SetParameters((VOID*)parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, BrightnessContrastParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
+        
+    ; Hue/Saturation/Lightness
+        
+    class HueSaturationLightness : public Effect
+    {
+    public:
+        HueSaturationLightness()
+        {
+            GdipCreateEffect(HueSaturationLightnessEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const HueSaturationLightnessParams *parameters)
+        {
+            UINT size = sizeof(HueSaturationLightnessParams);
+            return Effect::SetParameters((VOID*)parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, HueSaturationLightnessParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
+        
+    ; Highlight/Midtone/Shadow curves
+        
+    class Levels : public Effect
+    {
+    public:
+        Levels()
+        {
+            GdipCreateEffect(LevelsEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const LevelsParams *parameters)
+        {
+            UINT size = sizeof(LevelsParams);
+            return Effect::SetParameters((VOID*)parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, LevelsParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
+        
+    ; Tint
+        
+    class Tint : public Effect
+    {
+    public:
+        Tint()
+        {
+            GdipCreateEffect(TintEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const TintParams *parameters)
+        {
+            UINT size = sizeof(TintParams);
+            return Effect::SetParameters((VOID*)parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, TintParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
+        
+    ; ColorBalance
+        
+    class ColorBalance : public Effect
+    {
+    public:
+        ColorBalance()
+        {
+            GdipCreateEffect(ColorBalanceEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const ColorBalanceParams *parameters)
+        {
+            UINT size = sizeof(ColorBalanceParams);
+            return Effect::SetParameters((VOID*)parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, ColorBalanceParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
+        
+    ; ColorMatrix
+        
+    class ColorMatrixEffect : public Effect
+    {
+    public:
+        
+        ; constructors cannot return an error code.
+        
+        ColorMatrixEffect()
+        { 
+            GdipCreateEffect(ColorMatrixEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const ColorMatrix *matrix)
+        {
+            UINT size = sizeof(ColorMatrix);
+            return Effect::SetParameters(matrix, size);
+        }
+        
+        Status GetParameters(UINT *size, ColorMatrix *matrix)
+        {
+            return Effect::GetParameters(size, (VOID*)matrix);
+        }
+    };
+        
 
-
-    #endif /* WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) */
-    #pragma endregion
-
-    #endif
-
-
-}
+    ; ColorLUT
+        
+    class ColorLUT : public Effect
+    {
+        public:
+        
+        ; constructors cannot return an error code.
+        
+        ColorLUT()
+        { 
+            GdipCreateEffect(ColorLUTEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const ColorLUTParams *lut)
+        {
+            UINT size = sizeof(ColorLUTParams);
+            return Effect::SetParameters(lut, size);
+        }
+        
+        Status GetParameters(UINT *size, ColorLUTParams *lut)
+        {
+            return Effect::GetParameters(size, (VOID*)lut);
+        }
+    };
+        
+    ; Color Curve
+        
+    class ColorCurve : public Effect
+    {
+    public:
+        ColorCurve()
+        {
+            GdipCreateEffect(ColorCurveEffectGuid, &nativeEffect);
+        }
+        
+        Status SetParameters(const ColorCurveParams *parameters)
+        {
+            UINT size = sizeof(ColorCurveParams);
+            return Effect::SetParameters((VOID*)parameters, size);
+        }
+        
+        Status GetParameters(UINT *size, ColorCurveParams *parameters)
+        {
+            return Effect::GetParameters(size, (VOID*)parameters);
+        }
+    };
