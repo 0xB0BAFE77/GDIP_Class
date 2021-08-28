@@ -5317,12 +5317,6 @@ data_type_size(type)
 
 
 
-; ### IDEAS ###
-; Add a "cup" class as a container to hold pens and brushes
-;     Add a method to "empty" the cup of all brushes and pens
-;     Add a method to list all stored brushes and pens
-
-
 
 
 
@@ -5363,87 +5357,25 @@ data_type_size(type)
 
 
 
-/* WIP
+/*
     ;   Gdiplus effect objects.
 
     ;-----------------------------------------------------------------------------
     ; GDI+ effect GUIDs
     ;-----------------------------------------------------------------------------
 
-    ; BlurEffectGuid = {633C80A4-1843-482b-9EF2-BE2834C5FDD4}
-    ; SharpenEffectGuid = {63CBF3EE-C526-402c-8F71-62C540BF5142}
-    ; ColorMatrixEffectGuid = {718F2615-7933-40e3-A511-5F68FE14DD74}
-    ; ColorLUTEffectGuid = {A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}
-    ; BrightnessContrastEffectGuid = {D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}
-    ; HueSaturationLightnessEffectGuid = {8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}
-    ; LevelsEffectGuid = {99C354EC-2A31-4f3a-8C34-17A803B33A25}
-    ; TintEffectGuid = {1077AF00-2848-4441-9489-44AD4C2D7A2C}
-    ; ColorBalanceEffectGuid = {537E597D-251E-48da-9664-29CA496B70F8}
-    ; RedEyeCorrectionEffectGuid = {74D29D05-69A4-4266-9549-3CC52836B632}
-    ; GUID ColorCurveEffectGuid ={DD6A0022-58E4-4a67-9D9B-D48EB881A53D}
+    ; BlurEffectGuid =                  {633C80A4-1843-482b-9EF2-BE2834C5FDD4}
+    ; SharpenEffectGuid =               {63CBF3EE-C526-402c-8F71-62C540BF5142}
+    ; ColorMatrixEffectGuid =           {718F2615-7933-40e3-A511-5F68FE14DD74}
+    ; ColorLUTEffectGuid =              {A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}
+    ; BrightnessContrastEffectGuid =    {D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}
+    ; HueSaturationLightnessEffectGuid ={8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}
+    ; LevelsEffectGuid =                {99C354EC-2A31-4f3a-8C34-17A803B33A25}
+    ; TintEffectGuid =                  {1077AF00-2848-4441-9489-44AD4C2D7A2C}
+    ; ColorBalanceEffectGuid =          {537E597D-251E-48da-9664-29CA496B70F8}
+    ; RedEyeCorrectionEffectGuid =      {74D29D05-69A4-4266-9549-3CC52836B632}
+    ; GUID ColorCurveEffectGuid =       {DD6A0022-58E4-4a67-9D9B-D48EB881A53D}
     ;-----------------------------------------------------------------------------
-
-    struct SharpenParams
-    {
-        float radius;
-        float amount;
-    };
-        
-    struct BlurParams
-    {
-        float radius;
-        BOOL expandEdge;
-    };
-        
-    struct BrightnessContrastParams
-    {
-        INT brightnessLevel;
-        INT contrastLevel;
-    };
-        
-    struct RedEyeCorrectionParams
-    {
-        UINT numberOfAreas;
-        RECT *areas;
-    };
-        
-    struct HueSaturationLightnessParams
-    {
-        INT hueLevel;
-        INT saturationLevel;
-        INT lightnessLevel;
-    };
-        
-    struct TintParams
-    {
-        INT hue;
-        INT amount;
-    };
-        
-    struct LevelsParams
-    {
-        INT highlight;
-        INT midtone;
-        INT shadow;
-    };
-        
-    struct ColorBalanceParams
-    {
-        INT cyanRed;
-        INT magentaGreen;
-        INT yellowBlue;
-    };
-        
-    struct ColorLUTParams
-    {
-        ; look up tables for each color channel.
-        
-        ColorChannelLUT lutB;
-        ColorChannelLUT lutG;
-        ColorChannelLUT lutR;
-        ColorChannelLUT lutA;
-    };
-        
     enum CurveAdjustments
     {
         AdjustExposure,
@@ -5455,7 +5387,7 @@ data_type_size(type)
         AdjustWhiteSaturation,
         AdjustBlackSaturation
     };
-        
+    
     enum CurveChannel
     {
         CurveChannelAll,
@@ -5463,36 +5395,25 @@ data_type_size(type)
         CurveChannelGreen,
         CurveChannelBlue
     };
-        
-    struct ColorCurveParams
-    {
-        CurveAdjustments adjustment;
-        CurveChannel channel;
-        INT adjustValue;
-    };
-        
+    
     Class CGpEffect
     {
-        Status __stdcall
         GdipCreateEffect(const GUID guid, CGpEffect **effect);
-    
-        Status __stdcall
         GdipDeleteEffect(CGpEffect *effect);
-    
-        Status __stdcall
         GdipGetEffectParameterSize(CGpEffect *effect, UINT *size);
-    
-        Status __stdcall
         GdipSetEffectParameters(CGpEffect *effect, const VOID *params, const UINT size);
-    
-        Status __stdcall
         GdipGetEffectParameters(CGpEffect *effect, UINT *size, VOID *params);
     }
-        
-    #ifndef _GDIPLUSEFFECTS_EXCLUDEOBJECTS
-        
+    
     class Effect
     {
+        ; protected data members.
+        
+        CGpEffect *nativeEffect;
+        INT auxDataSize;
+        VOID *auxData;
+        BOOL useAuxData;
+        
         public:
         Effect()
         {
@@ -5502,7 +5423,8 @@ data_type_size(type)
             useAuxData = FALSE;
         }
         
-        virtual ~Effect()
+        ;virtual ~Effect()
+        __Delete()
         {
             ; pvData is allocated by ApplyEffect. Return the pointer so that
             ; it can be freed by the appropriate memory manager.
@@ -5546,18 +5468,18 @@ data_type_size(type)
             return GdipGetEffectParameters(nativeEffect, size, params);
         }
         
-        ; protected data members.
-        
-        CGpEffect *nativeEffect;
-        INT auxDataSize;
-        VOID *auxData;
-        BOOL useAuxData;
     };
         
     ; Blur
         
     class Blur : public Effect
     {
+        struct BlurParams
+        {
+            float radius;
+            BOOL expandEdge;
+        };
+        
         public:
         
         ; constructors cannot return an error code.
@@ -5583,6 +5505,12 @@ data_type_size(type)
         
     class Sharpen : public Effect
     {
+        struct SharpenParams
+        {
+            float radius;
+            float amount;
+        };
+
     public:
         
         Sharpen()
@@ -5601,11 +5529,17 @@ data_type_size(type)
             return Effect::GetParameters(size, (VOID*)parameters);
         }
     };
-        
+    
     ; RedEye Correction
-        
+    
     class RedEyeCorrection : public Effect
     {
+        struct RedEyeCorrectionParams
+        {
+            UINT numberOfAreas;
+            RECT *areas;
+        };
+
     public:
         
         ; constructors cannot return an error code.
@@ -5642,6 +5576,12 @@ data_type_size(type)
     ; Brightness/Contrast
     class BrightnessContrast : public Effect
     {
+        struct BrightnessContrastParams
+        {
+            INT brightnessLevel;
+            INT contrastLevel;
+        };
+
     public:
         BrightnessContrast()
         {
@@ -5664,6 +5604,13 @@ data_type_size(type)
         
     class HueSaturationLightness : public Effect
     {
+        struct HueSaturationLightnessParams
+        {
+            INT hueLevel;
+            INT saturationLevel;
+            INT lightnessLevel;
+        };
+
     public:
         HueSaturationLightness()
         {
@@ -5683,9 +5630,16 @@ data_type_size(type)
     };
         
     ; Highlight/Midtone/Shadow curves
-        
+    
     class Levels : public Effect
     {
+        struct LevelsParams
+        {
+            INT highlight;
+            INT midtone;
+            INT shadow;
+        };
+        
     public:
         Levels()
         {
@@ -5708,6 +5662,12 @@ data_type_size(type)
         
     class Tint : public Effect
     {
+        struct TintParams
+        {
+            INT hue;
+            INT amount;
+        };
+
     public:
         Tint()
         {
@@ -5730,6 +5690,12 @@ data_type_size(type)
         
     class ColorBalance : public Effect
     {
+        struct ColorBalanceParams
+        {
+            INT cyanRed;
+            INT magentaGreen;
+            INT yellowBlue;
+        };
     public:
         ColorBalance()
         {
@@ -5778,6 +5744,16 @@ data_type_size(type)
         
     class ColorLUT : public Effect
     {
+        struct ColorLUTParams
+        {
+            ; look up tables for each color channel.
+            
+            ColorChannelLUT lutB;
+            ColorChannelLUT lutG;
+            ColorChannelLUT lutR;
+            ColorChannelLUT lutA;
+        };
+
         public:
         
         ; constructors cannot return an error code.
@@ -5803,6 +5779,13 @@ data_type_size(type)
         
     class ColorCurve : public Effect
     {
+        struct ColorCurveParams
+        {
+            CurveAdjustments adjustment;
+            CurveChannel channel;
+            INT adjustValue;
+        };
+        
     public:
         ColorCurve()
         {
