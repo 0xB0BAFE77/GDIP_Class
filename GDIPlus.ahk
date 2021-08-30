@@ -6,7 +6,7 @@
         Image.FromFile() works
     20210730
         Image.GetType() works
-        Added NativeImage to image class to store the current image
+        Added NativeImage to image Class to store the current image
             NativeImage is used by many methods to interact with the "Native Image"
             IMOP = IMO Pointer
             Other classes operate like this, such as the graphics class
@@ -14,11 +14,11 @@
         Created Rect, Point, and Size classes
             Added overloaded constructors
         Created gui class
-        Added new_layered_window() to gui class to create fast guis
+        Added new_layered_window() to gui Class to create fast guis
             Returns an HWND to that gui
-        Created test class for testing all the things!
+        Created test Class for testing all the things!
     20210801
-        Spent almost all day learning about structs and storing them to class vars
+        Spent almost all day learning about structs and storing them to Class vars
             Apparently objects have their own built-in variable sizers and address getters.
     20210802
         Finished up Point class
@@ -45,12 +45,12 @@
         Finished all the float variants of Point, Size, and Rect
         Still need to test all 6 classes
     20210808
-        Updated the Gui class and the layered window method
+        Updated the Gui Class and the layered window method
         Started working with the Graphics class
     20210809
         Finished Enumerations
     20210810
-        Started working on graphics class and image class
+        Started working on graphics Class and image class
     20210811
         Lots of reading the .h file of GDIPlus
     20210812
@@ -70,25 +70,25 @@
     20210817
         Finished GUID class
     20210818
-        Worked heavily on effect class and the 11 related effect classes
+        Worked heavily on effect Class and the 11 related effect classes
     20210819
         Did more work on graphics class
     20210820
         Graphics Class is now Grafixed and working!!
     20210821
         Started work on the Pen class.
-        Updated the Color class and added some methods.
+        Updated the Color Class and added some methods.
     20210821
         Reformatted and organized all the color constants
             Colors are broken up by general color and alphabetized
     20210822
-        Colors class finished and tested
-        Pen class progress
+        Colors Class finished and tested
+        Pen Class progress
     20210824
-        Pen class - Got a chunk of methods done
+        Pen Class - Got a chunk of methods done
             Added SetStatus method back in
     20210826
-        Got most of the Pen class done
+        Got most of the Pen Class done
             Have not done any testing on it
         Reorganized code to be more inline with GDIP's C++ wrapper
 */
@@ -102,8 +102,8 @@ Class GDIP
             ,_version   := 1.0
     
     ;####################################################################################################################
-    ; STATUS ENUMERATION - This defines all possible status enumeration return types you might encounter                |
-    ;                      Any function with a status return type references this. 0 is OK. Anything > 0 is an error.   |
+    ; STATUS ENUMERATION - This defines all possible status enumeration Return types you might encounter                |
+    ;                      Any function with a status Return type references this. 0 is OK. Anything > 0 is an error.   |
     ;___________________________________________________________________________________________________________________|
     ; Num | Value                     | Indicates that...                                                               |
     ;  0  | Ok                        | Method call was successful.                                                     |
@@ -135,7 +135,7 @@ Class GDIP
     ;####################################################################################################################
     ;___________________________________________________________________________________________________________________|
     ; Call          Startup()                                                                                           |
-    ; Description   Initializes GDI+ and stores token in the main GDIP class under GDIP.token                           |
+    ; Description   Initializes GDI+ and stores token in the main GDIP Class under GDIP.token                           |
     ; Return        Status enumeration. 0 = success. -1 = GDIP already started.                                         |
     ;               The Status Enumeration Table can be found at the top of this library.                               |
     ;___________________________________________________________________________________________________________________|
@@ -203,7 +203,7 @@ Class GDIP
     }
     
     ;####################################################################################################################
-    ;  TYPEDEF CLASS                                                                                                    |
+    ;  TYPEDEF Class                                                                                                    |
     ;####################################################################################################################
     ; Responsible for tracking all the different var types there are in GDIPlus
     Class TypeDef
@@ -230,7 +230,7 @@ Class GDIP
     }
     
     ;####################################################################################################################
-    ;  DEFINED CLASS                                                                                                    |
+    ;  DEFINED Class                                                                                                    |
     ;####################################################################################################################
     ; Responsible for tracking all the different var types there are in GDIPlus
     Class DEFINE
@@ -1384,7 +1384,7 @@ Class GDIP
     ; Point(Size)       Set X to Size.width and Y to Size.height                                                        |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct()         Create struct and return pointer to it.                                                         |
+    ; .Struct()         Create struct and Return pointer to it.                                                         |
     ; .Plus(Point)      Return a new Point object with Point and NativePoint values summed                              |
     ; .Minus(Point)     Return a new Point object with Point and NativePoint values differenced                         |
     ; .Equals(Point)    Return True if Point and NativePoint have equal values                                          |
@@ -1481,7 +1481,7 @@ Class GDIP
     ; Size(Size)        Set Width to Size.Width and Height to Size.Height                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Create struct a struct and return pointer to it.                                                |
+    ; .Struct(type)     Create struct a struct and Return pointer to it.                                                |
     ; .Plus(Size)       Return a new Size object with sum of Size and NativeSize values                                 |
     ; .Minus(Size)      Return a new Size object with difference of NativeSize and Size values                          |
     ; .Equals(Size)     Return True if Size and NativeSize have equal values                                            |
@@ -1586,7 +1586,7 @@ Class GDIP
     ; Rect(Point, Size) X=Point.X, Y=Point.Y, Width=Size.Width, Height=Size.Height                                      |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Create struct with current values and return pointer to it. type can be any 4 byte data type.   |
+    ; .Struct(type)     Create struct with current values and Return pointer to it. type can be any 4 byte data type.   |
     ; .Clone()          Return new Rect object with copy of NativeRect's values.                                        |
     ; .GetLocation(Point) Store X and Y values of NativeRect into Point object.                                         |
     ; .GetSize(Size)    Store Width and Height values of Rect into Size object.                                         |
@@ -1611,7 +1611,7 @@ Class GDIP
     ; .Offset(dx, dy)   Update NativeRect x,y with dx,dy                                                                |
     ; .Offset(Point)    Update NativeRect x,y with Point.X,Point.Y                                                      |
     ;                                                                                                                   |
-    ; Remarks           A return value of "" means there was a parameter error.                                         |
+    ; Remarks           A Return value of "" means there was a parameter error.                                         |
     ;                   Struct type is updated to the requested type at .Struct() call.                                 |
     ;___________________________________________________________________________________________________________________|
     Class Rect
@@ -2305,7 +2305,7 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------.
     ; Imaging.h                                                                                                         |
     ;___________________________________________________________________________________________________________________|
-    class ImageCodecInfo
+    Class ImageCodecInfo
     {
         ;CLSID Clsid
         ;GUID  FormatID
@@ -2322,7 +2322,7 @@ Class GDIP
         ;const BYTE* SigMask
     }
     
-    class BitmapData
+    Class BitmapData
     {
         ;UINT Width
         ;UINT Height
@@ -2332,7 +2332,7 @@ Class GDIP
         ;UINT_PTR Reserved
     }
     
-    class EncoderParameter
+    Class EncoderParameter
     {
         ;GUID    Guid               ; GUID of the parameter
         ;ULONG   NumberOfValues     ; Number of the parameter values
@@ -2340,7 +2340,7 @@ Class GDIP
         ;VOID*   Value              ; A pointer to the parameter values
     }
     
-    class ImageItemData
+    Class ImageItemData
     {
         ;UINT  Size;                 ; size of the structure 
         ;UINT  Position;             ; flags describing how the data is to be used.
@@ -2354,7 +2354,7 @@ Class GDIP
         ;                            ; enumeration of image data items.
     }
     
-    class PropertyItem
+    Class PropertyItem
     {
         ;PROPID  id;                 ; ID of this property
         ;ULONG   length;             ; Length of the property value, in bytes
@@ -2385,7 +2385,478 @@ Class GDIP
     
     
     
-    ; Effects are next
+    ; Going to hold off on finishing this until I get the Graphics and Bitmap classes done.
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Gdiplus effects                                                                                                   |
+    ;___________________________________________________________________________________________________________________|
+
+    ;-----------------------------------------------------------------------------
+    ;enum CurveAdjustments
+    ;{
+    ;    AdjustExposure,
+    ;    AdjustDensity,
+    ;    AdjustContrast,
+    ;    AdjustHighlight,
+    ;    AdjustShadow,
+    ;    AdjustMidtone,
+    ;    AdjustWhiteSaturation,
+    ;    AdjustBlackSaturation
+    ;};
+    
+    ;enum CurveChannel
+    ;{
+    ;    CurveChannelAll,
+    ;    CurveChannelRed,
+    ;    CurveChannelGreen,
+    ;    CurveChannelBlue
+    ;};
+    
+    Class CGpEffect
+    {
+        ; Constructor
+        GdipCreateEffect(const GUID guid, CGpEffect **effect);
+        ; Destructor
+        GdipDeleteEffect(CGpEffect *effect);
+        ; Get size
+        GdipGetEffectParameterSize(CGpEffect *effect, UINT *size);
+        ; Get param
+        GdipGetEffectParameters(CGpEffect *effect, UINT *size, VOID *params);
+        ; Set param
+        GdipSetEffectParameters(CGpEffect *effect, const VOID *params, const UINT size);
+    }
+    
+    Class Effect
+    {
+        ;-----------------------------------------------------------------------------
+        ; GDI+ effect GUIDs                    xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  
+        ;-----------------------------------------------------------------------------
+         BlurEffectGuid                   := "{633C80A4-1843-482b-9EF2-BE2834C5FDD4}"
+        ,SharpenEffectGuid                := "{63CBF3EE-C526-402c-8F71-62C540BF5142}"
+        ,ColorMatrixEffectGuid            := "{718F2615-7933-40e3-A511-5F68FE14DD74}"
+        ,ColorLUTEffectGuid               := "{A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}"
+        ,BrightnessContrastEffectGuid     := "{D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}"
+        ,HueSaturationLightnessEffectGuid := "{8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}"
+        ,LevelsEffectGuid                 := "{99C354EC-2A31-4f3a-8C34-17A803B33A25}"
+        ,TintEffectGuid                   := "{1077AF00-2848-4441-9489-44AD4C2D7A2C}"
+        ,ColorBalanceEffectGuid           := "{537E597D-251E-48da-9664-29CA496B70F8}"
+        ,RedEyeCorrectionEffectGuid       := "{74D29D05-69A4-4266-9549-3CC52836B632}"
+        ,ColorCurveEffectGuid             := "{DD6A0022-58E4-4a67-9D9B-D48EB881A53D}"
+        
+        ;protected data members.
+        ;~ CGpEffect *nativeEffect;
+        ;~ INT auxDataSize;
+        ;~ VOID *auxData;
+        ;~ BOOL useAuxData;
+        
+        Static nativeEffect = ""        ; ptr
+             , auxDataSize  = 0         ; int
+             , auxData      = ""        ; ptr
+             , useAuxData   = 0         ; bool
+        
+        Effect()
+        {
+             this.auxDataSize  := 0
+            ,this.auxData      := ""
+            ,this.nativeEffect := ""
+            ,this.useAuxData   := 0
+        }
+        
+        ;virtual ~Effect()
+        __Delete()
+        {
+            ; pvData is allocated by ApplyEffect. Return the pointer so that
+            ; it can be freed by the appropriate memory manager.
+            DllCall("gdiplus\GdipFree", this.Ptr, this.auxData)
+            ; Release the native Effect.
+            DllCall("gdiplus\GdipDeleteEffect", this.Ptr, this.nativeEffect)
+        }
+        
+        ;INT GetAuxDataSize() const
+        GetAuxDataSize()
+        {
+            Return this.auxDataSize
+        }
+        
+        ;VOID *GetAuxData() const
+        GetAuxData()
+        {
+            Return this.auxData
+        }
+        
+        ;VOID UseAuxData(const BOOL useAuxDataFlag)
+        UseAuxData(useAuxDataFlag)
+        {
+            this.useAuxData := (useAuxDataFlag) ? 1 : 0
+        }
+        
+        ;Status GetParameterSize(UINT *size)
+        GetParameterSize(size) ; ptr to size
+        {
+            Return DllCall("gdiplus\GdipGetEffectParameterSize"
+                          ,this.Ptr    ,this.nativeEffect
+                          ,this.Ptr    ,this.size)
+        }
+        
+        ;Status SetParameters(const void *params, const UINT size)
+        SetParameters(params, size) ; ptr, uint
+        {
+            Return DllCall("gdiplus\GdipSetEffectParameters"
+                          ,this.Ptr    ,this.nativeEffect
+                          ,this.Ptr    ,params
+                          ,"UInt"      ,size)
+        }
+        
+        ;Status GetParameters(UINT *size, void *params)
+        GetParameters(size, params) ; uint, ptr
+        {
+            Return DllCall("gdiplus\GdipGetEffectParameters"
+                          ,this.Ptr    ,this.nativeEffect
+                          ,"UInt"      ,size
+                          ,this.Ptr    ,params)
+        }
+        
+        ; Effect sublcasses
+        
+        ; Blur
+        Class Blur Extends Effect
+        {
+            ;struct BlurParams
+            ;{
+            ;    float radius;
+            ;    BOOL expandEdge;
+            ;};
+            
+             radius     := ""
+            ,expandEdge := ""
+            
+            __New()
+            {
+                DllCall("gdiplus\GdipCreateEffect"
+                       ,this.Ptr    ,this.BlurEffectGuid
+                       ,this.Ptr    ,this.nativeEffect)
+            }
+            
+            ;Status SetParameters(const BlurParams *parameters)
+            SetParameters(parameters) ; ptr
+            {
+                UINT size = sizeof(BlurParams);
+                Return DllCall("gdiplus\SetParameters"
+                              ,this.Ptr    ,parameters
+                              ,"UInt"      ,&size)
+            }
+            
+            ;Status GetParameters(UINT *size, BlurParams *parameters)
+            GetParameters(size, parameters) ; uint, pointer
+            {
+                Return DllCall("gdiplus\GetParameters"
+                              ,"UInt"    ,size
+                              ,this.Ptr  ,parameters)
+            }
+        }
+        
+        ; Sharpen
+        Class Sharpen Extends Effect
+        {
+            ;struct SharpenParams
+            ;{
+            ;    float radius;
+            ;    float amount;
+            ;};
+            
+            __New()
+            { 
+                DllCall("gdiplus\GdipCreateEffect"
+                       ,(SharpenEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const SharpenParams *parameters)
+            {
+                UINT size = sizeof(SharpenParams);
+                Return Effect::SetParameters(parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, SharpenParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+        
+        ; RedEye Correction
+        
+        Class RedEyeCorrection Extends Effect
+        {
+            struct RedEyeCorrectionParams
+            {
+                UINT numberOfAreas;
+                RECT *areas;
+            };
+
+        public:
+            
+            ; constructors cannot Return an error code.
+            
+            RedEyeCorrection()
+            { 
+                GdipCreateEffect(RedEyeCorrectionEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const RedEyeCorrectionParams *parameters)
+            {
+                Status status = InvalidParameter;
+            
+                if (parameters)
+                {
+                    RedEyeCorrectionParams *inputParam =
+                        (RedEyeCorrectionParams*)parameters;
+            
+                    UINT size = sizeof(RedEyeCorrectionParams) +
+                        inputParam->numberOfAreas * sizeof(RECT);
+            
+                    status = Effect::SetParameters(parameters, size);
+                }
+            
+                Return status;
+            }    
+            
+            Status GetParameters(UINT *size, RedEyeCorrectionParams *parameters)
+            {
+                Return Effect::GetParameters(size,(VOID*)parameters);
+            }
+        };
+            
+        ; Brightness/Contrast
+        Class BrightnessContrast Extends Effect
+        {
+            struct BrightnessContrastParams
+            {
+                INT brightnessLevel;
+                INT contrastLevel;
+            };
+
+        public:
+            BrightnessContrast()
+            {
+                GdipCreateEffect(BrightnessContrastEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const BrightnessContrastParams *parameters)
+            {
+                UINT size = sizeof(BrightnessContrastParams);
+                Return Effect::SetParameters((VOID*)parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, BrightnessContrastParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+            
+        ; Hue/Saturation/Lightness
+            
+        Class HueSaturationLightness Extends Effect
+        {
+            struct HueSaturationLightnessParams
+            {
+                INT hueLevel;
+                INT saturationLevel;
+                INT lightnessLevel;
+            };
+
+        public:
+            HueSaturationLightness()
+            {
+                GdipCreateEffect(HueSaturationLightnessEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const HueSaturationLightnessParams *parameters)
+            {
+                UINT size = sizeof(HueSaturationLightnessParams);
+                Return Effect::SetParameters((VOID*)parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, HueSaturationLightnessParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+            
+        ; Highlight/Midtone/Shadow curves
+        
+        Class Levels Extends Effect
+        {
+            struct LevelsParams
+            {
+                INT highlight;
+                INT midtone;
+                INT shadow;
+            };
+            
+        public:
+            Levels()
+            {
+                GdipCreateEffect(LevelsEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const LevelsParams *parameters)
+            {
+                UINT size = sizeof(LevelsParams);
+                Return Effect::SetParameters((VOID*)parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, LevelsParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+            
+        ; Tint
+            
+        Class Tint Extends Effect
+        {
+            struct TintParams
+            {
+                INT hue;
+                INT amount;
+            };
+
+        public:
+            Tint()
+            {
+                GdipCreateEffect(TintEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const TintParams *parameters)
+            {
+                UINT size = sizeof(TintParams);
+                Return Effect::SetParameters((VOID*)parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, TintParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+            
+        ; ColorBalance
+            
+        Class ColorBalance Extends Effect
+        {
+            struct ColorBalanceParams
+            {
+                INT cyanRed;
+                INT magentaGreen;
+                INT yellowBlue;
+            };
+        public:
+            ColorBalance()
+            {
+                GdipCreateEffect(ColorBalanceEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const ColorBalanceParams *parameters)
+            {
+                UINT size = sizeof(ColorBalanceParams);
+                Return Effect::SetParameters((VOID*)parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, ColorBalanceParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+            
+        ; ColorMatrix
+            
+        Class ColorMatrixEffect Extends Effect
+        {
+        public:
+            
+            ; constructors cannot Return an error code.
+            
+            ColorMatrixEffect()
+            { 
+                GdipCreateEffect(ColorMatrixEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const ColorMatrix *matrix)
+            {
+                UINT size = sizeof(ColorMatrix);
+                Return Effect::SetParameters(matrix, size);
+            }
+            
+            Status GetParameters(UINT *size, ColorMatrix *matrix)
+            {
+                Return Effect::GetParameters(size, (VOID*)matrix);
+            }
+        };
+            
+
+        ; ColorLUT
+            
+        Class ColorLUT Extends Effect
+        {
+            struct ColorLUTParams
+            {
+                ; look up tables for each color channel.
+                
+                ColorChannelLUT lutB;
+                ColorChannelLUT lutG;
+                ColorChannelLUT lutR;
+                ColorChannelLUT lutA;
+            };
+            
+            public:
+            
+            ; constructors cannot Return an error code.
+            
+            ColorLUT()
+            { 
+                GdipCreateEffect(ColorLUTEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const ColorLUTParams *lut)
+            {
+                UINT size = sizeof(ColorLUTParams);
+                Return Effect::SetParameters(lut, size);
+            }
+            
+            Status GetParameters(UINT *size, ColorLUTParams *lut)
+            {
+                Return Effect::GetParameters(size, (VOID*)lut);
+            }
+        };
+        
+        ; Color Curve
+        Class ColorCurve Extends Effect
+        {
+            struct ColorCurveParams
+            {
+                CurveAdjustments adjustment;
+                CurveChannel channel;
+                INT adjustValue;
+            };
+            
+        public:
+            ColorCurve()
+            {
+                GdipCreateEffect(ColorCurveEffectGuid, &nativeEffect);
+            }
+            
+            Status SetParameters(const ColorCurveParams *parameters)
+            {
+                UINT size = sizeof(ColorCurveParams);
+                Return Effect::SetParameters((VOID*)parameters, size);
+            }
+            
+            Status GetParameters(UINT *size, ColorCurveParams *parameters)
+            {
+                Return Effect::GetParameters(size, (VOID*)parameters);
+            }
+        };
+        
+    }
+    
+
     
     
     
@@ -2414,7 +2885,7 @@ Class GDIP
     ;####################################################################################################################
     ;  Image Class                                                                                                      |
     ;####################################################################################################################
-    ; The Image class provides methods for loading and saving raster images (bitmaps) and vector images (metafiles).
+    ; The Image Class provides methods for loading and saving raster images (bitmaps) and vector images (metafiles).
     ; An Image object encapsulates a bitmap or a metafile and stores attributes that you can retrieve by calling 
     ; various Get methods.
     ; Image objects can be constructe from the following types: BMP, ICON, GIF, JPEG, Exif, PNG, TIFF, WMF, EMF
@@ -2670,7 +3141,7 @@ Class GDIP
             ;, type , value)
         ;}
         
-        ; This topic lists the constructors of the Image class. For a complete class listing, see Image Class.
+        ; This topic lists the constructors of the Image class. For a complete Class listing, see Image Class.
         ;Image()
         ;{
             ;DllCall("gdiplus\"
@@ -2684,7 +3155,7 @@ Class GDIP
             ;, type , value)
         ;}
         
-        ; This topic lists the constructors of the Image class. For a complete class listing, see Image Class.
+        ; This topic lists the constructors of the Image class. For a complete Class listing, see Image Class.
         ;Image()
         ;{
             ;DllCall("gdiplus\"
@@ -2698,7 +3169,7 @@ Class GDIP
             ;, type , value)
         ;}
         
-        ; This topic lists the constructors of the Image class. For a complete class listing, see Image Class.
+        ; This topic lists the constructors of the Image class. For a complete Class listing, see Image Class.
         ;Image()
         ;{
             ;DllCall("gdiplus\"
@@ -2810,7 +3281,7 @@ Class GDIP
                   ,this.lastResult := estat)
         }
         
-        ; Description       Record any non-OK status and return status
+        ; Description       Record any non-OK status and Return status
         SetStatus(status)
         {
             Return (status = 0)
@@ -3806,7 +4277,7 @@ Class GDIP
                    ;~ , type      , value)
         ;~ }
         
-        ;~ This topic lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
+        ;~ This topic lists the constructors of the Graphics class. For a complete Class listing, see Graphics Class.
         
         ;~ Graphics()
         ;~ {
@@ -3814,7 +4285,7 @@ Class GDIP
                    ;~ , type      , value)
         ;~ }
         
-        ;~ This topic lists the constructors of the Graphics class. For a complete class listing, see Graphics Class.
+        ;~ This topic lists the constructors of the Graphics class. For a complete Class listing, see Graphics Class.
         
         ;~ IntersectClip()
         ;~ {
@@ -4858,8 +5329,18 @@ Class GDIP
         
         new_guid()
         {
-             this._str := ComObjCreate("Scriptlet.TypeLib").GUID
-            ,this._ptr := this.get_pointer(this._str)
+            VarSetCapacity(pguid, 16)
+            if !(DllCall("ole32.dll\CoCreateGuid", "ptr", &pguid))
+            {
+                VarSetCapacity(sguid, 38 * 2 + 1)
+                if (DllCall("ole32.dll\StringFromGUID2", "ptr", &pguid, "ptr", &sguid, "int", 38 + 1))
+                    return StrGet(&sguid, "UTF-16")
+            }
+            return ""
+            
+            ; Easy COM way of doing it
+            ; this._str := ComObjCreate("Scriptlet.TypeLib").GUID
+            ;,this._ptr := this.get_pointer(this._str)
         }
         
         string
@@ -4976,7 +5457,7 @@ Class GDIP
     ; value of 0.
     
     ; If the metafile was recorded with a reference Hdc that was a display.
-    class MetafileHeader
+    Class MetafileHeader
     {
          ;~ _type              := "MetafileHeader"
         ;~ ,Type               := ""                     ; MetafileType
@@ -4995,21 +5476,21 @@ Class GDIP
         ;~ ,LogicalDpiX        :=                        ; INT Logical Dpi of reference Hdc
         ;~ ,LogicalDpiY        :=                        ; INT usually valid only for EMF+
         
-        ;~ MetafileType GetType() const { return Type; }
+        ;~ MetafileType GetType() const { Return Type; }
         
-        ;~ UINT GetMetafileSize() const { return Size; }
+        ;~ UINT GetMetafileSize() const { Return Size; }
         
         ;~ ; If IsEmfPlus, this is the EMF+ version; else it is the WMF or EMF ver
         
-        ;~ UINT GetVersion() const { return Version; }
+        ;~ UINT GetVersion() const { Return Version; }
         
         ;~ ; Get the EMF+ flags associated with the metafile
         
-        ;~ UINT GetEmfPlusFlags() const { return EmfPlusFlags; }
+        ;~ UINT GetEmfPlusFlags() const { Return EmfPlusFlags; }
         
-        ;~ REAL GetDpiX() const { return DpiX; }
+        ;~ REAL GetDpiX() const { Return DpiX; }
         
-        ;~ REAL GetDpiY() const { return DpiY; }
+        ;~ REAL GetDpiY() const { Return DpiY; }
         
         ;~ VOID GetBounds (OUT Rect *rect) const
         ;~ {
@@ -5023,38 +5504,38 @@ Class GDIP
         
         ;~ BOOL IsWmf() const
         ;~ {
-           ;~ return ((Type == MetafileTypeWmf) || (Type == MetafileTypeWmfPlaceable));
+           ;~ Return ((Type == MetafileTypeWmf) || (Type == MetafileTypeWmfPlaceable));
         ;~ }
         
         ;~ ; Is this an Placeable Metafile?
         
-        ;~ BOOL IsWmfPlaceable() const { return (Type == MetafileTypeWmfPlaceable); }
+        ;~ BOOL IsWmfPlaceable() const { Return (Type == MetafileTypeWmfPlaceable); }
         
         ;~ ; Is this an EMF (not an EMF+)?
         
-        ;~ BOOL IsEmf() const { return (Type == MetafileTypeEmf); }
+        ;~ BOOL IsEmf() const { Return (Type == MetafileTypeEmf); }
         
         ;~ ; Is this an EMF or EMF+ file?
         
-        ;~ BOOL IsEmfOrEmfPlus() const { return (Type >= MetafileTypeEmf); }
+        ;~ BOOL IsEmfOrEmfPlus() const { Return (Type >= MetafileTypeEmf); }
         
         ;~ ; Is this an EMF+ file?
         
-        ;~ BOOL IsEmfPlus() const { return (Type >= MetafileTypeEmfPlusOnly); }
+        ;~ BOOL IsEmfPlus() const { Return (Type >= MetafileTypeEmfPlusOnly); }
         
         ;~ ; Is this an EMF+ dual (has dual, down-level records) file?
         
-        ;~ BOOL IsEmfPlusDual() const { return (Type == MetafileTypeEmfPlusDual); }
+        ;~ BOOL IsEmfPlusDual() const { Return (Type == MetafileTypeEmfPlusDual); }
         
         ;~ ; Is this an EMF+ only (no dual records) file?
         
-        ;~ BOOL IsEmfPlusOnly() const { return (Type == MetafileTypeEmfPlusOnly); }
+        ;~ BOOL IsEmfPlusOnly() const { Return (Type == MetafileTypeEmfPlusOnly); }
         
         ;~ ; If it's an EMF+ file, was it recorded against a display Hdc?
         
         ;~ BOOL IsDisplay() const
         ;~ {
-            ;~ return (IsEmfPlus() &&
+            ;~ Return (IsEmfPlus() &&
                     ;~ ((EmfPlusFlags & GDIP_EMFPLUSFLAGS_DISPLAY) != 0));
         ;~ }
         
@@ -5064,9 +5545,9 @@ Class GDIP
         ;~ {
             ;~ if (IsWmf())
             ;~ {
-                ;~ return &WmfHeader;
+                ;~ Return &WmfHeader;
             ;~ }
-            ;~ return NULL;
+            ;~ Return NULL;
         ;~ }
         
         ;~ ; Get the EMF header of the metafile (if it is an EMF)
@@ -5075,9 +5556,9 @@ Class GDIP
         ;~ {
             ;~ if (IsEmfOrEmfPlus())
             ;~ {
-                ;~ return &EmfHeader;
+                ;~ Return &EmfHeader;
             ;~ }
-            ;~ return NULL;
+            ;~ Return NULL;
         ;~ }
     }
     
@@ -5357,449 +5838,3 @@ data_type_size(type)
 
 
 
-/*
-    ;   Gdiplus effect objects.
-
-    ;-----------------------------------------------------------------------------
-    ; GDI+ effect GUIDs
-    ;-----------------------------------------------------------------------------
-
-    ; BlurEffectGuid =                  {633C80A4-1843-482b-9EF2-BE2834C5FDD4}
-    ; SharpenEffectGuid =               {63CBF3EE-C526-402c-8F71-62C540BF5142}
-    ; ColorMatrixEffectGuid =           {718F2615-7933-40e3-A511-5F68FE14DD74}
-    ; ColorLUTEffectGuid =              {A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}
-    ; BrightnessContrastEffectGuid =    {D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}
-    ; HueSaturationLightnessEffectGuid ={8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}
-    ; LevelsEffectGuid =                {99C354EC-2A31-4f3a-8C34-17A803B33A25}
-    ; TintEffectGuid =                  {1077AF00-2848-4441-9489-44AD4C2D7A2C}
-    ; ColorBalanceEffectGuid =          {537E597D-251E-48da-9664-29CA496B70F8}
-    ; RedEyeCorrectionEffectGuid =      {74D29D05-69A4-4266-9549-3CC52836B632}
-    ; GUID ColorCurveEffectGuid =       {DD6A0022-58E4-4a67-9D9B-D48EB881A53D}
-    ;-----------------------------------------------------------------------------
-    enum CurveAdjustments
-    {
-        AdjustExposure,
-        AdjustDensity,
-        AdjustContrast,
-        AdjustHighlight,
-        AdjustShadow,
-        AdjustMidtone,
-        AdjustWhiteSaturation,
-        AdjustBlackSaturation
-    };
-    
-    enum CurveChannel
-    {
-        CurveChannelAll,
-        CurveChannelRed,
-        CurveChannelGreen,
-        CurveChannelBlue
-    };
-    
-    Class CGpEffect
-    {
-        GdipCreateEffect(const GUID guid, CGpEffect **effect);
-        GdipDeleteEffect(CGpEffect *effect);
-        GdipGetEffectParameterSize(CGpEffect *effect, UINT *size);
-        GdipSetEffectParameters(CGpEffect *effect, const VOID *params, const UINT size);
-        GdipGetEffectParameters(CGpEffect *effect, UINT *size, VOID *params);
-    }
-    
-    class Effect
-    {
-        ; protected data members.
-        
-        CGpEffect *nativeEffect;
-        INT auxDataSize;
-        VOID *auxData;
-        BOOL useAuxData;
-        
-        public:
-        Effect()
-        {
-            auxDataSize = 0;
-            auxData = NULL;
-            nativeEffect = NULL;
-            useAuxData = FALSE;
-        }
-        
-        ;virtual ~Effect()
-        __Delete()
-        {
-            ; pvData is allocated by ApplyEffect. Return the pointer so that
-            ; it can be freed by the appropriate memory manager.
-            
-            DllExports::GdipFree(auxData);
-            
-            ; Release the native Effect.
-            
-            GdipDeleteEffect(nativeEffect);
-        }
-        
-        INT GetAuxDataSize() const
-        {
-            return auxDataSize;
-        }
-        
-        VOID *GetAuxData() const
-        {
-            return auxData;
-        }
-        
-        VOID UseAuxData(const BOOL useAuxDataFlag)
-        {
-            useAuxData = useAuxDataFlag;
-        }
-        
-        Status GetParameterSize(UINT *size)
-        {
-            return GdipGetEffectParameterSize(nativeEffect, size);
-        }
-        
-    protected:
-        
-        Status SetParameters(const void *params, const UINT size)
-        {
-            return GdipSetEffectParameters(nativeEffect, params, size);
-        }
-        
-        Status GetParameters(UINT *size, void *params)
-        {
-            return GdipGetEffectParameters(nativeEffect, size, params);
-        }
-        
-    };
-        
-    ; Blur
-        
-    class Blur : public Effect
-    {
-        struct BlurParams
-        {
-            float radius;
-            BOOL expandEdge;
-        };
-        
-        public:
-        
-        ; constructors cannot return an error code.
-        
-        Blur()
-        { 
-            GdipCreateEffect(BlurEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const BlurParams *parameters)
-        {
-            UINT size = sizeof(BlurParams);
-            return Effect::SetParameters(parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, BlurParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-        
-    ; Sharpen
-        
-    class Sharpen : public Effect
-    {
-        struct SharpenParams
-        {
-            float radius;
-            float amount;
-        };
-
-    public:
-        
-        Sharpen()
-        { 
-            GdipCreateEffect(SharpenEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const SharpenParams *parameters)
-        {
-            UINT size = sizeof(SharpenParams);
-            return Effect::SetParameters(parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, SharpenParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-    
-    ; RedEye Correction
-    
-    class RedEyeCorrection : public Effect
-    {
-        struct RedEyeCorrectionParams
-        {
-            UINT numberOfAreas;
-            RECT *areas;
-        };
-
-    public:
-        
-        ; constructors cannot return an error code.
-        
-        RedEyeCorrection()
-        { 
-            GdipCreateEffect(RedEyeCorrectionEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const RedEyeCorrectionParams *parameters)
-        {
-            Status status = InvalidParameter;
-        
-            if (parameters)
-            {
-                RedEyeCorrectionParams *inputParam =
-                    (RedEyeCorrectionParams*)parameters;
-        
-                UINT size = sizeof(RedEyeCorrectionParams) +
-                    inputParam->numberOfAreas * sizeof(RECT);
-        
-                status = Effect::SetParameters(parameters, size);
-            }
-        
-            return status;
-        }    
-        
-        Status GetParameters(UINT *size, RedEyeCorrectionParams *parameters)
-        {
-            return Effect::GetParameters(size,(VOID*)parameters);
-        }
-    };
-        
-    ; Brightness/Contrast
-    class BrightnessContrast : public Effect
-    {
-        struct BrightnessContrastParams
-        {
-            INT brightnessLevel;
-            INT contrastLevel;
-        };
-
-    public:
-        BrightnessContrast()
-        {
-            GdipCreateEffect(BrightnessContrastEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const BrightnessContrastParams *parameters)
-        {
-            UINT size = sizeof(BrightnessContrastParams);
-            return Effect::SetParameters((VOID*)parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, BrightnessContrastParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-        
-    ; Hue/Saturation/Lightness
-        
-    class HueSaturationLightness : public Effect
-    {
-        struct HueSaturationLightnessParams
-        {
-            INT hueLevel;
-            INT saturationLevel;
-            INT lightnessLevel;
-        };
-
-    public:
-        HueSaturationLightness()
-        {
-            GdipCreateEffect(HueSaturationLightnessEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const HueSaturationLightnessParams *parameters)
-        {
-            UINT size = sizeof(HueSaturationLightnessParams);
-            return Effect::SetParameters((VOID*)parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, HueSaturationLightnessParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-        
-    ; Highlight/Midtone/Shadow curves
-    
-    class Levels : public Effect
-    {
-        struct LevelsParams
-        {
-            INT highlight;
-            INT midtone;
-            INT shadow;
-        };
-        
-    public:
-        Levels()
-        {
-            GdipCreateEffect(LevelsEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const LevelsParams *parameters)
-        {
-            UINT size = sizeof(LevelsParams);
-            return Effect::SetParameters((VOID*)parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, LevelsParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-        
-    ; Tint
-        
-    class Tint : public Effect
-    {
-        struct TintParams
-        {
-            INT hue;
-            INT amount;
-        };
-
-    public:
-        Tint()
-        {
-            GdipCreateEffect(TintEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const TintParams *parameters)
-        {
-            UINT size = sizeof(TintParams);
-            return Effect::SetParameters((VOID*)parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, TintParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-        
-    ; ColorBalance
-        
-    class ColorBalance : public Effect
-    {
-        struct ColorBalanceParams
-        {
-            INT cyanRed;
-            INT magentaGreen;
-            INT yellowBlue;
-        };
-    public:
-        ColorBalance()
-        {
-            GdipCreateEffect(ColorBalanceEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const ColorBalanceParams *parameters)
-        {
-            UINT size = sizeof(ColorBalanceParams);
-            return Effect::SetParameters((VOID*)parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, ColorBalanceParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
-        
-    ; ColorMatrix
-        
-    class ColorMatrixEffect : public Effect
-    {
-    public:
-        
-        ; constructors cannot return an error code.
-        
-        ColorMatrixEffect()
-        { 
-            GdipCreateEffect(ColorMatrixEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const ColorMatrix *matrix)
-        {
-            UINT size = sizeof(ColorMatrix);
-            return Effect::SetParameters(matrix, size);
-        }
-        
-        Status GetParameters(UINT *size, ColorMatrix *matrix)
-        {
-            return Effect::GetParameters(size, (VOID*)matrix);
-        }
-    };
-        
-
-    ; ColorLUT
-        
-    class ColorLUT : public Effect
-    {
-        struct ColorLUTParams
-        {
-            ; look up tables for each color channel.
-            
-            ColorChannelLUT lutB;
-            ColorChannelLUT lutG;
-            ColorChannelLUT lutR;
-            ColorChannelLUT lutA;
-        };
-
-        public:
-        
-        ; constructors cannot return an error code.
-        
-        ColorLUT()
-        { 
-            GdipCreateEffect(ColorLUTEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const ColorLUTParams *lut)
-        {
-            UINT size = sizeof(ColorLUTParams);
-            return Effect::SetParameters(lut, size);
-        }
-        
-        Status GetParameters(UINT *size, ColorLUTParams *lut)
-        {
-            return Effect::GetParameters(size, (VOID*)lut);
-        }
-    };
-        
-    ; Color Curve
-        
-    class ColorCurve : public Effect
-    {
-        struct ColorCurveParams
-        {
-            CurveAdjustments adjustment;
-            CurveChannel channel;
-            INT adjustValue;
-        };
-        
-    public:
-        ColorCurve()
-        {
-            GdipCreateEffect(ColorCurveEffectGuid, &nativeEffect);
-        }
-        
-        Status SetParameters(const ColorCurveParams *parameters)
-        {
-            UINT size = sizeof(ColorCurveParams);
-            return Effect::SetParameters((VOID*)parameters, size);
-        }
-        
-        Status GetParameters(UINT *size, ColorCurveParams *parameters)
-        {
-            return Effect::GetParameters(size, (VOID*)parameters);
-        }
-    };
