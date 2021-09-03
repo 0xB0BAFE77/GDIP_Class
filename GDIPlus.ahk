@@ -1616,20 +1616,20 @@ Class GDIP
     ; Methods:                                                                                                          |
     ; .Struct(type)     Create struct with current values and Return pointer to it. type can be any 4 byte data type.   |
     ; .Clone()          Return new Rect object with copy of NativeRect's values.                                        |
-    ; .GetLocation(Point) Store X and Y values of NativeRect into Point object.                                         |
-    ; .GetSize(Size)    Store Width and Height values of Rect into Size object.                                         |
-    ; .GetBounds(Rect)  Update Rect values with NativeRect's values.                                                    |
-    ; .GetLeft()        Same as the .Left   property.                                                                   |
-    ; .GetTop()         Same as the .Top    property.                                                                   |
-    ; .GetRight()       Same as the .Right  property.                                                                   |
-    ; .GetBottom()      Same as the .Bottom property.                                                                   |
-    ; .IsEmptyArea()    Return True if width or height <= 0.                                                            |
-    ; .Equals(Rect)     Return True if NativeRect and Rect have equal values.                                           |
-    ; .Contains(x, y)   Return True if the (x,y) coordinate provided falls inside NativeRect.                           |
-    ; .Contains(Point)  Return True if the Point provided falls inside NativeRect.                                      |
-    ; .Inflate(dx, dy)  Increase width of NativeRect by dx and height by dy. Sizes decreases if negative.               |
-    ; .Inflate(Point)   Increases width by Point.X and Height by Point.Y. Sizes decreases if negative.                  |
-    ; .Intersect(Rect)  Update NativeRect values to the intersect values of NativeRect and Rect.                        |
+    ; .GetLocation(Point) Pass a Point object in and get the X and Y coordianates of the Native Rect.                   |
+    ; .GetSize(Size)    Pass a Size object in and get the Width and Height of the Native Rect.                          |
+    ; .GetBounds(Rect)  Pass a Rect object in and get the X, Y, Width, and Height values of the Native Rect.            |
+    ; .GetLeft()        Return the .Left property.                                                                      |
+    ; .GetTop()         Return the .Top property.                                                                       |
+    ; .GetRight()       Return the .Right property.                                                                     |
+    ; .GetBottom()      Return the .Bottom property.                                                                    |
+    ; .IsEmptyArea()    Return True if either width or height <= 0.                                                     |
+    ; .Equals(Rect)     Return True if Rect object has same values as Native Rect.                                      |
+    ; .Contains(x, y)   Return True if the (x,y) coordinate provided falls inside the Native Rect.                      |
+    ; .Contains(Point)  Return True if the Point Object provided falls inside NativeRect.                               |
+    ; .Inflate(dx, dy)  Adjusts the width of Native Rect by dx and height by dy. A negative will decrease size.         |
+    ; .Inflate(Point)   Adjusts the width of Native X by Point.X and height by Point.Y. A negative will decrease size.  |
+    ; .Intersect(Rect)  Update Native Rect values to the intersect values of NativeRect and Rect.                       |
     ; .Intersect(R1, R2 Update ROut values to the intersect values of R1 and R2.                                        |
     ;           , ROut)                                                                                                 |
     ; .IntersectsWith(Rect) Return true if Rect intersects with NativeRect                                              |
@@ -1921,60 +1921,60 @@ Class GDIP
         
         A[]
         {
-            Set{
-                NumPut(value, this._ptr, 3, "UChar")
-            }
             Get{
                 Return NumGet(this._ptr, 3, "UChar")
+            }
+            Set{
+                NumPut(value, this._ptr, 3, "UChar")
             }
         }
         
         R[]
         {
-            Set{
-                NumPut(value, this._ptr, 2, "UChar")
-            }
             Get{
                 Return NumGet(this._ptr, 2, "UChar")
+            }
+            Set{
+                NumPut(value, this._ptr, 2, "UChar")
             }
         }
         
         G[]
         {
-            Set{
-                NumPut(value, this._ptr, 1, "UChar")
-            }
             Get{
                 Return NumGet(this._ptr, 1, "UChar")
+            }
+            Set{
+                NumPut(value, this._ptr, 1, "UChar")
             }
         }
         
         B[]
         {
-            Set{
-                NumPut(value, this._ptr, 0, "UChar")
-            }
             Get{
                 Return NumGet(this._ptr, 0, "UChar")
+            }
+            Set{
+                NumPut(value, this._ptr, 0, "UChar")
             }
         }
         
         ARGB[]
         {
-            Set{
-                this.SetValue(value)
-            }
             Get{
                 Return this.GetValue(this.A, this.R, this.G, this.B)
+            }
+            Set{
+                this.SetValue(value)
             }
         }
         
         Struct[]
         {
-            Set{
-            }
             Get{
                 Return this._ptr
+            }
+            Set{
             }
         }
         
@@ -2448,6 +2448,40 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------.
     ; Gdiplus effects                                                                                                   |
     ;___________________________________________________________________________________________________________________|
+    ;-------------------------------------------------------------------------------------------------------------------.
+    ; Effect Class - Serves as a base class for blur, sharpen, tint, RedEyeCorrection, ColorMatrixEffect, ColorLUT,     |
+    ;                BrightnessContrast, HueSaturationLightness, ColorBalance, Levels, and ColorCurve.                  |
+    ;-------------------------------------------------------------------------------------------------------------------|
+    ; The effect class is a precursor to using GDIPluses effects. Create an Effect Object and set the effects you want. |
+    ; Properties:                                                                                                       |
+    ; .A                Transparency. 0-255                                                                             |
+    ; .R                Red value. 0-255                                                                                |
+    ; .G                Green value. 0-255                                                                              |
+    ; .B                Blue value. 0-255                                                                               |
+    ; .ARGB             A R B G values in AARRBBGG form (Identical to .GetValue() method)                               |
+    ; .Struct           Stores the pointer for the struct                                                               |
+    ;                                                                                                                   |
+    ; Constructors:                                                                                                     |
+    ; Color()           Create solid black color object                                                                 |
+    ; Color(ColorObj)   Create a color object using the values from the provided color object                           |
+    ; Color(ARGB)       Create a color object using an ARGB (a 0xAARRGGBB value)                                        |
+    ; Color(r, g, b)    Create a solid color object using the provided red, green and blue values                       |
+    ; Color(a, r, g, b) Create a color object using the provided alpha, red, green and blue values                      |
+    ;                                                                                                                   |
+    ; Methods:                                                                                                          |
+    ; .GetAlpha(hex)    Returns Alpha value.                                                                            |
+    ; .GetRed(hex)      Returns Red value.                                                                              |
+    ; .GetGreen(hex)    Returns Green value.                                                                            |
+    ; .GetBlue(hex)     Returns Blue value.                                                                             |
+    ; .GetValue()       Returns an ARGB value.                                                                          |
+    ; .SetValue(ARGB)   Sets color's ARGB values using an ARGB.                                                         |
+    ; .MakeARGB(a ,r    Creates an ARGB value using an alpha, red, green, and blue value.                               |
+    ;          ,g ,b)                                                                                                   |
+    ;                                                                                                                   |
+    ; Remarks           An ARGB is a hex number containing 4 values. Alpha, Red, Green, and Blue: 0xAARRGGBB            |
+    ;                   Alpha, Red, Green, and Blue values less than 0 are set to 0 & greater than 255 are set to 255.  |
+    ;                   Gray and grey are both supported for colors. Ex: DarkGray and DarkGrey both Return 0xFFA9A9A9   |
+    ;___________________________________________________________________________________________________________________|
 
     ;-----------------------------------------------------------------------------
     ;enum CurveAdjustments
@@ -2503,39 +2537,39 @@ Class GDIP
         
         nativeEffect[] ; ptr
         {
-            Set{
-            }
             Get{
-                Static ptr := ""
-                Return (ptr) ? ptr+0 : (ptr := this.GetAddress(""))
+                Return this._nativeEffect+0
+            }
+            Set{
             }
         }
         
         auxData[] ; ptr
         {
-            Set{
-            }
             Get{
-                Static ptr := ""
-                Return (ptr) ? ptr+0 : (ptr := this.GetAddress("_struct"))
+                Return this._auxData+0
+            }
+            Set{
             }
         }
         
         auxDataSize[] ; int
         {
             Get{
-                Return this._auxDataSize
+                Return NumGet(this._auxDataSizePtr, 0, "Int")
             }
             Set{
+                NumPut(value, this._auxDataSizePtr, 0, "Int")
             }
         }
         
         useAuxData[] ; BOOL (int)
         {
             Get{
-                Return this._useAuxData
+                Return NumGet(this._useAuxDataPtr, 0, "Int")
             }
             Set{
+                NumPut((value ? 1 : 0), this._useAuxDataPtr, 0, "Int")
             }
         }
         
@@ -2545,10 +2579,12 @@ Class GDIP
             ;~ ,this.SetCapacity("_auxDataSize", 4)
             ;~ ,this.SetCapacity("_nativeEffect", A_PtrSize)
             ;~ ,this.SetCapacity("_useAuxData", 4)
-             this._auxData      := 0
-            ,this._auxDataSize  := 0
-            ,this._nativeEffect := 0
-            ,this._useAuxData   := 0
+             this._nativeEffect := 0                ; Ptr
+            ,this._auxData      := 0                ; Ptr
+            ,this.SetCapacity("_auxDataSize", 4)    ; Int
+            ,this._auxDataSizePtr := this.GetAddress("_auxDataSize")
+            ,this.SetCapacity("_useAuxData", 4)     ; Int
+            ,this._useAuxDataPtr := this.GetAddress("_useAuxData")
         }
         
         ;virtual ~Effect()
@@ -5793,7 +5829,6 @@ data_type_size(type)
     ; Return                                                                                                            |
     ;___________________________________________________________________________________________________________________|
     
-
 
 
 
