@@ -91,6 +91,10 @@
         Got most of the Pen Class done
             Have not done any testing on it
         Reorganized code to be more inline with GDIP's C++ wrapper
+    20210902
+        Rewrote some code fixing an error I made with Static vars
+        Implemented setter and getter prpoperties
+            Rewrote a lot of code to due to the new set/get props
 */
 
 #Warn
@@ -221,8 +225,8 @@ Class GDIP
              , DWORD                := "Int"
              , DWORDLONG            := "Int64"
         
-        Static ARGB                 := DWORD
-             , ARGB64               := DWORDLONG
+        Static ARGB                 := "Int"
+             , ARGB64               := "Int64"
              , PixelFormat          := "Int"
              , GraphicsState        := "UInt"
              , GraphicsContainer    := "UInt"
@@ -493,8 +497,6 @@ Class GDIP
              , PropertyTagGpsAreaInformation        := 0x001C
              , PropertyTagGpsDate                   := 0x001D
              , PropertyTagGpsDifferential           := 0x001E
-        
-        Static GDIP_EMFPLUSFLAGS_DISPLAY := 0x00000001
     }
     
     ;####################################################################################################################
@@ -1375,7 +1377,8 @@ Class GDIP
     ; Properties:                                                                                                       |
     ; .X                X coord                                                                                         |
     ; .Y                Y coord                                                                                         |
-    ; ._float           Set to 1 if Point is of Float type. Default is 0 which is Int.                                  |
+    ; .Struct           Stores pointer to the Point struct                                                              |
+    ; .IsFloat          Set to true if numbers are to be treated as float type. Default is 0.                           |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Point()           Set X and Y to 0                                                                                |
@@ -1384,7 +1387,6 @@ Class GDIP
     ; Point(Size)       Set X to Size.width and Y to Size.height                                                        |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct()         Create struct and Return pointer to it.                                                         |
     ; .Plus(Point)      Return a new Point object with Point and NativePoint values summed                              |
     ; .Minus(Point)     Return a new Point object with Point and NativePoint values differenced                         |
     ; .Equals(Point)    Return True if Point and NativePoint have equal values                                          |
@@ -1393,10 +1395,48 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Class Point
     {
-        _type  := "Point"
-        _float := 0
-        Width  := ""
-        Height := ""
+        _type   := "Point"
+        ,_float := 0
+        ,_ptr   := ""
+        
+        X[]
+        {
+            Get{
+                Return NumGet(this.struct, 0, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this.struct, 0, this._float ? "Float" : "Int")
+            }
+        }
+        
+        Y[]
+        {
+            Get{
+                Return NumGet(this.struct, 0, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this.struct, 0, this._float ? "Float" : "Int")
+            }
+        }
+        
+        IsFloat[]
+        {
+            Get{
+                Return this._float
+            }
+            Set{
+                this._float := (value) ? 1 : 0
+            }
+        }
+        
+        Struct[]
+        {
+            Get{
+                Return this._ptr+0
+            }
+            Set{
+            }
+        }
         
         ; ## Constructor ##
         ; Point()
@@ -1406,48 +1446,22 @@ Class GDIP
         __New(x="", y="")
         {
              this.SetCapacity("_struct", 8)
-            ,this.structP := this.GetAddress("_struct")
-            
-            ,(x = "" && y = "")                     ; empty
-                ? this._set_xy(0, 0)
-            : (GDIP.is_num(x) && GDIP.is_num(y))    ; numbers
-                ? this._set_xy(x, y)
-            : (x._type == "Point" && y = "")        ; Point
-                ? this._set_xy(x.X, x.Y)
-            : (x._type == "Size" && y = "")         ; Size
-                ? this._set_xy(x.Width, x.Height)
-            : GDIP.error_log(A_ThisFunc, "Point constructor error."
-                , "Empty: Point()`nFrom two numbers: Point(x, y)"
-                . "`nFrom another Point: Point(Point)`nFrom a Size: Point(Size)"
-                , {p1:w, p2:h})
+            ,this._ptr := this.GetAddress("_struct")
+            ,(GDIP.is_num(x) && GDIP.is_num(y)) ; x and y nums
+                ? (this.X := x, this.Y := y)
+            : (x._type == "Point")              ; Point
+                ? (this.X := x.X, this.Y := x.Y)
+            : (x._type == "Size")               ; Size
+                ? (this.X := x.Width, this.Y := x.Height)
+            : (this.X := 0, this.Y := 0)        ; Default 0,0 point
         }
         
         Show()
         {
-            ptr := this.Struct()
-            ,type := (this._float) ? "Float" : "Int"
             MsgBox, % this._type " Object:"
-                . "`nthis.X: "       this.X
-                . "`nthis.Y: "       this.Y
-                . "`nthis.structP: " this.structP
-                . "`nSturct x: "     NumGet(ptr, 0, type)
-                . "`nSturct y: "     NumGet(ptr, 4, type)
-            Return
-        }
-        
-        _set_xy(x, y)
-        {
-             this.X := x
-            ,this.Y := y
-        }
-        
-        ; Return    Pointer to struct
-        Struct()
-        {
-             type := (this._float) ? "Float" : "Int"
-            ,NumPut(this.X, this.structP+0, 0, type)
-            ,NumPut(this.Y, this.structP+0, 4, type)
-            Return structP+0
+                . "`nX Location:`t" this.Width
+                . "`nY Location:`t" this.Height
+                . "`nStruct Ptr:`t" this.Struct
         }
         
         Plus(Point)
@@ -1473,7 +1487,8 @@ Class GDIP
     ; Properties:                                                                                                       |
     ; .Width            Size Width                                                                                      |
     ; .Height           Size Height                                                                                     |
-    ; ._float           Set to 1 if Size is of Float type. Default is 0 which is Int.                                   |
+    ; .Struct           Stores pointer to the Size struct                                                               |
+    ; .IsFloat          Set to true if numbers are to be treated as float type. Default is 0.                           |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Size()            Set Width and Height to 0                                                                       |
@@ -1481,7 +1496,6 @@ Class GDIP
     ; Size(Size)        Set Width to Size.Width and Height to Size.Height                                               |
     ;                                                                                                                   |
     ; Methods:                                                                                                          |
-    ; .Struct(type)     Create struct a struct and Return pointer to it.                                                |
     ; .Plus(Size)       Return a new Size object with sum of Size and NativeSize values                                 |
     ; .Minus(Size)      Return a new Size object with difference of NativeSize and Size values                          |
     ; .Equals(Size)     Return True if Size and NativeSize have equal values                                            |
@@ -1491,57 +1505,70 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Class Size
     {
-        _type  := "Size"
-        _float := 0
-        Width  := ""
-        Height := ""
+        _type   := "Size"
+        ,_float := 0
+        ,_ptr   := ""
+        
+        Width[]
+        {
+            Get{
+                Return NumGet(this.struct, 0, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this.struct, 0, this._float ? "Float" : "Int")
+            }
+        }
+        
+        Height[]
+        {
+            Get{
+                Return NumGet(this.struct, 0, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this.struct, 0, this._float ? "Float" : "Int")
+            }
+        }
+        
+        IsFloat[]
+        {
+            Get{
+                Return this._float
+            }
+            Set{
+                this._float := (value) ? 1 : 0
+            }
+        }
+        
+        Struct[]
+        {
+            Get{
+                Return this._ptr+0
+            }
+            Set{
+            }
+        }
         
         ; ## Constructor ##
-        ; Size()
-        ; Size(width, height)
         ; Size(Size)
+        ; Size(width, height)
+        ; Size()
         __New(w="", h="")
         {
              this.SetCapacity("_struct", 8)
-            ,this.structP := this.GetAddress("_struct")
-            
-            ,(w = "" && h = "")
-                ? this._set_wh(0, 0)
-            : (GDIP.is_num(w) && GDIP.is_num(h))
-                ? this._set_wh(w, h)
-            : (w._type == "Size" && h = "")
-                ? this._set_wh(w.Width, w.Height)
-            : GDIP.error_log(A_ThisFunc, "Size constructor error."
-                  , "Empty: Size()`nFrom two numbers: Size(width, height)"
-                  . "`nFrom another Size: Size(Size)", {p1:w, p2:h})
+            ,this._ptr := this.GetAddress("_struct")
+            ,(w._type == "Size") ; SizeObj
+                ? (this.Width := w.Width, this.Height := w.Height)
+            : (GDIP.is_num(w) && GDIP.is_num(h)) ; 2 nums
+                ? (this.Width := w, this.Height := h)
+            : (this.Width := 0, this.Height := 0)   ; Default (0 size)
         }
         
-        Show(type="")
+        Show()
         {
-            ptr := this.Struct()
-            ,type := (this._float) ? "Float" : "Int"
-            MsgBox, % "Size Object:"
-                . "`nthis.Width: "    this.Width
-                . "`nthis.Height: "   this.Height
-                . "`nthis.structP: "  this.structP
-                . "`nSturct width: "  NumGet(ptr, 0, type)
-                . "`nSturct height: " NumGet(ptr, 4, type)
-            Return
-        }
-        
-        _set_wh(w, h)
-        {
-             this.Width  := w
-            ,this.Height := h
-        }
-        
-        ; type      Pass expected structure type
-        Struct(type="")
-        {
-             type := (this._float) ? "Float" : "Int"
-            ,NumPut(this.Width,  this.structP+0, 0, type)
-            ,NumPut(this.Height, this.structP+0, 4, type)
-            Return structP+0
+            MsgBox, % this._type " Object:"
+                . "`nSize Width:`t"  this.Width
+                . "`nSize Height:`t" this.Height
+                . "`nStruct Ptr:`t"  this.Struct
         }
         
         Plus(Size)
@@ -1575,10 +1602,11 @@ Class GDIP
     ; .Width            Rect Width including border                                                                     |
     ; .Height           Rect Height including border                                                                    |
     ; .Left             X coordinate of Left edge                                                                       |
-    ; .Top              Y coordinate of Top edge                                                                        |
     ; .Right            X coordinate of Right edge                                                                      |
+    ; .Top              Y coordinate of Top edge                                                                        |
     ; .Bottom           Y coordinate of Bottom edge                                                                     |
-    ; ._float           Set to 1 if Rect is of Float type. Default is 0 which is Int.                                   |
+    ; .IsFloat          Set to true if numbers are to be treated as float type. Default is 0.                           |
+    ; .Struct           Stores pointer to this Size struct                                                              |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
     ; Rect()            X, Y, Width, and Height = 0                                                                     |
@@ -1618,10 +1646,102 @@ Class GDIP
     {
          _type  := "Rect"
         ,_float := 0
-        ,X      := Left   := ""
-        ,Y      := Top    := ""
-        ,Width  := Right  := ""
-        ,Height := Bottom := ""
+        ,_ptr   := ""
+        
+        X[]
+        {
+            Get{
+                Return NumGet(this._ptr, 0, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this._ptr, 0, this._float ? "Float" : "Int")
+            }
+        }
+        
+        Y[]
+        {
+            Get{
+                Return NumGet(this._ptr, 4, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this._ptr, 4, this._float ? "Float" : "Int")
+            }
+        }
+        
+        Width[]
+        {
+            Get{
+                Return NumGet(this._ptr, 8, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this._ptr, 8, this._float ? "Float" : "Int")
+            }
+        }
+        
+        Height[]
+        {
+            Get{
+                Return NumGet(this._ptr, 12, this._float ? "Float" : "Int")
+            }
+            Set{
+                NumPut(value, this._ptr, 12, this._float ? "Float" : "Int")
+            }
+        }        
+        
+        Left[]
+        {
+            Get{
+                Return NumGet(this._ptr, 0, this._float ? "Float" : "Int")
+            }
+            Set{
+            }
+        }
+        
+        Right[]
+        {
+            Get{
+                Return (NumGet(this._ptr, 0, this._float ? "Float" : "Int") + NumGet(this._ptr, 8, this._float ? "Float" : "Int"))
+            }
+            Set{
+            }
+        }
+        
+        Top[]
+        {
+            Get{
+                Return NumGet(this._ptr, 4, this._float ? "Float" : "Int")
+            }
+            Set{
+            }
+        }
+        
+        Bottom[]
+        {
+            Get{
+                Return (NumGet(this._ptr, 4, this._float ? "Float" : "Int") + NumGet(this._ptr, 12, this._float ? "Float" : "Int"))
+            }
+            Set{
+            }
+        }
+        
+        IsFloat[]
+        {
+            Get{
+                Return this._float
+            }
+            Set{
+                this._float := (value) ? 1 : 0
+            }
+        }
+        
+        Struct[]
+        {
+            Get{
+                Return this._ptr+0
+            }
+            Set{
+            }
+        }
         
         ; ## Constructor ##
         ; Rect()
@@ -1630,72 +1750,26 @@ Class GDIP
         __New(x="", y="", w="", h="")
         {
             this.SetCapacity("_struct", 16)
-            ,this.structP := this.GetAddress("_struct")
-            
-            ,(x = "" && y = "" && w = "" && h = "")
-                ? this._set_xywh(0, 0, 0, 0)
+            ,this._ptr := this.GetAddress("_struct")
+            ,(x._type == "Point" && y._type == "Size")
+                ? (this.X := x.X, this.Y := x.Y, this.Width := y.Width, this.Height := y.Height)
             : (GDIP.is_num(x) && GDIP.is_num(y) && GDIP.is_num(w) && GDIP.is_num(h))
-                ? this._set_xywh(x, y, w, h)
-            : (x._type == "Point" && y._type == "Size" && w = "" && h = "")
-                ? this._set_xywh(x.X, x.Y, y.Width, y.Height)
-            : GDIP.error_log(A_ThisFunc, "Invalid Parameter", "Empty: Rect()"
-                . "`nNumbers: Rect(n1, n2, n3, n4)`nPoint and Size Object: Rect(Point, Size)"
-                , {p1:x, p2:y, p3:w, p4:h})
+                ? (this.X := x, this.Y := y, this.Width := w, this.Height := h)
+            : (this.X := 0, this.Y := 0, this.Width := 0, this.Height := 0)
         }
         
-        _set_xywh(x, y, w, h)
+        Show() ; Used for testing purposes
         {
-             this.Left   := this.X       := x
-            ,this.Top    := this.Y       := y
-            ,this.Right  := x + w
-            ,this.Bottom := y + h
-            ,this.Width  := w
-            ,this.Height := h
-        }
-        
-        _set_edge(l, t, r, b)
-        {
-             this.X      := this.Left    := l
-            ,this.Y      := this.Top     := t
-            ,this.Width  := (this.Right  := r) - l
-            ,this.Height := (this.Bottom := b) - t
-        }
-        
-        ; type      Pass expected structure type
-        ; Return    Pointer to struct
-        Struct(type="")
-        {
-             type := (this._float) ? "Float" : "Int"
-            ,NumPut(this.X,      this.structP+0,  0, type)
-            ,NumPut(this.Y,      this.structP+0,  4, type)
-            ,NumPut(this.Width,  this.structP+0,  8, type)
-            ,NumPut(this.Height, this.structP+0, 12, type)
-            Return structP+0
-        }
-        
-        Show(type="") ; Used for testing purposes
-        {
-            ptr := this.Struct()
-            ,type := (this._float) ? "Float" : "Int"
-            MsgBox, % this._type " object:"
-                . "`nthis.structP: "  this.structP
-                . "`nthis.X: "        this.X
-                . "`nthis.Y: "        this.Y
-                . "`nthis.Width: "    this.Width
-                . "`nthis.Height: "   this.Height
-                . "`nLeft: "          this.Left
-                . "`nTop: "           this.Top
-                . "`nRight: "         this.Right
-                . "`nBottom: "        this.Bottom
-                . "`nStruct X: "      (x := NumGet(ptr,  0, type))
-                . "`nStruct Y: "      (y := NumGet(ptr,  4, type))
-                . "`nStruct Width: "  (w := NumGet(ptr,  8, type))
-                . "`nStruct Height: " (h := NumGet(ptr, 12, type))
-                . "`nStruct Left: "   x
-                . "`nStruct Top: "    y
-                . "`nStruct Right: "  x+w
-                . "`nStruct Bottom: " y+h
-            Return
+            MsgBox, % this._type " Object:"
+                . "`nRect Location X: `t" this.X
+                . "`nRect Location Y: `t" this.Y
+                . "`nRect Size Width: `t" this.Width
+                . "`nRect Size Height:`t" this.Height
+                . "`nRect Edge Left:  `t" this.Left
+                . "`nRect Edge Right: `t" this.Right
+                . "`nRect Edge Top:   `t" this.Top
+                . "`nRect Edge Bottom:`t" this.Bottom
+                . "`nStruct Pointer:  `t" this.Struct
         }
         
         ; ## METHODS ##
@@ -1704,19 +1778,19 @@ Class GDIP
             Return new GDIP.Rect(this.X, this.Y, this.Width, this.Height)
         }
         
-        GetLocation(Point)
+        GetLocation(ByRef Point)
         {
-            Point._set_xy(this.X, this.Y)
+            Point.X := this.X, Point.Y := this.Y
         }
         
-        GetSize(Size)
+        GetSize(ByRef Size)
         {
-            Size._set_wh(this.Width, this.Height)
+            Size.Width := this.Width, Size.Height := this.Height
         }
         
-        GetBounds(Rect)
+        GetBounds(ByRef Rect)
         {
-            Rect._set_xywh(this.X, this.Y, this.Width, this.Height)
+            Rect.X := this.X, Rect.Y := this.Y, Rect.Width := this.Width, Rect.Height := this.Height
         }
         
         IsEmptyArea()
@@ -1732,32 +1806,22 @@ Class GDIP
         ; Contains(x, y)
         ; Contains(Point)
         ; Contains(Rect)
-        ; Return: 1 = True, 0 = False, "" = Error
         Contains(x, y="")
         {
             Return (x._type == "Point" && y = "") ; Point object
-                    ? (x.X >= this.X && x.Y >= this.Y && x.X < this.Right && x.Y < this.Bottom)
-                        ? 1 : 0
+                    ? (x.X >= this.X && x.Y >= this.Y && x.X < this.Right && x.Y < this.Bottom) ? 1 : 0
                 : (x._type == "Rect" && y = "") ; Rect object
-                    ? (Rect.X >= this.X && Rect.Y >= this.Y && Rect.X < this.Right && Rect.Y < this.Bottom)
-                        ? 1 : 0
-                : (x >= this.X && y >= this.Y && x < this.Right && y < this.Bottom) ; x,y coords
-                        ? 1 : 0
+                    ? (Rect.X >= this.X && Rect.Y >= this.Y && Rect.X < this.Right && Rect.Y < this.Bottom) ? 1 : 0
+                : (x >= this.X && y >= this.Y && x < this.Right && y < this.Bottom) ? 1 : 0 ; x,y coords
         }
         
         ; Inflate(dx, dy)
         ; Inflate(Point)
         Inflate(dx, dy="")
         {
-            (dx._type == "Point" && dy = "")
-                ? this._set_xywh(this.Width + (dx.X*2) ; Point object
-                                ,this.Height + (dx.Y*2)
-                                ,this.X - dx.X
-                                ,this.Y - dx.Y )
-                : this._set_xywh(this.Width + (dx*2) ; dx,dy
-                                ,this.Height + (dy*2)
-                                ,this.X - dx
-                                ,this.Y - dy )
+            (dx._type == "Point") ; Point object
+                ? (this.X -= dx.X, this.Y -= dx.Y, this.Width += (dx.X*2), this.Height += (dx.Y*2))
+                : (this.X -= dx,   this.Y -= dy,   this.Width += (dx*2),   this.Height += (dy*2))
         }
         
         ; Intersect(Rect)
@@ -1765,44 +1829,41 @@ Class GDIP
         ; Return        0 = Empty, 1 = Not Empty, "" = Error
         Intersect(Rect1, Rect2="", ByRef RectOut="")
         {
-            (Rect1._type == "Rect" && Rect2 = "" && RectOut = "") ; Rect object
-                ? (this._set_edge(GDIP.get_max(this.Left  , Rect1.Left  )
-                                 ,GDIP.get_max(this.Top   , Rect1.Top   )
-                                 ,GDIP.get_min(this.Right , Rect1.Right )
-                                 ,GDIP.get_min(this.Bottom, Rect1.Bottom) )
-                  ,status := !this.IsEmptyArea() )
-                : (RectOut._set_edge(GDIP.get_max(Rect1.Left  , Rect2.Left  )
-                                    ,GDIP.get_max(Rect1.Top   , Rect2.Top   )
-                                    ,GDIP.get_min(Rect1.Right , Rect2.Right )
-                                    ,GDIP.get_min(Rect1.Bottom, Rect2.Bottom) )
-                  ,status := !RectOut.IsEmptyArea() )
-            
+            (Rect2 = "" && RectOut = "") ; Rect object
+                ? (this.X      := GDIP.get_max(this.X      ,Rect1.X)
+                  ,this.Y      := GDIP.get_max(this.Y      ,Rect1.Y)
+                  ,this.Width  := GDIP.get_min(this.Right  ,Rect1.Right)  - this.X
+                  ,this.Height := GDIP.get_min(this.Bottom ,Rect1.Bottom) - this.Y
+                  ,status      := !this.IsEmptyArea() )
+                : (RectOut.X      := GDIP.get_max(Rect1.X      ,Rect2.X)
+                  ,RectOut.Y      := GDIP.get_max(Rect1.Y      ,Rect2.Y)
+                  ,RectOut.Width  := GDIP.get_min(Rect1.Right  ,Rect2.Right)  - RectOut.X
+                  ,RectOut.Height := GDIP.get_min(Rect1.Bottom ,Rect2.Bottom) - RectOut.Y
+                  ,status         := !RectOut.IsEmptyArea() )
             Return status
         }
         
         IntersectsWith(Rect)
         {
             Return ((this.Left   < Rect.Right )
-                &&  (this.Top    > Rect.Bottom)
-                &&  (this.Right  > Rect.Left  )
-                &&  (this.Bottom < Rect.Top   ) ) ? 1 : 0
+                 && (this.Top    > Rect.Bottom)
+                 && (this.Right  > Rect.Left  )
+                 && (this.Bottom < Rect.Top   ) ) ? 1 : 0
         }
         
-        ; Return        0 = Empty, 1 = Not Empty, "" = Error
         Union(Rect1, Rect2="", ByRef RectOut="")
         {
-            (Rect1._type == "Rect" && Rect2 = "" && RectOut = "") ; Rect object
-                ? (this._set_edge(GDIP.get_min(this.Left  , Rect1.Left  )
-                                 ,GDIP.get_min(this.Top   , Rect1.Top   )
-                                 ,GDIP.get_max(this.Right , Rect1.Right )
-                                 ,GDIP.get_max(this.Bottom, Rect1.Bottom) )
-                  ,status := !this.IsEmptyArea() )
-                : (RectOut._set_edge(GDIP.get_min(Rect1.Left  , Rect2.Left  )
-                                    ,GDIP.get_min(Rect1.Top   , Rect2.Top   )
-                                    ,GDIP.get_max(Rect1.Right , Rect2.Right )
-                                    ,GDIP.get_max(Rect1.Bottom, Rect2.Bottom) )
-                  ,status := !this.IsEmptyArea() )
-            
+            (Rect2 = "" && RectOut = "") ; Rect object
+                ? (this.X      := GDIP.get_min(this.X      ,Rect1.X)
+                  ,this.Y      := GDIP.get_min(this.Y      ,Rect1.Y)
+                  ,this.Width  := GDIP.get_max(this.Right  ,Rect1.Right)  - this.X
+                  ,this.Height := GDIP.get_max(this.Bottom ,Rect1.Bottom) - this.Y
+                  ,status      := !this.IsEmptyArea() )
+                : (RectOut.X      := GDIP.get_min(Rect1.X      ,Rect2.X)
+                  ,RectOut.Y      := GDIP.get_min(Rect1.Y      ,Rect2.Y)
+                  ,RectOut.Width  := GDIP.get_max(Rect1.Right  ,Rect2.Right)  - RectOut.X
+                  ,RectOut.Height := GDIP.get_max(Rect1.Bottom ,Rect2.Bottom) - RectOut.Y
+                  ,status         := !RectOut.IsEmptyArea() )
             Return status
         }
         
@@ -1810,9 +1871,9 @@ Class GDIP
         ; Offset(Point)
         Offset(dx, dy="")
         {
-            (dx._type = "Point" && y = "")
-                ? this._set_xywh(this.X + dx.X, this.Y + dx.Y, this.width, this.height)
-                : this._set_xywh(this.X + dx  , this.Y + dy  , this.width, this.height)
+            (dx._type == "Point")
+                ? (this.X += dx.X, this.Y += dx.Y)
+                : (this.X += dx,   this.Y += dy)
         }
     }
     
@@ -1821,7 +1882,6 @@ Class GDIP
     ;-------------------------------------------------------------------------------------------------------------------.
     ; GdiplusColor.h                                                                                                    |
     ;___________________________________________________________________________________________________________________|
-    
     ;-------------------------------------------------------------------------------------------------------------------.
     ; Color Class - Stores a 32 bit value tha represents Alpha, Red, Blue, and Green values.                            |
     ;-------------------------------------------------------------------------------------------------------------------|
@@ -1831,6 +1891,7 @@ Class GDIP
     ; .R                Red value. 0-255                                                                                |
     ; .G                Green value. 0-255                                                                              |
     ; .B                Blue value. 0-255                                                                               |
+    ; .ARGB             A R B G values in AARRBBGG form (Identical to .GetValue() method)                               |
     ; .Struct           Stores the pointer for the struct                                                               |
     ;                                                                                                                   |
     ; Constructors:                                                                                                     |
@@ -1845,8 +1906,8 @@ Class GDIP
     ; .GetRed(hex)      Returns Red value.                                                                              |
     ; .GetGreen(hex)    Returns Green value.                                                                            |
     ; .GetBlue(hex)     Returns Blue value.                                                                             |
-    ; .GetValue()       Returns an ARBG value.                                                                          |
-    ; .SetValue(argb)   Sets color's ARGB values using an ARGB.                                                         |
+    ; .GetValue()       Returns an ARGB value.                                                                          |
+    ; .SetValue(ARGB)   Sets color's ARGB values using an ARGB.                                                         |
     ; .MakeARGB(a ,r    Creates an ARGB value using an alpha, red, green, and blue value.                               |
     ;          ,g ,b)                                                                                                   |
     ;                                                                                                                   |
@@ -1857,28 +1918,63 @@ Class GDIP
     Class Color
     {
         _type := "Color"
-        ,A    := ""
-        ,R    := ""
-        ,G    := ""
-        ,B    := ""
-        _ptr[]
+        
+        A[]
         {
+            Set{
+                NumPut(value, this._ptr, 3, "UChar")
+            }
             Get{
-                Return value+0
+                Return NumGet(this._ptr, 3, "UChar")
             }
         }
-        struct[]
+        
+        R[]
         {
-            Get {
-                 NumPut(this.B, this._ptr, 0, "UChar")
-                ,NumPut(this.G, this._ptr, 1, "UChar")
-                ,NumPut(this.R, this._ptr, 2, "UChar")
-                ,NumPut(this.A, this._ptr, 3, "UChar")
-                Return this._ptr
+            Set{
+                NumPut(value, this._ptr, 2, "UChar")
             }
-            
-            Set {
-                Return
+            Get{
+                Return NumGet(this._ptr, 2, "UChar")
+            }
+        }
+        
+        G[]
+        {
+            Set{
+                NumPut(value, this._ptr, 1, "UChar")
+            }
+            Get{
+                Return NumGet(this._ptr, 1, "UChar")
+            }
+        }
+        
+        B[]
+        {
+            Set{
+                NumPut(value, this._ptr, 0, "UChar")
+            }
+            Get{
+                Return NumGet(this._ptr, 0, "UChar")
+            }
+        }
+        
+        ARGB[]
+        {
+            Set{
+                this.SetValue(value)
+            }
+            Get{
+                Return this.GetValue(this.A, this.R, this.G, this.B)
+            }
+        }
+        
+        Struct[]
+        {
+            Set{
+            }
+            Get{
+                Return this._ptr
             }
         }
         
@@ -1976,64 +2072,30 @@ Class GDIP
             , Thistle           = 0xFFD8BFD8    , Sienna               = 0xFFA0522D
             , Violet            = 0xFFEE82EE    , Tan                  = 0xFFD2B48C
         
-        ; Masks and bitshifts for ARGB
-        Static A_Mask  := 0xFF000000
-             , R_Mask  := 0x00FF0000
-             , G_Mask  := 0x0000FF00
-             , B_Mask  := 0x000000FF
-             , A_Shift := 24
-             , R_Shift := 16
-             , G_Shift := 8
-             , B_Shift := 0
-        
-        ; Color()
+        ; Color(alpha, red, blue, green)
+        ; Color(red, blue, green)
         ; Color(ColorObject)
         ; Color(ARGB)
-        ; Color(red, blue, green)
-        ; Color(alpha, red, blue, green)
+        ; Color()
         __New(a="", r="", g="", b="")
         {
             this.SetCapacity("_struct", 4)
-            ,this._ptr := this.GetAddress("_struct")
-            ,(a._type == "Color" && r = "" && g = "" && b = "")     ; Color object
-                ? this._set_color(a.A, a.R, a.G, a.B)
-            : ((a >= 0 && a <= 0xFFFFFFFF) && r="" && g="" && b="") ; ARGB (0xAARRGGBB)
-                ? this.SetValue(a)
-            : (a="" && r="" && g="" && b="")                        ; All Empty
-                ? this._set_color(255, 0, 0, 0)
-            : (b = "")                                              ; R G B values
-                ? this._set_color(255, a, r, g)
-                : this._set_color(a, r, g, b)                       ; A R G B values 
+            , (b != "")            ? (this.A := a   ,this.R := r   ,this.G := g   ,this.B := b)   ; A R G B values
+            : (g != "")            ? (this.A := 255 ,this.R := a   ,this.G := r   ,this.B := g)   ;   R G B values
+            : (a._type == "Color") ? (this.A := a.A ,this.R := a.R ,this.G := a.G ,this.B := a.B) ; Color Object
+            : (a != "")            ? this.SetValue(a)                                             ; ARGB (0xAARRGGBB)
+            :                        (this.A := 0   ,this.R := 0   ,this.G := 0   ,this.B := 0)   ; Default Solid Black
         }
         
-        ; Remark: Values fallling out of the 0-255 range will be rounded
-        _set_color(a, r, g, b)
+        Show() ; Used for testing purposes
         {
-             this.A := (a < 0) ? 0 : (a > 255) ? 255 : a
-            ,this.R := (r < 0) ? 0 : (r > 255) ? 255 : r
-            ,this.G := (g < 0) ? 0 : (g > 255) ? 255 : g
-            ,this.B := (b < 0) ? 0 : (b > 255) ? 255 : b
-        }
-        
-        Show()
-        {
-            ptr   := this.Struct()
-            ,a    := NumGet(ptr+0, 3, "UChar")
-            ,r    := NumGet(ptr+0, 2, "UChar")
-            ,g    := NumGet(ptr+0, 1, "UChar")
-            ,b    := NumGet(ptr+0, 0, "UChar")
-            ,argb := this.GetValue()
-            MsgBox, % this._type " object:"
-                . "`n_ptr: "   this._ptr
-                . "`nA: "         GDIP.to_hex(this.A) " | " this.A
-                . "`nR: "         GDIP.to_hex(this.R) " | " this.R
-                . "`nB: "         GDIP.to_hex(this.B) " | " this.B
-                . "`nG: "         GDIP.to_hex(this.G) " | " this.G
-                . "`nNumGet A: "  GDIP.to_hex(a) " | " a
-                . "`nNumGet R: "  GDIP.to_hex(r) " | " r
-                . "`nNumGet G: "  GDIP.to_hex(g) " | " g
-                . "`nNumGet B: "  GDIP.to_hex(b) " | " b
-                . "`nARBG: "      GDIP.to_hex(argb) " | " argb
+            MsgBox, % this._type " Object:"
+                . "`nAlpha: `t" this.A
+                . "`nRed:   `t" this.R
+                . "`nGreen: `t" this.G
+                . "`nBlue:  `t" this.B
+                . "`nARGB:  `t" this.ARGB
+                . "`nStruct:`t" this.Struct
         }
         
         GetAlpha(hex=0) {
@@ -2053,27 +2115,25 @@ Class GDIP
         }
         
         GetValue(hex=0) {
-            argb := (this.A << this.A_Shift)
-                 +  (this.R << this.R_Shift)
-                 +  (this.G << this.G_Shift)
-                 +   this.B
-            Return (hex ? GDIP.to_hex(argb) : argb)
+            Return (hex)
+                ? GDIP.to_hex(this.MakeARGB(this.A, this.R, this.G, this.B))
+                : this.MakeARGB(this.A, this.R, this.G, this.B)
         }
         
         SetValue(argb) {
-             this.A := (argb & this.A_Mask) >> this.A_Shift
-            ,this.R := (argb & this.R_Mask) >> this.R_Shift
-            ,this.G := (argb & this.G_Mask) >> this.G_Shift
-            ,this.B := (argb & this.B_Mask)
+             this.A := (argb & 0xFF000000) >> 24
+            ,this.R := (argb & 0x00FF0000) >> 16
+            ,this.G := (argb & 0x0000FF00) >> 8
+            ,this.B := (argb & 0x000000FF)
         }
         
-        ; Takes four 8-bit values (0-255) and returns a 32-bit combined
+        ; Takes four 8-bit values (0-255) and returns a 32-bit AARRGGBB value
         MakeARGB(a, r, g, b)
         {
-            Return ( (a << this.A_Shift)
-                   + (r << this.R_Shift)
-                   + (g << this.G_Shift)
-                   +  b )
+            Return ( ((a & 0xFF) << 24)
+                   + ((r & 0xFF) << 16)
+                   + ((g & 0xFF) << 8)
+                   +  (b & 0xFF) )
         }        
     }
     
@@ -2370,8 +2430,7 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Class ColorMatrix
     {
-        _type   := "ColorMatrix"
-        _dt     := "Float"
+        _type  := "ColorMatrix"
         __New()
         {
             this.matrix := {0:{0:0, 1:0, 2:0, 3:0, 4:0}
@@ -2411,54 +2470,85 @@ Class GDIP
     ;    CurveChannelBlue
     ;};
     
-    Class CGpEffect
-    {
-        ; Constructor
-        GdipCreateEffect(const GUID guid, CGpEffect **effect);
-        ; Destructor
-        GdipDeleteEffect(CGpEffect *effect);
-        ; Get size
-        GdipGetEffectParameterSize(CGpEffect *effect, UINT *size);
-        ; Get param
-        GdipGetEffectParameters(CGpEffect *effect, UINT *size, VOID *params);
-        ; Set param
-        GdipSetEffectParameters(CGpEffect *effect, const VOID *params, const UINT size);
-    }
+    ;~ Class CGpEffect
+    ;~ {
+        ;~ ; Constructor
+        ;~ GdipCreateEffect(const GUID guid, CGpEffect **effect);
+        ;~ ; Destructor
+        ;~ GdipDeleteEffect(CGpEffect *effect);
+        ;~ ; Get size
+        ;~ GdipGetEffectParameterSize(CGpEffect *effect, UINT *size);
+        ;~ ; Get param
+        ;~ GdipGetEffectParameters(CGpEffect *effect, UINT *size, VOID *params);
+        ;~ ; Set param
+        ;~ GdipSetEffectParameters(CGpEffect *effect, const VOID *params, const UINT size);
+    ;~ }
     
     Class Effect
     {
-        ;-----------------------------------------------------------------------------
-        ; GDI+ effect GUIDs                    xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  
-        ;-----------------------------------------------------------------------------
-         BlurEffectGuid                   := "{633C80A4-1843-482b-9EF2-BE2834C5FDD4}"
-        ,SharpenEffectGuid                := "{63CBF3EE-C526-402c-8F71-62C540BF5142}"
-        ,ColorMatrixEffectGuid            := "{718F2615-7933-40e3-A511-5F68FE14DD74}"
-        ,ColorLUTEffectGuid               := "{A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}"
-        ,BrightnessContrastEffectGuid     := "{D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}"
-        ,HueSaturationLightnessEffectGuid := "{8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}"
-        ,LevelsEffectGuid                 := "{99C354EC-2A31-4f3a-8C34-17A803B33A25}"
-        ,TintEffectGuid                   := "{1077AF00-2848-4441-9489-44AD4C2D7A2C}"
-        ,ColorBalanceEffectGuid           := "{537E597D-251E-48da-9664-29CA496B70F8}"
-        ,RedEyeCorrectionEffectGuid       := "{74D29D05-69A4-4266-9549-3CC52836B632}"
-        ,ColorCurveEffectGuid             := "{DD6A0022-58E4-4a67-9D9B-D48EB881A53D}"
+        ;----------------------------------------------------------------------------------
+        ; GDI+ effect GUIDs                          xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  
+        ;----------------------------------------------------------------------------------
+        Static BlurEffectGuid                   := "{633C80A4-1843-482b-9EF2-BE2834C5FDD4}"
+             , SharpenEffectGuid                := "{63CBF3EE-C526-402c-8F71-62C540BF5142}"
+             , ColorMatrixEffectGuid            := "{718F2615-7933-40e3-A511-5F68FE14DD74}"
+             , ColorLUTEffectGuid               := "{A7CE72A9-0F7F-40d7-B3CC-D0C02D5C3212}"
+             , BrightnessContrastEffectGuid     := "{D3A1DBE1-8EC4-4c17-9F4C-EA97AD1C343D}"
+             , HueSaturationLightnessEffectGuid := "{8B2DD6C3-EB07-4d87-A5F0-7108E26A9C5F}"
+             , LevelsEffectGuid                 := "{99C354EC-2A31-4f3a-8C34-17A803B33A25}"
+             , TintEffectGuid                   := "{1077AF00-2848-4441-9489-44AD4C2D7A2C}"
+             , ColorBalanceEffectGuid           := "{537E597D-251E-48da-9664-29CA496B70F8}"
+             , RedEyeCorrectionEffectGuid       := "{74D29D05-69A4-4266-9549-3CC52836B632}"
+             , ColorCurveEffectGuid             := "{DD6A0022-58E4-4a67-9D9B-D48EB881A53D}"
         
-        ;protected data members.
-        ;~ CGpEffect *nativeEffect;
-        ;~ INT auxDataSize;
-        ;~ VOID *auxData;
-        ;~ BOOL useAuxData;
-        
-        Static nativeEffect = ""        ; ptr
-             , auxDataSize  = 0         ; int
-             , auxData      = ""        ; ptr
-             , useAuxData   = 0         ; bool
-        
-        Effect()
+        nativeEffect[] ; ptr
         {
-             this.auxDataSize  := 0
-            ,this.auxData      := ""
-            ,this.nativeEffect := ""
-            ,this.useAuxData   := 0
+            Set{
+            }
+            Get{
+                Static ptr := ""
+                Return (ptr) ? ptr+0 : (ptr := this.GetAddress(""))
+            }
+        }
+        
+        auxData[] ; ptr
+        {
+            Set{
+            }
+            Get{
+                Static ptr := ""
+                Return (ptr) ? ptr+0 : (ptr := this.GetAddress("_struct"))
+            }
+        }
+        
+        auxDataSize[] ; int
+        {
+            Get{
+                Return this._auxDataSize
+            }
+            Set{
+            }
+        }
+        
+        useAuxData[] ; BOOL (int)
+        {
+            Get{
+                Return this._useAuxData
+            }
+            Set{
+            }
+        }
+        
+        __New()
+        {
+             ;~ this.SetCapacity("_auxData", A_PtrSize)
+            ;~ ,this.SetCapacity("_auxDataSize", 4)
+            ;~ ,this.SetCapacity("_nativeEffect", A_PtrSize)
+            ;~ ,this.SetCapacity("_useAuxData", 4)
+             this._auxData      := 0
+            ,this._auxDataSize  := 0
+            ,this._nativeEffect := 0
+            ,this._useAuxData   := 0
         }
         
         ;virtual ~Effect()
@@ -2490,59 +2580,95 @@ Class GDIP
         }
         
         ;Status GetParameterSize(UINT *size)
-        GetParameterSize(size) ; ptr to size
+        _GetParameterSize(size) ; ptr to size
         {
             Return DllCall("gdiplus\GdipGetEffectParameterSize"
                           ,this.Ptr    ,this.nativeEffect
-                          ,this.Ptr    ,this.size)
+                          ,this.Ptr    ,this.size+0)
         }
         
         ;Status SetParameters(const void *params, const UINT size)
-        SetParameters(params, size) ; ptr, uint
+        _SetParameters(params, size) ; ptr, uint
         {
             Return DllCall("gdiplus\GdipSetEffectParameters"
                           ,this.Ptr    ,this.nativeEffect
-                          ,this.Ptr    ,params
+                          ,this.Ptr    ,params+0
                           ,"UInt"      ,size)
         }
         
         ;Status GetParameters(UINT *size, void *params)
-        GetParameters(size, params) ; uint, ptr
+        _GetParameters(size, params) ; uint, ptr
         {
             Return DllCall("gdiplus\GdipGetEffectParameters"
                           ,this.Ptr    ,this.nativeEffect
                           ,"UInt"      ,size
-                          ,this.Ptr    ,params)
+                          ,this.Ptr    ,params+0)
         }
         
         ; Effect sublcasses
-        
         ; Blur
         Class Blur Extends Effect
         {
             ;struct BlurParams
-            ;{
-            ;    float radius;
-            ;    BOOL expandEdge;
-            ;};
+            ;    float radius;      4
+            ;    BOOL expandEdge;   4
             
-             radius     := ""
-            ,expandEdge := ""
-            
-            __New()
+            radius[]
             {
-                DllCall("gdiplus\GdipCreateEffect"
-                       ,this.Ptr    ,this.BlurEffectGuid
-                       ,this.Ptr    ,this.nativeEffect)
+                Get {
+                    Return NumGet(this._ptr, 0, "Float")
+                }
+                Set {
+                    NumPut(value, this._ptr, 0, "Float")
+                }
+            }
+            
+            expandEdge[]
+            {
+                Get {
+                    Return NumPut(this._ptr, 4, "Int")
+                }
+                Set {
+                    NumPut((value ? 1 : 0), this._ptr, 4, "Int")
+                }
+            }
+            
+            _ptr[]
+            {
+                Get {
+                    Static ptr := ""
+                    Return (ptr) ? ptr+0 : (ptr := this.GetAddress("_struct"))+0
+                }
+                Set {
+                    Return
+                }
+            }
+            
+            Struct[]
+            {
+                Get {
+                    Return this._ptr
+                }
+                Set {
+                    Return
+                }
+            }
+            
+            __New(radius=0, expandEdge=0)
+            {
+                this.SetCapacity("_struct", 8)
+                ,DllCall("gdiplus\GdipCreateEffect"
+                        ,this.Ptr    ,this.BlurEffectGuid
+                        ,this.Ptr    ,this.nativeEffect)
+                ,(r>0) ? this.SetParameters(radius, (expandEdge ? 1 : 0)) : ""
             }
             
             ;Status SetParameters(const BlurParams *parameters)
-            SetParameters(parameters) ; ptr
+            SetParameters(radius, expandEdge) ; ptr
             {
-                UINT size = sizeof(BlurParams);
-                Return DllCall("gdiplus\SetParameters"
-                              ,this.Ptr    ,parameters
-                              ,"UInt"      ,&size)
+                ;UINT size = sizeof(BlurParams);
+                this.Radius := radius, this.expandEdge := expandEdge
+                Return this._SetParameters(this._ptr, VarSetCapacity(this._ptr))
             }
             
             ;Status GetParameters(UINT *size, BlurParams *parameters)
@@ -2550,7 +2676,7 @@ Class GDIP
             {
                 Return DllCall("gdiplus\GetParameters"
                               ,"UInt"    ,size
-                              ,this.Ptr  ,parameters)
+                              ,this.Ptr  ,&parameters)
             }
         }
         
@@ -2558,15 +2684,47 @@ Class GDIP
         Class Sharpen Extends Effect
         {
             ;struct SharpenParams
-            ;{
-            ;    float radius;
-            ;    float amount;
-            ;};
+            ;    float radius; 4
+            ;    float amount; 4
+            
+            radius[]
+            {
+                Get {
+                    Return NumGet(this._ptr, 0, "Float")
+                }
+                
+                Set {
+                    NumPut(value, this._ptr, 0, "Float")
+                }
+            }
+            
+            amount[]
+            {
+                Get {
+                    Return NumPut(this._ptr, 4, "Float")
+                }
+                
+                Set {
+                    NumPut(value, this._ptr, 4, "Float")
+                }
+            }
+            
+            _ptr[]
+            {
+                Get {
+                    Static ptr := ""
+                    Return (ptr) ? ptr+0 : (ptr := this.GetAddress("_struct"))+0
+                }
+                
+                Set {
+                }
+            }
             
             __New()
             { 
-                DllCall("gdiplus\GdipCreateEffect"
-                       ,(SharpenEffectGuid, &nativeEffect);
+                this.SetCapacity("_struct", 8)
+                ,DllCall("gdiplus\GdipCreateEffect"
+                        ,(SharpenEffectGuid, &nativeEffect);
             }
             
             Status SetParameters(const SharpenParams *parameters)
@@ -2855,7 +3013,6 @@ Class GDIP
         };
         
     }
-    
 
     
     
@@ -3313,7 +3470,7 @@ Class GDIP
         {
             stat := DllCall("gdiplus\GdipComment"
                            ,this.Ptr    , gp                    ; Graphics pointer
-                           ,"UINT"      , VarSetCapacity(text)  ; Size of text
+                           ,"UInt"      , VarSetCapacity(text)  ; Size of text
                            ,this.Ptr    , text)                 ; Text
             Return stat
         }
@@ -4158,7 +4315,7 @@ Class GDIP
         
         GetHDC()
         {
-            ;VarSetCapacity(HDC, A_PtrSize, 0)
+            ;VarSetCapacity(HDC, A_PtrSize)
             ;last SetStatus(DllExports::GdipGetDC(nativeGraphics, &hdc));
             ;DllCall(""
             ;       , type      , value)
@@ -4878,7 +5035,7 @@ Class GDIP
         
         GetWidth()
         {
-            VarSetCapacity(width, 4, 0)
+            VarSetCapacity(width, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenWidth"
                                    ,this.Ptr    ,this.nativePen
                                    ,"Float"     ,&width) )
@@ -4919,7 +5076,7 @@ Class GDIP
         ; LineCap Getters
         GetStartCap()
         {
-            VarSetCapacity(startCap, 4, 0)
+            VarSetCapacity(startCap, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenstartCap197819"
                                    ,this.Ptr    ,this.nativePen
                                    ,"UInt"      ,&startCap) )
@@ -4928,7 +5085,7 @@ Class GDIP
         
         GetEndCap()
         {
-            VarSetCapacity(endCap, 4, 0)
+            VarSetCapacity(endCap, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenEndCap"
                                    ,this.Ptr    ,this.nativePen
                                    ,"UInt"      ,&endCap) )
@@ -4937,7 +5094,7 @@ Class GDIP
         
         GetDashCap()
         {
-            VarSetCapacity(dashCap, 4, 0)
+            VarSetCapacity(dashCap, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenDashCap197819"
                                    ,this.Ptr    ,this.nativePen
                                    ,"UInt"      ,&dashCap) )
@@ -4947,14 +5104,14 @@ Class GDIP
         ; Line Join
         SetLineJoin(lineJoin)
         {
-            Return SetStatus(DllCall("gdiplus\GdipSetPenLineJoin"
-                                    ,this.Ptr    ,this.nativePen                 
-                                    ,"UInt"      ,lineJoin) )
+            Return this.SetStatus(DllCall("gdiplus\GdipSetPenLineJoin"
+                                         ,this.Ptr    ,this.nativePen                 
+                                         ,"UInt"      ,lineJoin) )
         }
         
         GetLineJoin()
         {
-            VarSetCapacity(lineJoin, 4, 0)
+            VarSetCapacity(lineJoin, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenLineJoin"
                                    ,this.Ptr    ,this.nativePen
                                    ,"UInt"      ,&lineJoin) )
@@ -4973,7 +5130,7 @@ Class GDIP
         
         GetCustomStartCap(ByRef customCap)
         {
-            VarSetCapacity(retPtr, A_PtrSize, 0)
+            VarSetCapacity(retPtr, A_PtrSize)
             , (customCap._type == "CustomLineCap")
                 ? (status := DllCall("gdiplus\GdipGetPenCustomStartCap"
                                     ,this.Ptr    ,nativePen
@@ -4994,7 +5151,7 @@ Class GDIP
         
         GetCustomEndCap(ByRef customCap)
         {
-            VarSetCapacity(retPtr, A_PtrSize, 0)
+            VarSetCapacity(retPtr, A_PtrSize)
             , (customCap._type == "CustomLineCap")
                 ? (status := DllCall("gdiplus\GdipGetPenCustomEndCap"
                                     ,this.Ptr    ,this.nativePen
@@ -5013,7 +5170,7 @@ Class GDIP
         
         GetMiterLimit()
         {
-            VarSetCapacity(miterLimit, 4, 0)
+            VarSetCapacity(miterLimit, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenMiterLimit"
                                    ,this.Ptr    ,this.nativePen
                                    ,"Float"     ,&miterLimit) )
@@ -5029,7 +5186,7 @@ Class GDIP
         
         GetAlignment()
         {
-            VarSetCapacity(penAlignment, 4, 0)
+            VarSetCapacity(penAlignment, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenMode"
                                    ,this.Ptr    ,this.nativePen
                                    ,"Int"       ,&penAlignment) )
@@ -5046,7 +5203,7 @@ Class GDIP
         
         GetTransform(ByRef matrix)
         {
-            VarSetCapacity(retPtr, A_PtrSize, 0)
+            VarSetCapacity(retPtr, A_PtrSize)
             , (matrix._type == "CustomLineCap")
                 ? (status := DllCall("gdiplus\GdipGetPenTransform"
                                     ,this.Ptr    ,this.nativePen
@@ -5097,7 +5254,7 @@ Class GDIP
         
         GetPenType()
         {
-            VarSetCapacity(penType, 4, 0)
+            VarSetCapacity(penType, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenFillType"
                                 ,this.Ptr    ,this.nativePen
                                 ,"UInt"      ,&penType) )
@@ -5107,7 +5264,7 @@ Class GDIP
         SetColor(color)
         {
             Return (color._type == "Color")
-                ? SetStatus(DllCall("gdiplus\GdipSetPenColor"
+                ? this.SetStatus(DllCall("gdiplus\GdipSetPenColor"
                                 ,this.Ptr    ,this.nativePen
                                 ,"UInt"      ,color.GetValue()) )
                 : 2    ; Invalid Parameter
@@ -5116,7 +5273,7 @@ Class GDIP
         SetBrush(brush) ;ptr
         {
             Return (brush._type == "Brush")
-                ? SetStatus(DllCall("gdiplus\GdipSetPenBrushFill"
+                ? this.SetStatus(DllCall("gdiplus\GdipSetPenBrushFill"
                                 ,this.Ptr    ,this.nativePen
                                 ,this.Ptr    ,brush.nativeBrush) )
                 : 2    ; Invalid Parameter
@@ -5128,11 +5285,11 @@ Class GDIP
                 Return 2
             If (color.GetPenType() != 0)
                 Return 8
-            VarSetCapacity(arbg, 4, 0)
+            VarSetCapacity(argb, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenColor"
                                    ,this.Ptr    ,this.nativePen,
                                    ,"UInt"      ,&argb) )
-            (this.lastResult = 0) ? color.SetValue(NumGet(arbg, 0, "UInt")) : ""
+            (this.lastResult = 0) ? color.SetValue(NumGet(argb, 0, "UInt")) : ""
             Return this.lastResult
         }
         
@@ -5146,7 +5303,7 @@ Class GDIP
                     :  (penType = 4) ? new GDIP.LinearGradientBrush()
                     :  0
             
-            ,VarSetCapacity(brushPtr, A_PtrSize, 0)
+            ,VarSetCapacity(brushPtr, A_PtrSize)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenBrushFill"
                                    ,this.Ptr    ,this.nativePen 
                                    ,this.Ptr    ,&brushPtr) )
@@ -5157,7 +5314,7 @@ Class GDIP
         
         GetDashStyle() ; int
         {
-            VarSetCapacity(dashStyle, 4, 0)
+            VarSetCapacity(dashStyle, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenDashStyle"
                                 ,this.Ptr    ,this.nativePen
                                 ,"Int"         ,&dashStyle) )
@@ -5173,7 +5330,7 @@ Class GDIP
         
         GetDashOffset() ; float
         {
-            VarSetCapacity(dashOffset, 4, 0)
+            VarSetCapacity(dashOffset, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenDashOffset"
                                    ,this.Ptr    ,this.nativePen
                                    ,"Float"     ,&dashOffset) )
@@ -5197,7 +5354,7 @@ Class GDIP
         
         GetDashPatternCount()
         {
-            VarSetCapacity(count, 4, 0)
+            VarSetCapacity(count, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenDashCount"
                                 ,this.Ptr    ,this.nativePen
                                 ,"Int"       ,&count) )
@@ -5207,7 +5364,7 @@ Class GDIP
         GetDashPattern(dashArray, count) ; ptr, int
         {
             if (dashArray == 0 || count <= 0)
-                Return SetStatus(2)
+                Return this.SetStatus(2)
             
             Return this.SetStatus(DllCall("gdiplus\GdipGetPenDashArray"
                                 ,this.Ptr    ,this.nativePen
@@ -5225,7 +5382,7 @@ Class GDIP
         
         GetCompoundArrayCount()
         {
-            VarSetCapacity(count, 4, 0)
+            VarSetCapacity(count, 4)
             ,this.SetStatus(DllCall("gdiplus\GdipGetPenCompoundCount"
                                 ,this.Ptr    ,this.nativePen
                                 ,"Int"       ,&count) )
@@ -5276,8 +5433,7 @@ Class GDIP
     ;___________________________________________________________________________________________________________________|
     Class GUID
     {
-        Static _rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
-            , _rgx_hex  := "[\d|A-F|a-f]+"
+        Static rgx_guid := "\{?([\d|A-F|a-f]{8})-?([[\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{4})-?([\d|A-F|a-f]{12})\}?"
         
         _type   := "GUID"
         ,_str   := ""
@@ -5288,14 +5444,12 @@ Class GDIP
             m := ""
             ,(guid = "")
                 ? this.new_guid()
-            : RegExMatch(guid, this._rgx_guid, m)
+            : RegExMatch(guid, this.rgx_guid, m)
                 ? (this._str := "{" m1 "-" m2 "-" m3 "-" m4 "-" m5 "}"
                   ,this._ptr := this.get_pointer(this._str) )
-            : RegExMatch(guid, this._rgx_hex)
+            : (guid+0 < )
                 ? (this._ptr := guid+0
                   ,this._str := this.get_string(this._ptr) )
-            : this.error_log(A_ThisFunc, "Error creating GUID"
-                            ,"GUID String `nPointer to GUID" ,{guid:guid})
         }
         
         ; Return        GUID string if success or a blank string if fail
@@ -5373,200 +5527,6 @@ Class GDIP
     }
     
     
-    
-
-    
-    
-    
-    
-    
-    ; gdiplusmetaheader.h
-    
-    ; Placeable WMFs
-    
-    ; Placeable Metafiles were created as a non-standard way of specifying how 
-    ; a metafile is mapped and scaled on an output device.
-    ; Placeable metafiles are quite wide-spread, but not directly supported by
-    ; the Windows API. To playback a placeable metafile using the Windows API,
-    ; you will first need to strip the placeable metafile header from the file.
-    ; This is typically performed by copying the metafile to a temporary file
-    ; starting at file offset 22 (0x16). The contents of the temporary file may
-    ; then be used as input to the Windows GetMetaFile(), PlayMetaFile(),
-    ; CopyMetaFile(), etc. GDI functions.
-    
-    ; Each placeable metafile begins with a 22-byte header,
-    ;  followed by a standard metafile:
-    
-    ;~ Class ENHMETAHEADER3
-    ;~ {
-        ;~ iType          := 4    ; Record type EMR_HEADER
-        ;~ nSize          := 4    ; Record size in bytes.  This may be greater than the sizeof(ENHMETAHEADER).
-        ;~ rclBounds      := 16   ; Inclusive-inclusive bounds in device units
-        ;~ rclFrame       := 16   ; Inclusive-inclusive Picture Frame .01mm unit
-        ;~ dSignature     := 4    ; Signature.  Must be ENHMETA_SIGNATURE.
-        ;~ nVersion       := 4    ; Version number
-        ;~ nBytes         := 4    ; Size of the metafile in bytes
-        ;~ nRecords       := 4    ; Number of records in the metafile
-        ;~ nHandles       := 2    ; Number of handles in the handle table Handle index zero is reserved.
-        ;~ sReserved      := 2    ; Reserved.  Must be zero.
-        ;~ nDescription   := 4    ; Number of chars in the unicode desc string This is 0 if there is no description string
-        ;~ offDescription := 4    ; Offset to the metafile description record. This is 0 if there is no description string
-        ;~ nPalEntries    := 4    ; Number of entries in the metafile palette.
-        ;~ szlDevice      := 8    ; Size of the reference device in pels
-        ;~ szlMillimeters := 8    ; Size of the reference device in millimeters
-    ;~ }
-    
-    ;~ Class PWMFRect16
-    ;~ {
-        ;~ Static Left   := 2
-        ;~ Static Top    := 2
-        ;~ Static Right  := 2
-        ;~ Static Bottom := 2
-    ;~ }
-    
-    ;~ Class WmfPlaceableFileHeader
-    ;~ {
-        ;~ UINT32          Key         := 4   ; GDIP_WMF_PLACEABLEKEY
-        ;~ INT16           Hmf         := 2   ; Metafile HANDLE number (always 0)
-        ;~ PWMFRect16      BoundingBox := 8   ; Coordinates in metafile units
-        ;~ INT16           Inch        := 2   ; Number of metafile units per inch
-        ;~ UINT32          Reserved    := 4   ; Reserved (always 0)
-        ;~ INT16           Checksum    := 2   ; Checksum value for previous 10 WORDs
-    ;~ } 
-    
-    ; Key contains a special identification value that indicates the presence of a placeable metafile header.
-    ; It is always 0x9AC6CDD7.
-    ; Handle is used to stored the handle of the metafile in memory. When written to disk, this field is not used
-    ; and will always contains the value 0.
-    
-    ; Left, Top, Right, and Bottom contain the coordinates of the upper-left and lower-right corners of the image
-    ; on the output device. These are measured in twips.
-    
-    ; A twip (meaning "twentieth of a point") is the logical unit of measurement used in Windows Metafiles.
-    ; A twip is equal to 1/1440 of an inch. Thus 720 twips equal 1/2 inch, while 32,768 twips is 22.75 inches.
-    
-    ; Inch contains the number of twips per inch used to represent the image. Normally, there are 1440 twips per inch;
-    ; however, this number may be changed to scale the image. A value of 720 indicates that the image is double its normal
-    ; size, or scaled to a factor of 2:1. A value of 360 indicates a scale of 4:1, while a value of 2880 indicates that 
-    ; the image is scaled down in size by a factor of two. A value of 1440 indicates a 1:1 scale ratio.
-    
-    ; Reserved is unused and always set to 0.
-    
-    ; Checksum contains a checksum value for the previous 10 WORDs in the header. This value can be used in an attempt
-    ; to detect if the metafile has become corrupted. The checksum is calculated by XORing each WORD value to an initial
-    ; value of 0.
-    
-    ; If the metafile was recorded with a reference Hdc that was a display.
-    Class MetafileHeader
-    {
-         ;~ _type              := "MetafileHeader"
-        ;~ ,Type               := ""                     ; MetafileType
-        ;~ ,Size               := ""                     ; UINT               ; Size of the metafile (in bytes)
-        ;~ ,Version            := ""                     ; UINT       ; EMF+, EMF, or WMF version
-        ;~ ,EmfPlusFlags       := ""                     ; UINT 
-        ;~ ,DpiX               := ""                     ; REAL 
-        ;~ ,DpiY               := ""                     ; REAL 
-        ;~ ,X                  := ""                     ; INT         ; Bounds in device units
-        ;~ ,Y                  := ""                     ; INT  
-        ;~ ,Width              := ""                     ; INT  
-        ;~ ,Height             := ""                     ; INT  
-        ;~ ,union              := {METAHEADER     : 0
-                               ;~ ,ENHMETAHEADER3 : 0}
-        ;~ ,EmfPlusHeaderSize  :=                        ; INT size of the EMF+ header in file
-        ;~ ,LogicalDpiX        :=                        ; INT Logical Dpi of reference Hdc
-        ;~ ,LogicalDpiY        :=                        ; INT usually valid only for EMF+
-        
-        ;~ MetafileType GetType() const { Return Type; }
-        
-        ;~ UINT GetMetafileSize() const { Return Size; }
-        
-        ;~ ; If IsEmfPlus, this is the EMF+ version; else it is the WMF or EMF ver
-        
-        ;~ UINT GetVersion() const { Return Version; }
-        
-        ;~ ; Get the EMF+ flags associated with the metafile
-        
-        ;~ UINT GetEmfPlusFlags() const { Return EmfPlusFlags; }
-        
-        ;~ REAL GetDpiX() const { Return DpiX; }
-        
-        ;~ REAL GetDpiY() const { Return DpiY; }
-        
-        ;~ VOID GetBounds (OUT Rect *rect) const
-        ;~ {
-            ;~ rect->X = X;
-            ;~ rect->Y = Y;
-            ;~ rect->Width = Width;
-            ;~ rect->Height = Height;
-        ;~ }
-        
-        ;~ ; Is it any type of WMF (standard or Placeable Metafile)?
-        
-        ;~ BOOL IsWmf() const
-        ;~ {
-           ;~ Return ((Type == MetafileTypeWmf) || (Type == MetafileTypeWmfPlaceable));
-        ;~ }
-        
-        ;~ ; Is this an Placeable Metafile?
-        
-        ;~ BOOL IsWmfPlaceable() const { Return (Type == MetafileTypeWmfPlaceable); }
-        
-        ;~ ; Is this an EMF (not an EMF+)?
-        
-        ;~ BOOL IsEmf() const { Return (Type == MetafileTypeEmf); }
-        
-        ;~ ; Is this an EMF or EMF+ file?
-        
-        ;~ BOOL IsEmfOrEmfPlus() const { Return (Type >= MetafileTypeEmf); }
-        
-        ;~ ; Is this an EMF+ file?
-        
-        ;~ BOOL IsEmfPlus() const { Return (Type >= MetafileTypeEmfPlusOnly); }
-        
-        ;~ ; Is this an EMF+ dual (has dual, down-level records) file?
-        
-        ;~ BOOL IsEmfPlusDual() const { Return (Type == MetafileTypeEmfPlusDual); }
-        
-        ;~ ; Is this an EMF+ only (no dual records) file?
-        
-        ;~ BOOL IsEmfPlusOnly() const { Return (Type == MetafileTypeEmfPlusOnly); }
-        
-        ;~ ; If it's an EMF+ file, was it recorded against a display Hdc?
-        
-        ;~ BOOL IsDisplay() const
-        ;~ {
-            ;~ Return (IsEmfPlus() &&
-                    ;~ ((EmfPlusFlags & GDIP_EMFPLUSFLAGS_DISPLAY) != 0));
-        ;~ }
-        
-        ;~ ; Get the WMF header of the metafile (if it is a WMF)
-        
-        ;~ const METAHEADER * GetWmfHeader() const
-        ;~ {
-            ;~ if (IsWmf())
-            ;~ {
-                ;~ Return &WmfHeader;
-            ;~ }
-            ;~ Return NULL;
-        ;~ }
-        
-        ;~ ; Get the EMF header of the metafile (if it is an EMF)
-        
-        ;~ const ENHMETAHEADER3 * GetEmfHeader() const
-        ;~ {
-            ;~ if (IsEmfOrEmfPlus())
-            ;~ {
-                ;~ Return &EmfHeader;
-            ;~ }
-            ;~ Return NULL;
-        ;~ }
-    }
-    
-    
-    
-    ; Imaging.h
-    
-
     
     Class GUI Extends GDIP
     {
@@ -5833,7 +5793,6 @@ data_type_size(type)
     ; Return                                                                                                            |
     ;___________________________________________________________________________________________________________________|
     
-
 
 
 
