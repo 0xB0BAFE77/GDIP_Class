@@ -2575,10 +2575,6 @@ Class GDIP
         
         __New()
         {
-             ;~ this.SetCapacity("_auxData", A_PtrSize)
-            ;~ ,this.SetCapacity("_auxDataSize", 4)
-            ;~ ,this.SetCapacity("_nativeEffect", A_PtrSize)
-            ;~ ,this.SetCapacity("_useAuxData", 4)
              this._nativeEffect := 0                ; Ptr
             ,this._auxData      := 0                ; Ptr
             ,this.SetCapacity("_auxDataSize", 4)    ; Int
@@ -2728,7 +2724,6 @@ Class GDIP
                 Get {
                     Return NumGet(this._ptr, 0, "Float")
                 }
-                
                 Set {
                     NumPut(value, this._ptr, 0, "Float")
                 }
@@ -2739,7 +2734,6 @@ Class GDIP
                 Get {
                     Return NumPut(this._ptr, 4, "Float")
                 }
-                
                 Set {
                     NumPut(value, this._ptr, 4, "Float")
                 }
@@ -2748,11 +2742,10 @@ Class GDIP
             _ptr[]
             {
                 Get {
-                    Static ptr := ""
-                    Return (ptr) ? ptr+0 : (ptr := this.GetAddress("_struct"))+0
+                    
                 }
-                
                 Set {
+                    
                 }
             }
             
@@ -2762,7 +2755,7 @@ Class GDIP
                 ,DllCall("gdiplus\GdipCreateEffect"
                         ,(SharpenEffectGuid, &nativeEffect);
             }
-            
+             
             Status SetParameters(const SharpenParams *parameters)
             {
                 UINT size = sizeof(SharpenParams);
